@@ -1,0 +1,209 @@
+@extends('layouts.app')
+
+@section('title', 'Ubah Perusahaan')
+@section('body_title', 'Ubah Perusahaan')
+
+@section('buttons_beside_title')
+    <a href="{{ route('company.show', $company->unique_id) }}" class="btn btn-outline-secondary">Kembali</a>
+@endsection
+
+@section('content')
+    @include('partials.flash')
+
+    <form action="{{ route('company.update', $company->unique_id) }}" method="POST" class="card" autocomplete="off" id="company-edit-form">
+        @csrf
+        @method('PUT')
+        <div class="card-header">
+            <div>
+                <h3 class="card-title mb-1">Formulir Perusahaan</h3>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="card mb-3 shadow-none border">
+                <div class="card-header py-3">
+                    <div>
+                        <h4 class="card-title mb-1">Informasi Dasar</h4>
+                        <div class="text-muted">Identitas utama dan nomor kontak perusahaan.</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label required">Nama Perusahaan</label>
+                                <input class="form-control" name="name" value="{{ old('name', $company->name) }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label required">Telepon Utama</label>
+                                <input class="form-control" name="phone_1" value="{{ old('phone_1', $company->phone_1 ?? '') }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Telepon Alternatif</label>
+                                <input class="form-control" name="phone_2" value="{{ old('phone_2', $company->phone_2 ?? '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Email</label>
+                                <input class="form-control" type="email" name="email" value="{{ old('email', $company->email ?? '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">NPWP</label>
+                                <input class="form-control" name="tax_id" value="{{ old('tax_id', $company->tax_id ?? '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Nomor Registrasi</label>
+                                <input class="form-control" name="registration_number" value="{{ old('registration_number', $company->registration_number ?? '') }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3 shadow-none border">
+                <div class="card-header py-3">
+                    <div>
+                        <h4 class="card-title mb-1">Kontak Penanggung Jawab</h4>
+                        <div class="text-muted">Data CEO dan PIC yang akan dihubungi.</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Nama CEO</label>
+                                <input class="form-control" name="ceo_name" value="{{ old('ceo_name', $company->ceo_name ?? '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Telepon CEO</label>
+                                <input class="form-control" name="ceo_phone" value="{{ old('ceo_phone', $company->ceo_phone ?? '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Email CEO</label>
+                                <input class="form-control" type="email" name="ceo_email" value="{{ old('ceo_email', $company->ceo_email ?? '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Nama PIC</label>
+                                <input class="form-control" name="pic_name" value="{{ old('pic_name', $company->pic_name ?? '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Telepon PIC</label>
+                                <input class="form-control" name="pic_phone" value="{{ old('pic_phone', $company->pic_phone ?? '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Email PIC</label>
+                                <input class="form-control" type="email" name="pic_email" value="{{ old('pic_email', $company->pic_email ?? '') }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-none border">
+                <div class="card-header py-3">
+                    <div>
+                        <h4 class="card-title mb-1">Alamat Perusahaan</h4>
+                        <div class="text-muted">Tuliskan alamat lengkap perusahaan untuk kebutuhan administrasi.</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label class="form-label required">Alamat</label>
+                                <textarea class="form-control" name="address" rows="3" required>{{ old('address', $company->address) }}</textarea>
+                                <small class="text-muted">Maksimal 255 karakter.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer text-end">
+            <button class="btn btn-primary" type="submit">Perbarui</button>
+        </div>
+    </form>
+@endsection
+
+@push('scripts')
+	<script>
+		$(document).ready(function() {
+			$('#company-edit-form').validate({
+				rules: {
+					name: {
+						required: true,
+						maxlength: 255
+					},
+					address: {
+						required: true,
+						maxlength: 255
+					},
+					email: {
+						email: true,
+						maxlength: 255
+					},
+					ceo_email: {
+						email: true,
+						maxlength: 255
+					},
+					pic_email: {
+						email: true,
+						maxlength: 255
+					}
+				},
+				messages: {
+					name: {
+						required: "Nama perusahaan wajib diisi.",
+						maxlength: "Nama perusahaan tidak boleh lebih dari 255 karakter."
+					},
+					address: {
+						required: "Alamat perusahaan wajib diisi.",
+						maxlength: "Alamat perusahaan tidak boleh lebih dari 255 karakter."
+					},
+					email: {
+						email: "Format email tidak valid.",
+						maxlength: "Email tidak boleh lebih dari 255 karakter."
+					},
+					ceo_email: {
+						email: "Format email CEO tidak valid.",
+						maxlength: "Email CEO tidak boleh lebih dari 255 karakter."
+					},
+					pic_email: {
+						email: "Format email PIC tidak valid.",
+						maxlength: "Email PIC tidak boleh lebih dari 255 karakter."
+					}
+				},
+				errorElement: 'span',
+                errorPlacement: function (error, element) {
+                    error.addClass('invalid-feedback');
+                    element.closest('.form-group').append(error);
+                },
+                highlight: function (element) {
+                    $(element).addClass('is-invalid');
+                },
+                unhighlight: function (element) {
+                    $(element).removeClass('is-invalid');
+                },
+			});
+		});
+	</script>
+@endpush
+Ed
