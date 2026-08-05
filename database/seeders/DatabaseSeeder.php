@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             DockingSpaceSeeder::class,
             InitialSeeder::class,
             NotificationFlagSeeder::class,
+            DummyCompanyShipDockingSeeder::class,
         ]);
 
 

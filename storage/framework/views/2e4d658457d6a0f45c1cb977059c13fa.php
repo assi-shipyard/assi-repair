@@ -23,14 +23,15 @@
 					</thead>
 					<tbody>
 						<?php $__currentLoopData = $ships; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ship): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <?php ($ship_identifier = $ship->unique_id ?? $ship->id); ?>
 							<tr>
 								<td class="text-center fw-semibold"><?php echo e($ship->name); ?></td>
 								<td class="text-center"><?php echo e($ship->company?->name ?? '-'); ?></td>
 								<td class="text-center"><?php echo e($ship->type?->name ?? '-'); ?></td>
 								<td class="text-center"><?php echo e($ship->classification?->name ?? '-'); ?></td>
 								<td class="text-center">
-									<a href="<?php echo e(route('ship.show', $ship->unique_id)); ?>" class="btn btn-sm btn-outline-primary">Lihat</a>
-									<a href="<?php echo e(route('ship.edit', $ship->unique_id)); ?>" class="btn btn-sm btn-outline-secondary">Ubah</a>
+                                    <a href="<?php echo e(route('ship.show', $ship_identifier)); ?>" class="btn btn-sm btn-outline-primary">Lihat</a>
+                                    <a href="<?php echo e(route('ship.edit', $ship_identifier)); ?>" class="btn btn-sm btn-outline-secondary">Ubah</a>
 								</td>
 							</tr>
 						<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>

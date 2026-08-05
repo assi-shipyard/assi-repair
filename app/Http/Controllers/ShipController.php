@@ -7,6 +7,7 @@ use App\Models\Ship;
 use App\Models\ShipClass;
 use App\Models\ShipType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -26,7 +27,7 @@ class ShipController extends Controller
      */
     public function index()
     {
-        $ships = Ship::with(['company', 'type'])->orderBy('name')->get();
+        $ships = Ship::with(['company', 'type', 'classification'])->orderBy('name')->get();
 
         return view('ship.index', compact('ships'));
     }
@@ -231,7 +232,13 @@ class ShipController extends Controller
 
     private function find_ship_by_unique_id(string $unique_id, array $relations = []): Ship
     {
-        return Ship::with($relations)->where('unique_id', $unique_id)->firstOrFail();
+        $query = Ship::with($relations);
+
+        if (Schema::hasColumn('ships', 'unique_id')) {
+            return $query->where('unique_id', $unique_id)->firstOrFail();
+        }
+
+        return $query->whereKey((int) $unique_id)->firstOrFail();
     }
 
     /**

@@ -89,4 +89,19 @@ class Project extends Model
 	{
 		return $this->hasMany(ProjectJobDocument::class, 'project_id');
 	}
+
+	public function docking_requests(): HasMany
+	{
+		return $this->hasMany(ProjectDockingRequest::class, 'project_id');
+	}
+
+	public function docking_occupancies(): HasMany
+	{
+		return $this->hasMany(DockingOccupancy::class, 'project_id');
+	}
+
+	public function floating_repair_histories(): HasMany
+	{
+		return $this->hasMany(FloatingRepairHistory::class, 'project_id');
+	}
 }

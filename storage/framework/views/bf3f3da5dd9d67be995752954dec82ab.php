@@ -111,10 +111,15 @@
                             <tbody>
                                 <?php $__currentLoopData = $documents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $document): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                     <tr>
-                                        <td><?php echo e($document->document_name); ?></td>
-                                        <td><?php echo e($document->document_type); ?></td>
-                                        <td><?php echo e(basename((string) $document->document_path)); ?></td>
-                                        <td class="text-end">
+                                        <td class="text-center"><?php echo e($document->document_name); ?></td>
+                                        <td class="text-center"><?php echo e($document->document_type); ?></td>
+                                        <td class="text-center">
+                                            <a href="<?php echo e(Storage::disk('public')->url($document->document_path)); ?>" target="_blank" rel="noopener noreferrer" class="text-reset">
+                                                <?php echo e(basename((string) $document->document_path)); ?>
+
+                                            </a>
+                                        </td>
+                                        <td class="text-center">
                                             <form action="<?php echo e(route('company.delete-document', [$company->unique_id, $document->id])); ?>" method="POST" onsubmit="return confirm('Hapus dokumen ini?')">
                                                 <?php echo csrf_field(); ?>
                                                 <?php echo method_field('DELETE'); ?>

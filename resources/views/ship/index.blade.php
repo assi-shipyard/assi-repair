@@ -25,14 +25,15 @@
 					</thead>
 					<tbody>
 						@foreach ($ships as $ship)
+                            @php($ship_identifier = $ship->unique_id ?? $ship->id)
 							<tr>
 								<td class="text-center fw-semibold">{{ $ship->name }}</td>
 								<td class="text-center">{{ $ship->company?->name ?? '-' }}</td>
 								<td class="text-center">{{ $ship->type?->name ?? '-' }}</td>
 								<td class="text-center">{{ $ship->classification?->name ?? '-' }}</td>
 								<td class="text-center">
-									<a href="{{ route('ship.show', $ship->unique_id) }}" class="btn btn-sm btn-outline-primary">Lihat</a>
-									<a href="{{ route('ship.edit', $ship->unique_id) }}" class="btn btn-sm btn-outline-secondary">Ubah</a>
+                                    <a href="{{ route('ship.show', $ship_identifier) }}" class="btn btn-sm btn-outline-primary">Lihat</a>
+                                    <a href="{{ route('ship.edit', $ship_identifier) }}" class="btn btn-sm btn-outline-secondary">Ubah</a>
 								</td>
 							</tr>
 						@endforeach

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ship extends Model
 {
@@ -38,5 +39,20 @@ class Ship extends Model
 	public function classification()
 	{
 		return $this->belongsTo(ShipClass::class, 'ship_class_id');
+	}
+
+	public function docking_requests(): HasMany
+	{
+		return $this->hasMany(ProjectDockingRequest::class, 'ship_id');
+	}
+
+	public function docking_occupancies(): HasMany
+	{
+		return $this->hasMany(DockingOccupancy::class, 'ship_id');
+	}
+
+	public function floating_repair_histories(): HasMany
+	{
+		return $this->hasMany(FloatingRepairHistory::class, 'ship_id');
 	}
 }

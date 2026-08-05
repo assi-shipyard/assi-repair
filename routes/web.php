@@ -8,6 +8,7 @@ use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\NotificationSettingController;
+use App\Http\Controllers\DockingManagementController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectJobDocumentPageController;
 use App\Http\Controllers\RoleController;
@@ -167,11 +168,11 @@ Route::middleware('auth')->group(function (): void {
         Route::delete('/{documentId}/jobs/{jobId}/photos/{photoId}', 'destroyPhoto')->name('job.photo.destroy');
     });
 
-    Route::view('/dock', 'examples.placeholder', [
-        'page_title' => 'Data Dok',
-        'body_title' => 'Data Dok',
-        'message' => 'Halaman data dok belum diaktifkan.',
-    ])->name('dock.index');
+    Route::get('/docking-space', [DockingManagementController::class, 'index_docking_space'])->name('docking-space.index');
+    Route::post('/docking-space', [DockingManagementController::class, 'store_docking_space'])->name('docking-space.store');
+    Route::get('/docking-space/{id}/edit', [DockingManagementController::class, 'edit_docking_space'])->name('docking-space.edit');
+    Route::put('/docking-space/{id}', [DockingManagementController::class, 'update_docking_space'])->name('docking-space.update');
+    Route::delete('/docking-space/{id}', [DockingManagementController::class, 'destroy_docking_space'])->name('docking-space.destroy');
 
     Route::view('/ship-type', 'examples.placeholder', [
         'page_title' => 'Data Jenis Kapal',
@@ -191,35 +192,21 @@ Route::middleware('auth')->group(function (): void {
         'message' => 'Halaman data jenis reparasi belum diaktifkan.',
     ])->name('price-dictionary.index');
 
-    Route::view('/docking-space-request/create', 'examples.placeholder', [
-        'page_title' => 'Form Permohonan Docking Space',
-        'body_title' => 'Form Permohonan Docking Space',
-        'message' => 'Form permohonan docking space belum diaktifkan.',
-    ])->name('docking-space-request.create');
+    Route::controller(DockingManagementController::class)->group(function (): void {
+        Route::get('/docking-space-request/create', 'create_request')->name('docking-space-request.create');
+        Route::post('/docking-space-request', 'store_request')->name('docking-space-request.store');
+        Route::get('/docking-space-request', 'index_request')->name('docking-space-request.index');
+        Route::post('/docking-space-request/{request_id}/evaluate', 'evaluate_request')->name('docking-space-request.evaluate');
+        Route::post('/docking-space-request/{request_id}/review', 'review_request')->name('docking-space-request.review');
+        Route::post('/docking-space-request/{request_id}/start-docking', 'start_docking')->name('docking-space-request.start-docking');
 
-    Route::view('/docking-space-request', 'examples.placeholder', [
-        'page_title' => 'Daftar Permohonan Docking Space',
-        'body_title' => 'Daftar Permohonan Docking Space',
-        'message' => 'Daftar permohonan docking space belum diaktifkan.',
-    ])->name('docking-space-request.index');
+        Route::get('/docking-space-availability', 'docking_space_availability')->name('docking-space-availability');
 
-    Route::view('/docking-space-availability', 'examples.placeholder', [
-        'page_title' => 'Ketersediaan Docking Space',
-        'body_title' => 'Ketersediaan Docking Space',
-        'message' => 'Halaman ketersediaan docking space belum diaktifkan.',
-    ])->name('docking-space-availability');
-
-    Route::view('/ship-docking/current', 'examples.placeholder', [
-        'page_title' => 'Docking Kapal Sekarang',
-        'body_title' => 'Docking Kapal Sekarang',
-        'message' => 'Halaman docking kapal sekarang belum diaktifkan.',
-    ])->name('ship-docking.index.current');
-
-    Route::view('/ship-docking/history', 'examples.placeholder', [
-        'page_title' => 'Riwayat Docking Kapal',
-        'body_title' => 'Riwayat Docking Kapal',
-        'message' => 'Halaman riwayat docking kapal belum diaktifkan.',
-    ])->name('ship-docking.history');
+        Route::get('/ship-docking/current', 'current_docking')->name('ship-docking.index.current');
+        Route::get('/ship-docking/history', 'docking_history')->name('ship-docking.history');
+        Route::post('/ship-docking/occupancy/{occupancy_id}/undock-to-floating', 'undock_to_floating')->name('ship-docking.undock-to-floating');
+        Route::post('/ship-docking/occupancy/{occupancy_id}/complete-floating', 'complete_floating')->name('ship-docking.complete-floating');
+    });
 
     Route::view('/division', 'examples.placeholder', [
         'page_title' => 'Data Divisi',

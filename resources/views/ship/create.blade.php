@@ -10,7 +10,7 @@
 @section('content')
     @include('partials.flash')
 
-    <form action="{{ route('ship.store') }}" method="POST" class="card">
+    <form action="{{ route('ship.store') }}" method="POST" class="card" id="ship-form">
         @csrf
         <div class="card-header">
             <div>
@@ -99,35 +99,35 @@
                     <div class="row g-3">
                         <div class="col-md-3">
 							<label class="form-label">LOA</label>
-							<input class="form-control" name="length_overall" value="{{ old('length_overall') }}" required>
+							<input class="form-control" name="length_overall" id="length_overall" value="{{ old('length_overall') }}" required>
 						</div>
                         <div class="col-md-3">
 							<label class="form-label">Breadth</label>
-							<input class="form-control" name="breadth" value="{{ old('breadth') }}" required>
+							<input class="form-control" name="breadth" id="breadth" value="{{ old('breadth') }}" required>
 						</div>
                         <div class="col-md-3">
 							<label class="form-label">Height</label>
-							<input class="form-control" name="height" value="{{ old('height') }}" required>
+							<input class="form-control" name="height" id="height" value="{{ old('height') }}" required>
 						</div>
                         <div class="col-md-3">
 							<label class="form-label">Gross Tonnage</label>
-							<input class="form-control" name="gross_tonnage" value="{{ old('gross_tonnage') }}" required>
+							<input class="form-control" name="gross_tonnage" id="gross_tonnage" value="{{ old('gross_tonnage') }}" required>
 						</div>
                         <div class="col-md-3">
 							<label class="form-label">Draft Kosong</label>
-							<input class="form-control" name="empty_draft" value="{{ old('empty_draft') }}">
+							<input class="form-control" name="empty_draft" id="empty_draft" value="{{ old('empty_draft') }}">
 						</div>
                         <div class="col-md-3">
 							<label class="form-label">Draft Muat</label>
-							<input class="form-control" name="loaded_draft" value="{{ old('loaded_draft') }}">
+							<input class="form-control" name="loaded_draft" id="loaded_draft" value="{{ old('loaded_draft') }}">
 						</div>
                         <div class="col-md-3">
 							<label class="form-label">Net Tonnage</label>
-							<input class="form-control" name="net_tonnage" value="{{ old('net_tonnage') }}">
+							<input class="form-control" name="net_tonnage" id="net_tonnage" value="{{ old('net_tonnage') }}">
 						</div>
                         <div class="col-md-3">
 							<label class="form-label">Tahun Pembuatan</label>
-							<input class="form-control" type="date" name="build_year" value="{{ old('build_year') }}">
+							<input class="form-control" type="date" name="build_year" id="build_year" value="{{ old('build_year') }}">
 						</div>
                     </div>
                 </div>
@@ -144,40 +144,82 @@
                     <div class="row g-3">
                         <div class="col-md-6">
 							<label class="form-label">Merek Mesin</label>
-							<input class="form-control" name="engine_brand" value="{{ old('engine_brand') }}">
+							<input class="form-control" name="engine_brand" id="engine_brand" value="{{ old('engine_brand') }}">
 						</div>
                         <div class="col-md-6">
 							<label class="form-label">Model Mesin</label>
-							<input class="form-control" name="engine_model" value="{{ old('engine_model') }}">
+							<input class="form-control" name="engine_model" id="engine_model" value="{{ old('engine_model') }}">
 						</div>
                         <div class="col-md-4">
 							<label class="form-label">Daya Mesin</label>
-							<input class="form-control" name="engine_power" value="{{ old('engine_power') }}">
+							<input class="form-control" name="engine_power" id="engine_power" value="{{ old('engine_power') }}">
 						</div>
                         <div class="col-md-4">
 							<label class="form-label">Tipe Mesin</label>
-							<input class="form-control" name="engine_type" value="{{ old('engine_type') }}">
+							<input class="form-control" name="engine_type" id="engine_type" value="{{ old('engine_type') }}">
 						</div>
                         <div class="col-md-4">
 							<label class="form-label">RPM Mesin</label>
-							<input class="form-control" name="engine_rpm" value="{{ old('engine_rpm') }}">
+							<input class="form-control" name="engine_rpm" id="engine_rpm" value="{{ old('engine_rpm') }}">
 						</div>
                         <div class="col-md-6">
 							<label class="form-label">Tipe BBM</label>
-							<input class="form-control" name="engine_fuel_type" value="{{ old('engine_fuel_type') }}">
+							<input class="form-control" name="engine_fuel_type" id="engine_fuel_type" value="{{ old('engine_fuel_type') }}">
 						</div>
                         <div class="col-md-3">
 							<label class="form-label">Kapasitas BBM</label>
-							<input class="form-control" name="engine_fuel_capacity" value="{{ old('engine_fuel_capacity') }}">
+							<input class="form-control" name="engine_fuel_capacity" id="engine_fuel_capacity" value="{{ old('engine_fuel_capacity') }}">
 						</div>
                         <div class="col-md-3">
 							<label class="form-label">Konsumsi BBM</label>
-							<input class="form-control" name="engine_fuel_consumption" value="{{ old('engine_fuel_consumption') }}">
+							<input class="form-control" name="engine_fuel_consumption" id="engine_fuel_consumption" value="{{ old('engine_fuel_consumption') }}">
 						</div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="card-footer text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
+        <div class="card-footer text-end">
+			<button class="btn btn-primary" type="submit">Simpan</button>
+		</div>
     </form>
 @endsection
+
+
+@push('scripts')
+	<script>
+		$(document).ready(function() {
+			$('#ship-form').validate({
+				rules: {
+					name: {
+						required: true,
+						minlength: 3,
+						maxlength: 255
+					},
+					company_id: {
+						required: true,
+					},
+					ship_type_id: {
+						required: true,
+					},
+					ship_class_id: {
+						required: true,
+					}
+				},
+				messages: {
+
+				},
+				errorElement: 'span',
+                errorPlacement: function (error, element) {
+                    error.addClass('invalid-feedback');
+                    element.closest('.form-group').append(error);
+                },
+                highlight: function (element) {
+                    $(element).addClass('is-invalid');
+                },
+                unhighlight: function (element) {
+                    $(element).removeClass('is-invalid');
+                },
+			});
+		});
+	</script>
+@endpush
