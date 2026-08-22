@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DockingSpace extends Model
 {
+    use HasPublicUniqueId;
+
     protected $table = 'docking_spaces';
 
     protected $fillable = [
+        'unique_id',
         'name',
         'max_draft',
         'max_tonnage',
@@ -24,6 +28,7 @@ class DockingSpace extends Model
     ];
 
     protected $casts = [
+        'unique_id' => 'string',
         'max_length' => 'decimal:2',
         'max_width' => 'decimal:2',
         'max_weight' => 'decimal:2',

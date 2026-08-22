@@ -174,7 +174,7 @@
                                             <h6 class="dropdown-header">Entitas Utama</h6>
                                             <a href="<?php echo e(route('company.index')); ?>" class="dropdown-item">Data Perusahaan</a>
                                             <a href="<?php echo e(route('ship.index')); ?>" class="dropdown-item">Data Kapal</a>
-                                            <a href="<?php echo e(route('dock.index')); ?>" class="dropdown-item">Data Dok</a>
+                                            <a href="<?php echo e(route('docking-space.index')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space.index') ? 'active' : ''); ?>">Data Dok</a>
 
                                             <div class="dropdown-divider"></div>
 
@@ -209,16 +209,20 @@
                             <div class="dropdown-menu">
                                 <div class="dropdown-menu-columns">
                                     <div class="dropdown-menu-column">
-                                            <h6 class="dropdown-header">Docking Space</h6>
-                                            <a href="<?php echo e(route('docking-space-request.create')); ?>" class="dropdown-item">Form Permohonan Docking Space</a>
-                                            <a href="<?php echo e(route('docking-space-request.index')); ?>" class="dropdown-item">Daftar Permohonan Docking Space</a>
-                                            <a href="<?php echo e(route('docking-space-availability')); ?>" class="dropdown-item">Ketersediaan Docking Space</a>
+                                            <h6 class="dropdown-header">Docking Request</h6>
+                                            <a href="<?php echo e(route('docking-space-request.create')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space-request.create') ? 'active' : ''); ?>">Buat Docking Request</a>
+                                            <a href="<?php echo e(route('docking-space-request.index')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space-request.index') ? 'active' : ''); ?>">Daftar Docking Request</a>
+
+                                            <div class="dropdown-divider"></div>
+
+                                            <h6 class="dropdown-header">Docking Schedule</h6>
+                                            <a href="<?php echo e(route('docking-space-availability')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space-availability') ? 'active' : ''); ?>">Docking Schedule (Gantt)</a>
 
                                             <div class="dropdown-divider"></div>
 
                                             <h6 class="dropdown-header">Pelaksanaan</h6>
-                                            <a href="<?php echo e(route('ship-docking.index.current')); ?>" class="dropdown-item">Docking Kapal Sekarang</a>
-                                            <a href="<?php echo e(route('ship-docking.history')); ?>" class="dropdown-item">Riwayat Docking Kapal</a>
+                                            <a href="<?php echo e(route('ship-docking.index.current')); ?>" class="dropdown-item <?php echo e(request()->routeIs('ship-docking.index.current') ? 'active' : ''); ?>">Docking Aktif</a>
+                                            <a href="<?php echo e(route('ship-docking.history')); ?>" class="dropdown-item <?php echo e(request()->routeIs('ship-docking.history') ? 'active' : ''); ?>">Riwayat Docking</a>
                                     </div>
                                 </div>
                             </div>
@@ -293,6 +297,7 @@
                                             <h6 class="dropdown-header">Pengaturan Sistem</h6>
                                             <a href="<?php echo e(route('notification-flag.index')); ?>" class="dropdown-item">Tipe Notifikasi (Flags)</a>
                                             <a href="<?php echo e(route('notification-settings.index')); ?>" class="dropdown-item">Pengaturan Notifikasi</a>
+                                            <a href="<?php echo e(route('audit-log.index')); ?>" class="dropdown-item">Audit Log</a>
                                         </div>
                                     </div>
                                 </div>

@@ -38,7 +38,7 @@
                             <td><span class="badge bg-azure-lt">{{ strtoupper($occupancy->occupancy_status) }}</span></td>
                             <td>
                                 @if ($can_manage_docking)
-                                    <form method="POST" action="{{ route('ship-docking.undock-to-floating', $occupancy->id) }}" class="d-flex flex-column gap-2 js-undock-floating-form">
+                                    <form method="POST" action="{{ route('ship-docking.undock-to-floating', $occupancy->unique_id ?? $occupancy->id) }}" class="d-flex flex-column gap-2 js-undock-floating-form">
                                         @csrf
                                         <input type="datetime-local" class="form-control form-control-sm" name="undocked_at" required>
                                         <input type="datetime-local" class="form-control form-control-sm" name="floating_started_at">

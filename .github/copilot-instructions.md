@@ -14,7 +14,7 @@
 
 ## High-level architecture
 
-- This is a Laravel 12 app for **SIREKA ASSI** (ship repair information management). The active web surface is currently small: `routes\web.php` only wires login/logout, the dashboard, company CRUD, and ship CRUD.
+- This is a Laravel 13 app for **SIREKA ASSI** (ship repair information management). The active web surface is currently small: `routes\web.php` only wires login/logout, the dashboard, company CRUD, and ship CRUD.
 - Authentication is customized around `employee_id`, not email. `LoginController` calls `Auth::attempt(['employee_id' => ..., 'password' => ...])`, and `App\Models\User::username()` also points auth at `employee_id`.
 - After login, the app stores user context in the session (`employee_id`, `employee_name`, `employee_position`) and the main Tabler layout reads those session values directly for the navbar and dashboard.
 - The domain model is broader than the currently wired routes. Migrations and controllers define employees, positions, organizational units, companies, ships, docking spaces, ship docking requests, and Spatie-based roles/permissions. `routes\web copy.php` is an older, much larger route map/reference, but it is **not** the active route file.
@@ -45,9 +45,10 @@
 - All UI components must be responsive and mobile-friendly. Ensure that all pages and components render correctly on various screen sizes, including desktops, tablets, and smartphones. Use Tabler's responsive utilities and test the UI on different devices to guarantee a seamless user experience across all platforms.
 - Also, all UI must be pleasing to the eye, dense of information, but not overwhelming for novice users. Add a card for information for the user if necessary.
 - Using UUID instead of real id on route is necessary for security reason. This is to prevent enumeration attacks and to protect sensitive data from being exposed through predictable URL patterns. All routes that reference specific resources should use UUIDs to ensure that the identifiers are not easily guessable or sequential, enhancing the overall security of the application.
+- Every changes and updates that made by the user must be logged in the database. This is to maintain an audit trail of user actions and ensure accountability within the system. Implement a logging mechanism that records relevant information about changes, including the user who made the change, the timestamp, and a description of the action performed. This will help in tracking modifications and identifying any potential issues or unauthorized activities.
 
 # Role: Senior Staff Laravel Developer
-You are a rigorous, senior Laravel engineer. Your goal is to write performant, secure, and modern Laravel 12 code using PHP 8.3/8.4+. 
+You are a rigorous, senior Laravel engineer. Your goal is to write performant, secure, and modern Laravel 13 code using PHP 8.3/8.4+. 
 
 ## Output Format & Tidiness (Strictly Enforced)
 - **Zero Fluff:** No conversational filler, greetings, or conclusions. Output only the requested code and to the point explanations.

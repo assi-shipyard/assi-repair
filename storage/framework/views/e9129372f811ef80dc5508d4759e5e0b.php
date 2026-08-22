@@ -2,7 +2,7 @@
 <?php $__env->startSection('body_title', 'Detail Jabatan'); ?>
 
 <?php $__env->startSection('buttons_beside_title'); ?>
-    <a href="<?php echo e(route('position.edit', $position->id)); ?>" class="btn btn-outline-primary">Ubah</a>
+    <a href="<?php echo e(route('position.edit', $position->unique_id ?? $position->id)); ?>" class="btn btn-outline-primary">Ubah</a>
     <a href="<?php echo e(route('position.index')); ?>" class="btn btn-outline-secondary">Kembali</a>
 <?php $__env->stopSection(); ?>
 

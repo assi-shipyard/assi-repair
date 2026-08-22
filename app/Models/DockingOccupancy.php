@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,9 +10,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DockingOccupancy extends Model
 {
+    use HasPublicUniqueId;
+
     protected $table = 'docking_occupancies';
 
     protected $fillable = [
+        'unique_id',
         'project_id',
         'ship_id',
         'docking_space_id',
@@ -25,6 +29,7 @@ class DockingOccupancy extends Model
     ];
 
     protected $casts = [
+        'unique_id' => 'string',
         'docked_at' => 'datetime',
         'estimated_undock_at' => 'datetime',
         'undocked_at' => 'datetime',

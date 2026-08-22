@@ -47,8 +47,8 @@
                                             <td class="text-center"><?php echo e($organizational_unit->name); ?></td>
                                             <td class="text-center"><?php echo e($organizational_unit->parent?->name ?? '-'); ?></td>
                                             <td class="text-center">
-                                                <a href="<?php echo e(route('organizational-unit.show', $organizational_unit->id)); ?>" class="btn btn-sm btn-outline-primary">Lihat</a>
-                                                <a href="<?php echo e(route('organizational-unit.edit', $organizational_unit->id)); ?>" class="btn btn-sm btn-outline-secondary">Ubah</a>
+                                                <a href="<?php echo e(route('organizational-unit.show', $organizational_unit->unique_id ?? $organizational_unit->id)); ?>" class="btn btn-sm btn-outline-primary">Lihat</a>
+                                                <a href="<?php echo e(route('organizational-unit.edit', $organizational_unit->unique_id ?? $organizational_unit->id)); ?>" class="btn btn-sm btn-outline-secondary">Ubah</a>
                                             </td>
                                         </tr>
                                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>

@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProjectDocumentJobMaterial extends Model
 {
+    use HasPublicUniqueId;
+
     protected $table = 'project_document_job_materials';
 
     protected $fillable = [
+        'unique_id',
         'project_document_job_id',
         'material_name',
         'volume',
@@ -26,6 +30,7 @@ class ProjectDocumentJobMaterial extends Model
     protected function casts(): array
     {
         return [
+            'unique_id' => 'string',
             'project_document_job_id' => 'integer',
             'volume' => 'decimal:4',
             'density' => 'decimal:6',

@@ -49,8 +49,8 @@
                                             <td class="text-center">{{ $organizational_unit->name }}</td>
                                             <td class="text-center">{{ $organizational_unit->parent?->name ?? '-' }}</td>
                                             <td class="text-center">
-                                                <a href="{{ route('organizational-unit.show', $organizational_unit->id) }}" class="btn btn-sm btn-outline-primary">Lihat</a>
-                                                <a href="{{ route('organizational-unit.edit', $organizational_unit->id) }}" class="btn btn-sm btn-outline-secondary">Ubah</a>
+                                                <a href="{{ route('organizational-unit.show', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-primary">Lihat</a>
+                                                <a href="{{ route('organizational-unit.edit', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-secondary">Ubah</a>
                                             </td>
                                         </tr>
                                     @endforeach

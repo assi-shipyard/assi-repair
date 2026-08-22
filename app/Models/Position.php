@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Position extends Model
 {
+    use HasPublicUniqueId;
+
     public const CATEGORY_LEVELS = [
         'director' => 1,
         'manager' => 2,
@@ -25,12 +28,17 @@ class Position extends Model
     ];
 
     protected $fillable = [
+        'unique_id',
         'name',
         'level',
         'category',
         'is_head_position',
         'code',
         'organizational_unit_id',
+    ];
+
+    protected $casts = [
+        'unique_id' => 'string',
     ];
 
     public function organizational_unit(): BelongsTo

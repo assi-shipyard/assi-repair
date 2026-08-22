@@ -27,20 +27,18 @@
         </div>
 
         <div class="d-none flex-sm-fill d-sm-flex align-items-sm-center justify-content-sm-between">
-            <div>
-                <p class="small text-muted">
-                    <?php echo __('Showing'); ?>
+            <div class="small text-muted">
+                <?php echo __('Showing'); ?>
 
-                    <span class="fw-semibold"><?php echo e($paginator->firstItem()); ?></span>
-                    <?php echo __('to'); ?>
+                <span class="fw-semibold"><?php echo e($paginator->firstItem()); ?></span>
+                <?php echo __('to'); ?>
 
-                    <span class="fw-semibold"><?php echo e($paginator->lastItem()); ?></span>
-                    <?php echo __('of'); ?>
+                <span class="fw-semibold"><?php echo e($paginator->lastItem()); ?></span>
+                <?php echo __('of'); ?>
 
-                    <span class="fw-semibold"><?php echo e($paginator->total()); ?></span>
-                    <?php echo __('results'); ?>
+                <span class="fw-semibold"><?php echo e($paginator->total()); ?></span>
+                <?php echo __('results'); ?>
 
-                </p>
             </div>
 
             <div>

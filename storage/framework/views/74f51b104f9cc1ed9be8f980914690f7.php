@@ -1,3 +1,5 @@
+
+
 <?php $__env->startSection('title', __('Too Many Requests')); ?>
 <?php $__env->startSection('code', '429'); ?>
 <?php $__env->startSection('message', __('Too Many Requests')); ?>

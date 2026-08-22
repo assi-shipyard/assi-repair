@@ -31,7 +31,7 @@
                 </div>
 
                 <div class="card-body">
-                    <form method="POST" action="{{ $editing_space ? route('docking-space.update', $editing_space->id) : route('docking-space.store') }}">
+                    <form method="POST" action="{{ $editing_space ? route('docking-space.update', $editing_space->unique_id ?? $editing_space->id) : route('docking-space.store') }}">
                         @csrf
                         @if ($editing_space)
                             @method('PUT')
@@ -231,11 +231,11 @@
                                             @endif
 
                                             <div class="mt-3 d-flex gap-2">
-                                                <a href="{{ route('docking-space.edit', $space->id) }}" class="btn btn-sm btn-outline-primary">
+                                                <a href="{{ route('docking-space.edit', $space->unique_id ?? $space->id) }}" class="btn btn-sm btn-outline-primary">
                                                     Ubah
                                                 </a>
 
-                                                <form method="POST" action="{{ route('docking-space.destroy', $space->id) }}" onsubmit="return confirm('Hapus docking space ini?');">
+                                                <form method="POST" action="{{ route('docking-space.destroy', $space->unique_id ?? $space->id) }}" onsubmit="return confirm('Hapus docking space ini?');">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-sm btn-outline-danger">

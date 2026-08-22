@@ -45,16 +45,16 @@ class PositionController extends Controller
         return redirect()->route('position.index')->with('success', 'Jabatan berhasil ditambahkan.');
     }
 
-    public function show(int $id): View
+    public function show(string $position): View
     {
-        $position = Position::with(['organizational_unit.parent', 'employees'])->findOrFail($id);
+        $position = $this->find_position($position, ['organizational_unit.parent', 'employees']);
 
         return view('position.show', compact('position'));
     }
 
-    public function edit(int $id): View
+    public function edit(string $position): View
     {
-        $position = Position::findOrFail($id);
+        $position = $this->find_position($position);
 
         $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'directorate', 'division', 'subdivision', 'workshop')")
             ->orderBy('name')
@@ -64,11 +64,11 @@ class PositionController extends Controller
         return view('position.edit', compact('position', 'organizational_units', 'category_options'));
     }
 
-    public function update(Request $request, int $id): RedirectResponse
+    public function update(Request $request, string $position): RedirectResponse
     {
-        $position = Position::findOrFail($id);
+        $position = $this->find_position($position);
 
-        $validation = Validator::make($request->all(), $this->rules($id), $this->messages());
+        $validation = Validator::make($request->all(), $this->rules($position->id), $this->messages());
 
         if ($validation->fails()) {
             return back()->withErrors($validation)->withInput();
@@ -79,9 +79,9 @@ class PositionController extends Controller
         return redirect()->route('position.index')->with('success', 'Jabatan berhasil diperbarui.');
     }
 
-    public function destroy(int $id): RedirectResponse
+    public function destroy(string $position): RedirectResponse
     {
-        $position = Position::withCount('employees')->findOrFail($id);
+        $position = $this->find_position($position, [], true);
 
         if ($position->employees_count > 0) {
             return back()->with('error', 'Jabatan tidak dapat dihapus karena masih dipakai oleh karyawan.');
@@ -129,5 +129,20 @@ class PositionController extends Controller
         $validated['level'] = Position::level_for_category($validated['category']);
 
         return $validated;
+    }
+
+    private function find_position(string $position, array $relations = [], bool $with_employee_count = false): Position
+    {
+        $query = Position::query()->with($relations);
+
+        if ($with_employee_count) {
+            $query->withCount('employees');
+        }
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $position) === 1) {
+            return $query->where('unique_id', $position)->firstOrFail();
+        }
+
+        return $query->findOrFail((int) $position);
     }
 }

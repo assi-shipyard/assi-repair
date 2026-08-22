@@ -52,7 +52,7 @@
                             </td>
                             <td>
                                 @if ($can_manage_docking && $floating && $floating->floating_status === 'active')
-                                    <form method="POST" action="{{ route('ship-docking.complete-floating', $history->id) }}" class="d-flex flex-column gap-2 js-complete-floating-form">
+                                    <form method="POST" action="{{ route('ship-docking.complete-floating', $history->unique_id ?? $history->id) }}" class="d-flex flex-column gap-2 js-complete-floating-form">
                                         @csrf
                                         <input type="datetime-local" class="form-control form-control-sm" name="floating_completed_at" required>
                                         <input type="text" class="form-control form-control-sm" name="notes" placeholder="Catatan penyelesaian floating repair">

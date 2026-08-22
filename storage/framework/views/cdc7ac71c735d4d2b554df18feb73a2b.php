@@ -18,6 +18,24 @@ Laravel <?php echo e(app()->version()); ?>
 
 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
 
+<?php if($exception->previousExceptions()->isNotEmpty()): ?>
+## Previous <?php echo e(\Illuminate\Support\Str::plural('exception', $exception->previousExceptions()->count())); ?>
+
+<?php $__currentLoopData = $exception->previousExceptions(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $previous): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+
+### <?php echo e($index + 1); ?>. <?php echo e($previous->class()); ?>
+
+
+<?php echo $previous->message(); ?>
+
+
+<?php $__currentLoopData = $previous->frames(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $frame): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+<?php echo e($index); ?> - <?php echo e($frame->file()); ?>:<?php echo e($frame->line()); ?>
+
+<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+<?php endif; ?>
+
 ## Request
 
 <?php echo e($exception->request()->method()); ?> <?php echo e(\Illuminate\Support\Str::start($exception->request()->path(), '/')); ?>

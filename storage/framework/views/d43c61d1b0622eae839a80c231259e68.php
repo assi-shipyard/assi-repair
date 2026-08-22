@@ -17,4 +17,4 @@
         </ul>
     </nav>
 <?php endif; ?>
-<?php /**PATH D:\wamp64\www\assi-repair\vendor\laravel\framework\src\Illuminate\Pagination\resources\views\simple-default.blade.php ENDPATH**/ ?>
+<?php /**PATH D:\wamp64\www\assi-repair\vendor\laravel\framework\src\Illuminate\Pagination\resources\views\simple-bootstrap-3.blade.php ENDPATH**/ ?>

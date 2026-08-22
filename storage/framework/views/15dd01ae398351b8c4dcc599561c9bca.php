@@ -163,6 +163,29 @@
 <?php unset($__componentOriginal92c1a431b4816bac5d5a20d0fc1238ab); ?>
 <?php endif; ?>
 
+        <?php if($exception->previousExceptions()->isNotEmpty()): ?>
+            <?php if (isset($component)) { $__componentOriginal57933e9e29ce1ea934dd1d7d96c0d62e = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal57933e9e29ce1ea934dd1d7d96c0d62e = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'laravel-exceptions-renderer::components.previous-exceptions','data' => ['exception' => $exception]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('laravel-exceptions-renderer::previous-exceptions'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['exception' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($exception)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal57933e9e29ce1ea934dd1d7d96c0d62e)): ?>
+<?php $attributes = $__attributesOriginal57933e9e29ce1ea934dd1d7d96c0d62e; ?>
+<?php unset($__attributesOriginal57933e9e29ce1ea934dd1d7d96c0d62e); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal57933e9e29ce1ea934dd1d7d96c0d62e)): ?>
+<?php $component = $__componentOriginal57933e9e29ce1ea934dd1d7d96c0d62e; ?>
+<?php unset($__componentOriginal57933e9e29ce1ea934dd1d7d96c0d62e); ?>
+<?php endif; ?>
+        <?php endif; ?>
+
         <?php if (isset($component)) { $__componentOriginalb73d2d8821ad40718c243f895ec0c546 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalb73d2d8821ad40718c243f895ec0c546 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'laravel-exceptions-renderer::components.query','data' => ['queries' => $exception->applicationQueries()]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>

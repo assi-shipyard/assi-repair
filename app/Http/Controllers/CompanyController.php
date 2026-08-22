@@ -387,9 +387,7 @@ class CompanyController extends Controller
             return $this->company_not_found_redirect();
         }
 
-        $document = CompanyDocument::where('id', $documentId)
-            ->where('company_id', $company->id)
-            ->first();
+        $document = $this->find_company_document($company->id, (string) $documentId);
 
         if (! $document) {
             return redirect()->route('company.show', $company->unique_id)->with('error', 'Dokumen tidak ditemukan.');
@@ -404,6 +402,17 @@ class CompanyController extends Controller
     private function find_company(string $unique_id): ?Company
     {
         return Company::query()->firstWhere('unique_id', $unique_id);
+    }
+
+    private function find_company_document(int $company_id, string $document_id): ?CompanyDocument
+    {
+        $query = CompanyDocument::query()->where('company_id', $company_id);
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $document_id) === 1) {
+            return $query->where('unique_id', $document_id)->first();
+        }
+
+        return $query->whereKey((int) $document_id)->first();
     }
 
     private function back_with_validation(\Illuminate\Contracts\Validation\Validator $validation)

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class OrganizationalUnit extends Model
 {
+    use HasPublicUniqueId;
+
     protected $fillable = [
+        'unique_id',
         'name',
         'code',
         'type',
@@ -17,6 +21,7 @@ class OrganizationalUnit extends Model
     ];
 
     protected $casts = [
+        'unique_id' => 'string',
         'parent_id' => 'integer',
     ];
 

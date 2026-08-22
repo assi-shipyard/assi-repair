@@ -4,7 +4,7 @@
 @section('body_title', 'Detail Jabatan')
 
 @section('buttons_beside_title')
-    <a href="{{ route('position.edit', $position->id) }}" class="btn btn-outline-primary">Ubah</a>
+    <a href="{{ route('position.edit', $position->unique_id ?? $position->id) }}" class="btn btn-outline-primary">Ubah</a>
     <a href="{{ route('position.index') }}" class="btn btn-outline-secondary">Kembali</a>
 @endsection
 

@@ -21,7 +21,7 @@
 <div class="card mb-4">
     <div class="card-header"><h3 class="card-title mb-0">Tambah Pekerjaan</h3></div>
     <div class="card-body">
-        <form action="{{ route('project.job-document.workflow.job.store', [$project->unique_id, $document->id]) }}" method="POST">
+        <form action="{{ route('project.job-document.workflow.job.store', [$project->unique_id, $document->unique_id ?? $document->id]) }}" method="POST">
             @csrf
             <div class="row g-3">
                 <div class="col-md-4"><input class="form-control" name="job_name" placeholder="Nama pekerjaan" required></div>
@@ -52,7 +52,7 @@
                         <td>{{ $job->progress_percent ?? 0 }}%</td>
                         <td>{{ $job->status ?? '-' }}</td>
                         <td>
-                            <a href="{{ route('project.job-document.workflow.job.photos', [$project->unique_id, $document->id, $job->id]) }}" class="btn btn-sm btn-outline-primary">Foto</a>
+                            <a href="{{ route('project.job-document.workflow.job.photos', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id]) }}" class="btn btn-sm btn-outline-primary">Foto</a>
                         </td>
                     </tr>
                     <tr>
@@ -63,7 +63,7 @@
                                 <div class="col-md-2"><input class="form-control form-control-sm" form="material-form-{{ $job->id }}" name="price" placeholder="Harga"></div>
                                 <div class="col-md-2"><input class="form-control form-control-sm" form="material-form-{{ $job->id }}" name="currency" placeholder="IDR"></div>
                                 <div class="col-md-2">
-                                    <form id="material-form-{{ $job->id }}" action="{{ route('project.job-document.workflow.material.store', [$project->unique_id, $document->id, $job->id]) }}" method="POST">
+                                    <form id="material-form-{{ $job->id }}" action="{{ route('project.job-document.workflow.material.store', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id]) }}" method="POST">
                                         @csrf
                                         <button class="btn btn-sm btn-outline-primary w-100" type="submit">Tambah Material</button>
                                     </form>

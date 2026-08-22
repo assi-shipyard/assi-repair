@@ -2,13 +2,13 @@
 <?php $__env->startSection('body_title', 'Ubah Unit Organisasi'); ?>
 
 <?php $__env->startSection('buttons_beside_title'); ?>
-    <a href="<?php echo e(route('organizational-unit.show', $organizational_unit->id)); ?>" class="btn btn-outline-secondary">Kembali</a>
+    <a href="<?php echo e(route('organizational-unit.show', $organizational_unit->unique_id ?? $organizational_unit->id)); ?>" class="btn btn-outline-secondary">Kembali</a>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('content'); ?>
     <?php echo $__env->make('partials.flash', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
-    <form action="<?php echo e(route('organizational-unit.update', $organizational_unit->id)); ?>" method="POST" class="card">
+    <form action="<?php echo e(route('organizational-unit.update', $organizational_unit->unique_id ?? $organizational_unit->id)); ?>" method="POST" class="card">
         <?php echo csrf_field(); ?>
         <?php echo method_field('PUT'); ?>
         <div class="card-body">

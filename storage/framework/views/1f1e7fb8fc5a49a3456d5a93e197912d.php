@@ -2,7 +2,7 @@
 <?php $__env->startSection('body_title', 'Foto Pekerjaan'); ?>
 
 <?php $__env->startSection('buttons_beside_title'); ?>
-    <a href="<?php echo e(route('project.job-document.workflow.show', [$project->unique_id, $document->id])); ?>" class="btn btn-outline-secondary">Kembali</a>
+    <a href="<?php echo e(route('project.job-document.workflow.show', [$project->unique_id, $document->unique_id ?? $document->id])); ?>" class="btn btn-outline-secondary">Kembali</a>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('content'); ?>
@@ -18,7 +18,7 @@
     <div class="card mb-4">
         <div class="card-header"><h3 class="card-title mb-0">Unggah Foto</h3></div>
         <div class="card-body">
-            <form action="<?php echo e(route('project.job-document.workflow.job.photo.store', [$project->unique_id, $document->id, $job->id])); ?>" method="POST" enctype="multipart/form-data">
+            <form action="<?php echo e(route('project.job-document.workflow.job.photo.store', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id])); ?>" method="POST" enctype="multipart/form-data">
                 <?php echo csrf_field(); ?>
                 <div class="row g-3">
                     <div class="col-md-4"><input class="form-control" type="file" name="job_photo" required></div>
@@ -41,7 +41,7 @@
                             <td><?php echo e($photo->caption ?? '-'); ?></td>
                             <td><?php echo e(optional($photo->taken_at)->format('d/m/Y H:i') ?? '-'); ?></td>
                             <td>
-                                <form action="<?php echo e(route('project.job-document.workflow.job.photo.destroy', [$project->unique_id, $document->id, $job->id, $photo->id])); ?>" method="POST" onsubmit="return confirm('Hapus foto ini?')">
+                                <form action="<?php echo e(route('project.job-document.workflow.job.photo.destroy', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id, $photo->unique_id ?? $photo->id])); ?>" method="POST" onsubmit="return confirm('Hapus foto ini?')">
                                     <?php echo csrf_field(); ?>
                                     <?php echo method_field('DELETE'); ?>
                                     <button class="btn btn-sm btn-outline-danger" type="submit">Hapus</button>

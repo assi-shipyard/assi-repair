@@ -29,8 +29,8 @@
 								<td><?php echo e($position->organizational_unit?->name ?? '-'); ?></td>
 								<td><?php echo e($position->code ?? '-'); ?></td>
 								<td class="text-end">
-									<a href="<?php echo e(route('position.show', $position->id)); ?>" class="btn btn-sm btn-outline-primary">Lihat</a>
-									<a href="<?php echo e(route('position.edit', $position->id)); ?>" class="btn btn-sm btn-outline-secondary">Ubah</a>
+									<a href="<?php echo e(route('position.show', $position->unique_id ?? $position->id)); ?>" class="btn btn-sm btn-outline-primary">Lihat</a>
+									<a href="<?php echo e(route('position.edit', $position->unique_id ?? $position->id)); ?>" class="btn btn-sm btn-outline-secondary">Ubah</a>
 								</td>
 							</tr>
 						<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>

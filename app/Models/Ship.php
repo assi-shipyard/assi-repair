@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ship extends Model
 {
+	use HasPublicUniqueId;
+
     /**
 	 * The attributes that are mass assignable.
 	 *

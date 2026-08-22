@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProjectDockingRequest extends Model
 {
+    use HasPublicUniqueId;
+
     protected $table = 'project_docking_requests';
 
     protected $fillable = [
+        'unique_id',
         'project_id',
         'ship_id',
         'requested_by',
@@ -27,6 +31,7 @@ class ProjectDockingRequest extends Model
     ];
 
     protected $casts = [
+        'unique_id' => 'string',
         'requested_start_at' => 'datetime',
         'requested_end_at' => 'datetime',
         'reviewed_at' => 'datetime',

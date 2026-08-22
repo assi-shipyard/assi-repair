@@ -4,13 +4,13 @@
 @section('body_title', 'Ubah Jabatan')
 
 @section('buttons_beside_title')
-    <a href="{{ route('position.show', $position->id) }}" class="btn btn-outline-secondary">Kembali</a>
+    <a href="{{ route('position.show', $position->unique_id ?? $position->id) }}" class="btn btn-outline-secondary">Kembali</a>
 @endsection
 
 @section('content')
     @include('partials.flash')
 
-    <form action="{{ route('position.update', $position->id) }}" method="POST" class="card">
+    <form action="{{ route('position.update', $position->unique_id ?? $position->id) }}" method="POST" class="card">
         @csrf
         @method('PUT')
         <div class="card-body">

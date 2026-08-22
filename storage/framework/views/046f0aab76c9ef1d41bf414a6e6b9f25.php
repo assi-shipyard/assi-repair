@@ -46,4 +46,6 @@
 		<a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
 	</div>
 <?php endif; ?>
+
+
 <?php /**PATH D:\wamp64\www\assi-repair\resources\views/partials/flash.blade.php ENDPATH**/ ?>

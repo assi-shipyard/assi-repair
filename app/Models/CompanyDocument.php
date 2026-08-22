@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 
 class CompanyDocument extends Model
 {
+	use HasPublicUniqueId;
+
     /**
 	 * The attributes that are mass assignable.
 	 *
@@ -14,6 +17,7 @@ class CompanyDocument extends Model
 	protected $table = 'company_documents';
 
 	protected $fillable = [
+		'unique_id',
 		'company_id',
 		'document_name',
 		'document_type',
@@ -28,6 +32,7 @@ class CompanyDocument extends Model
 	protected function casts(): array
 	{
 		return [
+			'unique_id' => 'string',
 			'company_id' => 'integer',
 			'document_name' => 'string',
 			'document_type' => 'string',

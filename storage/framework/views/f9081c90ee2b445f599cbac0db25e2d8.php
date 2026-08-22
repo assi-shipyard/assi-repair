@@ -2,13 +2,13 @@
 <?php $__env->startSection('body_title', 'Ubah Jabatan'); ?>
 
 <?php $__env->startSection('buttons_beside_title'); ?>
-    <a href="<?php echo e(route('position.show', $position->id)); ?>" class="btn btn-outline-secondary">Kembali</a>
+    <a href="<?php echo e(route('position.show', $position->unique_id ?? $position->id)); ?>" class="btn btn-outline-secondary">Kembali</a>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('content'); ?>
     <?php echo $__env->make('partials.flash', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
-    <form action="<?php echo e(route('position.update', $position->id)); ?>" method="POST" class="card">
+    <form action="<?php echo e(route('position.update', $position->unique_id ?? $position->id)); ?>" method="POST" class="card">
         <?php echo csrf_field(); ?>
         <?php echo method_field('PUT'); ?>
         <div class="card-body">

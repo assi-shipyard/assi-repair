@@ -65,6 +65,7 @@
 </head>
 <body class="layout-fluid">
     @php
+		// Get unread notifications for the authenticated user
         $unread_notifications = auth()->user()?->unreadNotifications ?? collect();
         $unread_notification_count = $unread_notifications->count();
 
@@ -295,6 +296,7 @@
                                             <h6 class="dropdown-header">Pengaturan Sistem</h6>
                                             <a href="{{ route('notification-flag.index') }}" class="dropdown-item">Tipe Notifikasi (Flags)</a>
                                             <a href="{{ route('notification-settings.index') }}" class="dropdown-item">Pengaturan Notifikasi</a>
+                                            <a href="{{ route('audit-log.index') }}" class="dropdown-item">Audit Log</a>
                                         </div>
                                     </div>
                                 </div>
@@ -400,6 +402,7 @@
     <script src="{{ secure_asset('assets/dist/js/datatables.min.js') }}"></script>
     <script src="{{ secure_asset('assets/dist/js/select2.full.min.js') }}"></script>
 
+	{{-- Select2 Initialization --}}
     <script>
         $('.dropdown-list').select2({
             theme: 'bootstrap-5',
@@ -412,12 +415,13 @@
         $('.dropdown-list').next('.select2-container').find('.select2-search__field').css('font-size', '11pt');
     </script>
 
+	{{-- ApexCharts --}}
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-
     <script src="{{ secure_asset('assets/dist/libs/litepicker/dist/litepicker.js?1692870487') }}" defer></script>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+	{{-- Decimal Input Formatting --}}
     <script>
         $('#decimal-input').on('input', function () {
             const input = $(this).val().replace(/,/g, '');
@@ -429,7 +433,9 @@
         });
     </script>
 
+	{{-- Theme Settings Initialization --}}
     <script>
+		// Theme Settings
         document.addEventListener('DOMContentLoaded', function () {
             const themeConfig = {
                 theme: 'light',
@@ -483,6 +489,7 @@
 
     @auth
     <script>
+		// Enable Pusher logging for debugging (optional)
         window.Pusher = Pusher;
         window.Echo = new Echo({
             broadcaster: 'reverb',
@@ -494,6 +501,7 @@
             enabledTransports: ['ws', 'wss'],
         });
 
+		// Listen for notifications for the authenticated user
         window.Echo.private('App.Models.User.{{ auth()->user()->id }}')
             .notification((notification) => {
                 $('#no-notifications-msg').remove();

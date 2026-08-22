@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProjectDocumentJob extends Model
 {
+    use HasPublicUniqueId;
+
     protected $table = 'project_document_jobs';
 
     protected $fillable = [
+        'unique_id',
         'project_job_document_id',
         'source_job_id',
         'job_name',
@@ -37,6 +41,7 @@ class ProjectDocumentJob extends Model
     protected function casts(): array
     {
         return [
+            'unique_id' => 'string',
             'project_job_document_id' => 'integer',
             'source_job_id' => 'integer',
             'job_volume_estimated' => 'decimal:4',

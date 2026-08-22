@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 
 class ProjectJobDocument extends Model
 {
+    use HasPublicUniqueId;
+
     public const TYPE_REPAIR_LIST = 'repair_list';
     public const TYPE_INITIAL_BOQ = 'initial_boq';
     public const TYPE_SATISFACTION_NOTES = 'satisfaction_notes';
@@ -18,6 +21,7 @@ class ProjectJobDocument extends Model
     protected $table = 'project_job_documents';
 
     protected $fillable = [
+        'unique_id',
         'project_id',
         'document_type',
         'document_number',
@@ -35,6 +39,7 @@ class ProjectJobDocument extends Model
     protected function casts(): array
     {
         return [
+            'unique_id' => 'string',
             'project_id' => 'integer',
             'revision_no' => 'integer',
             'source_document_id' => 'integer',

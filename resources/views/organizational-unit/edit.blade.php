@@ -4,13 +4,13 @@
 @section('body_title', 'Ubah Unit Organisasi')
 
 @section('buttons_beside_title')
-    <a href="{{ route('organizational-unit.show', $organizational_unit->id) }}" class="btn btn-outline-secondary">Kembali</a>
+    <a href="{{ route('organizational-unit.show', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-outline-secondary">Kembali</a>
 @endsection
 
 @section('content')
     @include('partials.flash')
 
-    <form action="{{ route('organizational-unit.update', $organizational_unit->id) }}" method="POST" class="card">
+    <form action="{{ route('organizational-unit.update', $organizational_unit->unique_id ?? $organizational_unit->id) }}" method="POST" class="card">
         @csrf
         @method('PUT')
         <div class="card-body">

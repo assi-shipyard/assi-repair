@@ -47,7 +47,7 @@
                         </div>
                         <div class="text-secondary mb-3"><?php echo e($workflow_document->document_number ?? '-'); ?></div>
                         <div class="d-flex gap-2 flex-wrap">
-                            <a href="<?php echo e(route('project.job-document.workflow.show', [$project->unique_id, $workflow_document->id])); ?>" class="btn btn-sm btn-outline-primary">Buka</a>
+                            <a href="<?php echo e(route('project.job-document.workflow.show', [$project->unique_id, $workflow_document->unique_id ?? $workflow_document->id])); ?>" class="btn btn-sm btn-outline-primary">Buka</a>
                         </div>
                     </div>
                 </div>

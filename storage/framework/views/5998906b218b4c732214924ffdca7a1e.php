@@ -53,6 +53,12 @@ unset($__defined_vars, $__key, $__value); ?>
 <?php endif; ?>
         </div>
         <h3 class="text-base font-semibold text-neutral-900 dark:text-white">Exception trace</h3>
+        <?php if($exception->previousExceptions()->isNotEmpty()): ?>
+            <a href="#previous-exceptions" class="ml-auto text-sm text-neutral-500 dark:text-neutral-400 hover:text-blue-500 dark:hover:text-emerald-500 transition-colors">
+                <?php echo e($exception->previousExceptions()->count()); ?> previous <?php echo e(\Illuminate\Support\Str::plural('exception', $exception->previousExceptions()->count())); ?>
+
+            </a>
+        <?php endif; ?>
     </div>
 
     <div class="flex flex-col gap-1.5">

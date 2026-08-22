@@ -4,7 +4,7 @@
 @section('body_title', 'Detail Unit Organisasi')
 
 @section('buttons_beside_title')
-    <a href="{{ route('organizational-unit.edit', $organizational_unit->id) }}" class="btn btn-outline-primary">Ubah</a>
+    <a href="{{ route('organizational-unit.edit', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-outline-primary">Ubah</a>
     <a href="{{ route('organizational-unit.index') }}" class="btn btn-outline-secondary">Kembali</a>
 @endsection
 

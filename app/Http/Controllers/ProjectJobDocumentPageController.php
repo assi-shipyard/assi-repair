@@ -52,7 +52,7 @@ class ProjectJobDocumentPageController extends Controller
     }
 
     // Show the details of a specific job document
-    public function show(string $projectId, int $documentId): View|RedirectResponse
+    public function show(string $projectId, string $documentId): View|RedirectResponse
     {
         // Find the project by its unique ID
         $project = $this->findProject($projectId);
@@ -63,10 +63,7 @@ class ProjectJobDocumentPageController extends Controller
         }
 
         // Find the specific job document by its ID and project ID
-        $document = ProjectJobDocument::query()
-            ->where('project_id', $project->id)
-            ->where('id', $documentId)
-            ->first();
+        $document = $this->find_document_by_public_id($project->id, $documentId);
 
         // If the document is not found, redirect to the workflow page with an error message
         if (! $document) {
@@ -85,7 +82,7 @@ class ProjectJobDocumentPageController extends Controller
     }
 
     // The following methods handle the creation, updating, and deletion of jobs, materials, and photos associated with a job document. They also include validation and error handling to ensure that the operations are performed correctly and that the user is informed of any issues.
-    public function storeJob(Request $request, string $projectId, int $documentId): RedirectResponse
+    public function storeJob(Request $request, string $projectId, string $documentId): RedirectResponse
     {
         // Find the document for mutation (creation of a new job)
         $document = $this->findDocumentForMutation($projectId, $documentId);
@@ -108,12 +105,12 @@ class ProjectJobDocumentPageController extends Controller
         // Create the new job using the service and associate it with the document
         $this->service->createJob($document, $data, auth()->id());
 
-        return redirect()->route('project.job-document.workflow.show', [$projectId, $documentId])
+        return redirect()->route('project.job-document.workflow.show', [$projectId, $document->unique_id ?? $document->id])
             ->with('success', 'Pekerjaan berhasil ditambahkan.');
     }
 
     // The following methods handle updating and deleting jobs, as well as managing materials and photos associated with a job. They include validation, error handling, and appropriate redirects to ensure a smooth user experience.
-    public function updateJob(Request $request, string $projectId, int $documentId, int $jobId): RedirectResponse
+    public function updateJob(Request $request, string $projectId, string $documentId, string $jobId): RedirectResponse
     {
         // Find the document for mutation (updating an existing job)
         $document = $this->findDocumentForMutation($projectId, $documentId);
@@ -142,12 +139,12 @@ class ProjectJobDocumentPageController extends Controller
         // Update the job using the service with the validated data and the authenticated user's ID
         $this->service->updateJob($job, $validator->validated(), auth()->id());
 
-        return redirect()->route('project.job-document.workflow.show', [$projectId, $documentId])
+        return redirect()->route('project.job-document.workflow.show', [$projectId, $document->unique_id ?? $document->id])
             ->with('success', 'Pekerjaan berhasil diperbarui.');
     }
 
     // The following methods handle the deletion of jobs, as well as the management of materials and photos associated with a job. They include validation, error handling, and appropriate redirects to ensure a smooth user experience.
-    public function destroyJob(string $projectId, int $documentId, int $jobId): RedirectResponse
+    public function destroyJob(string $projectId, string $documentId, string $jobId): RedirectResponse
     {
         // Find the document for mutation (deleting an existing job)
         $document = $this->findDocumentForMutation($projectId, $documentId);
@@ -168,12 +165,12 @@ class ProjectJobDocumentPageController extends Controller
         // Delete the job using the service with the authenticated user's ID
         $this->service->deleteJob($job, auth()->id());
 
-        return redirect()->route('project.job-document.workflow.show', [$projectId, $documentId])
+        return redirect()->route('project.job-document.workflow.show', [$projectId, $document->unique_id ?? $document->id])
             ->with('success', 'Pekerjaan berhasil dihapus.');
     }
 
     // The following methods handle the creation, updating, and deletion of materials and photos associated with a job document. They include validation, error handling, and appropriate redirects to ensure a smooth user experience.
-    public function storeMaterial(Request $request, string $projectId, int $documentId, int $jobId): RedirectResponse
+    public function storeMaterial(Request $request, string $projectId, string $documentId, string $jobId): RedirectResponse
     {
         // Find the document for mutation (adding a new material to a job)
         $document = $this->findDocumentForMutation($projectId, $documentId);
@@ -222,12 +219,12 @@ class ProjectJobDocumentPageController extends Controller
         // Create the new material using the service and associate it with the job
         $this->service->createMaterial($job, $validator->validated(), auth()->id());
 
-        return redirect()->route('project.job-document.workflow.show', [$projectId, $documentId])
+        return redirect()->route('project.job-document.workflow.show', [$projectId, $document->unique_id ?? $document->id])
             ->with('success', 'Material berhasil ditambahkan.');
     }
 
     // The following methods handle the deletion of materials and photos associated with a job document. They include validation, error handling, and appropriate redirects to ensure a smooth user experience.
-    public function destroyMaterial(string $projectId, int $documentId, int $jobId, int $materialId): RedirectResponse
+    public function destroyMaterial(string $projectId, string $documentId, string $jobId, string $materialId): RedirectResponse
     {
         // Find the document for mutation (deleting an existing material from a job)
         $document = $this->findDocumentForMutation($projectId, $documentId);
@@ -246,9 +243,7 @@ class ProjectJobDocumentPageController extends Controller
         }
 
         // Find the specific material to be deleted within the job
-        $material = ProjectDocumentJobMaterial::query()
-            ->where('project_document_job_id', $job->id)
-            ->find($materialId);
+        $material = $this->find_material($job->id, $materialId);
 
         // If the material is not found, redirect back with an error message
         if (! $material) {
@@ -258,12 +253,12 @@ class ProjectJobDocumentPageController extends Controller
         // Delete the material using the service with the authenticated user's ID
         $this->service->deleteMaterial($material, auth()->id());
 
-        return redirect()->route('project.job-document.workflow.show', [$projectId, $documentId])
+        return redirect()->route('project.job-document.workflow.show', [$projectId, $document->unique_id ?? $document->id])
             ->with('success', 'Material berhasil dihapus.');
     }
 
     // The following methods handle the management of photos associated with a job document. They include validation, error handling, and appropriate redirects to ensure a smooth user experience.
-    public function photos(string $projectId, int $documentId, int $jobId): View|RedirectResponse
+    public function photos(string $projectId, string $documentId, string $jobId): View|RedirectResponse
     {
         // Find the project by its unique ID
         $project = $this->findProject($projectId);
@@ -271,18 +266,15 @@ class ProjectJobDocumentPageController extends Controller
             return redirect()->route('project.index')->with('error', 'Proyek tidak ditemukan.');
         }
 
-        $document = ProjectJobDocument::query()->where('project_id', $project->id)->find($documentId);
+        $document = $this->find_document_by_public_id($project->id, $documentId);
         if (! $document) {
             return redirect()->route('project.job-document.workflow', $project->unique_id)->with('error', 'Dokumen pekerjaan tidak ditemukan.');
         }
 
-        $job = ProjectDocumentJob::query()
-            ->with('photos')
-            ->where('project_job_document_id', $document->id)
-            ->find($jobId);
+        $job = $this->findJob($document->id, $jobId, ['photos']);
 
         if (! $job) {
-            return redirect()->route('project.job-document.workflow.show', [$project->unique_id, $document->id])->with('error', 'Pekerjaan tidak ditemukan.');
+            return redirect()->route('project.job-document.workflow.show', [$project->unique_id, $document->unique_id ?? $document->id])->with('error', 'Pekerjaan tidak ditemukan.');
         }
 
         return view('project.job-document.photos', [
@@ -294,7 +286,7 @@ class ProjectJobDocumentPageController extends Controller
         ]);
     }
 
-    public function storePhoto(Request $request, string $projectId, int $documentId, int $jobId): RedirectResponse
+    public function storePhoto(Request $request, string $projectId, string $documentId, string $jobId): RedirectResponse
     {
         $document = $this->findDocumentForMutation($projectId, $documentId);
         if ($document instanceof RedirectResponse) {
@@ -329,11 +321,11 @@ class ProjectJobDocumentPageController extends Controller
             'uploaded_by' => auth()->id(),
         ], auth()->id());
 
-        return redirect()->route('project.job-document.workflow.job.photos', [$projectId, $documentId, $jobId])
+        return redirect()->route('project.job-document.workflow.job.photos', [$projectId, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id])
             ->with('success', 'Foto berhasil diunggah.');
     }
 
-    public function destroyPhoto(string $projectId, int $documentId, int $jobId, int $photoId): RedirectResponse
+    public function destroyPhoto(string $projectId, string $documentId, string $jobId, string $photoId): RedirectResponse
     {
         $document = $this->findDocumentForMutation($projectId, $documentId);
         if ($document instanceof RedirectResponse) {
@@ -345,7 +337,7 @@ class ProjectJobDocumentPageController extends Controller
             return back()->with('error', 'Pekerjaan tidak ditemukan.');
         }
 
-        $photo = ProjectDocumentJobPhoto::query()->where('project_document_job_id', $job->id)->find($photoId);
+        $photo = $this->find_photo($job->id, $photoId);
         if (! $photo) {
             return back()->with('error', 'Foto tidak ditemukan.');
         }
@@ -356,7 +348,7 @@ class ProjectJobDocumentPageController extends Controller
 
         $this->service->deletePhoto($photo, auth()->id());
 
-        return redirect()->route('project.job-document.workflow.job.photos', [$projectId, $documentId, $jobId])
+        return redirect()->route('project.job-document.workflow.job.photos', [$projectId, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id])
             ->with('success', 'Foto berhasil dihapus.');
     }
 
@@ -433,7 +425,7 @@ class ProjectJobDocumentPageController extends Controller
             ->with('success', 'Dokumen pekerjaan berhasil dibuat.');
     }
 
-    public function finalizeSatisfactionNotes(string $projectId, int $documentId): RedirectResponse
+    public function finalizeSatisfactionNotes(string $projectId, string $documentId): RedirectResponse
     {
         $project = $this->findProject($projectId);
 
@@ -441,10 +433,7 @@ class ProjectJobDocumentPageController extends Controller
             return redirect()->route('project.index')->with('error', 'Proyek tidak ditemukan.');
         }
 
-        $document = ProjectJobDocument::query()
-            ->where('project_id', $project->id)
-            ->where('id', $documentId)
-            ->first();
+        $document = $this->find_document_by_public_id($project->id, $documentId);
 
         if (! $document || $document->document_type !== ProjectJobDocument::TYPE_SATISFACTION_NOTES) {
             return redirect()->route('project.job-document.workflow', $project->unique_id)
@@ -487,30 +476,69 @@ class ProjectJobDocumentPageController extends Controller
             ->firstWhere('unique_id', $projectId);
     }
 
-    private function findDocumentForMutation(string $projectId, int $documentId): ProjectJobDocument|RedirectResponse
+    private function findDocumentForMutation(string $projectId, string $documentId): ProjectJobDocument|RedirectResponse
     {
         $project = $this->findProject($projectId);
         if (! $project) {
             return redirect()->route('project.index')->with('error', 'Proyek tidak ditemukan.');
         }
 
-        $document = ProjectJobDocument::query()->where('project_id', $project->id)->find($documentId);
+        $document = $this->find_document_by_public_id($project->id, $documentId);
         if (! $document) {
             return redirect()->route('project.job-document.workflow', $project->unique_id)->with('error', 'Dokumen pekerjaan tidak ditemukan.');
         }
 
         if (in_array($document->status, ['approved', 'locked'], true)) {
-            return redirect()->route('project.job-document.workflow.show', [$project->unique_id, $document->id])->with('error', 'Dokumen sudah final dan tidak dapat diubah.');
+            return redirect()->route('project.job-document.workflow.show', [$project->unique_id, $document->unique_id ?? $document->id])->with('error', 'Dokumen sudah final dan tidak dapat diubah.');
         }
 
         return $document;
     }
 
-    private function findJob(int $documentId, int $jobId): ?ProjectDocumentJob
+    private function findJob(int $documentId, string $jobId, array $relations = []): ?ProjectDocumentJob
     {
-        return ProjectDocumentJob::query()
-            ->where('project_job_document_id', $documentId)
-            ->find($jobId);
+        $query = ProjectDocumentJob::query()
+            ->with($relations)
+            ->where('project_job_document_id', $documentId);
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $jobId) === 1) {
+            return $query->where('unique_id', $jobId)->first();
+        }
+
+        return $query->find((int) $jobId);
+    }
+
+    private function find_document_by_public_id(int $project_id, string $document_id): ?ProjectJobDocument
+    {
+        $query = ProjectJobDocument::query()->where('project_id', $project_id);
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $document_id) === 1) {
+            return $query->where('unique_id', $document_id)->first();
+        }
+
+        return $query->find((int) $document_id);
+    }
+
+    private function find_material(int $job_id, string $material_id): ?ProjectDocumentJobMaterial
+    {
+        $query = ProjectDocumentJobMaterial::query()->where('project_document_job_id', $job_id);
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $material_id) === 1) {
+            return $query->where('unique_id', $material_id)->first();
+        }
+
+        return $query->find((int) $material_id);
+    }
+
+    private function find_photo(int $job_id, string $photo_id): ?ProjectDocumentJobPhoto
+    {
+        $query = ProjectDocumentJobPhoto::query()->where('project_document_job_id', $job_id);
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $photo_id) === 1) {
+            return $query->where('unique_id', $photo_id)->first();
+        }
+
+        return $query->find((int) $photo_id);
     }
 
     private function documentView(ProjectJobDocument $document): string

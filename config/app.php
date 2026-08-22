@@ -136,7 +136,6 @@ return [
     'aliases' => [
         // DO NOT add 'role' or 'permission' here!
         // Only keep needed aliases, e.g.:
-        'NumConvert' => 'HnhDigital\LaravelNumberConverter\Facade',
         'Image' => 'Intervention\Image\Facades\Image',
     ],
 ];

@@ -1,3 +1,5 @@
+
+
 <?php $__env->startSection('title', __('Unauthorized')); ?>
 <?php $__env->startSection('code', '401'); ?>
 <?php $__env->startSection('message', __('Unauthorized')); ?>

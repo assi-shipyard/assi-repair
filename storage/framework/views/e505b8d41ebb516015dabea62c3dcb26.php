@@ -2,7 +2,7 @@
 <?php $__env->startSection('body_title', 'Detail Unit Organisasi'); ?>
 
 <?php $__env->startSection('buttons_beside_title'); ?>
-    <a href="<?php echo e(route('organizational-unit.edit', $organizational_unit->id)); ?>" class="btn btn-outline-primary">Ubah</a>
+    <a href="<?php echo e(route('organizational-unit.edit', $organizational_unit->unique_id ?? $organizational_unit->id)); ?>" class="btn btn-outline-primary">Ubah</a>
     <a href="<?php echo e(route('organizational-unit.index')); ?>" class="btn btn-outline-secondary">Kembali</a>
 <?php $__env->stopSection(); ?>
 

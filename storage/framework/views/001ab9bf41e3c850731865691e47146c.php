@@ -3,7 +3,7 @@
 
 <?php $__env->startSection('buttons_beside_title'); ?>
     <a href="<?php echo e(route('project.job-document.workflow.index', $project->unique_id)); ?>" class="btn btn-outline-secondary">Kembali</a>
-    <form action="<?php echo e(route('project.job-document.workflow.finalize-satisfaction-notes', [$project->unique_id, $document->id])); ?>" method="POST" class="d-inline">
+    <form action="<?php echo e(route('project.job-document.workflow.finalize-satisfaction-notes', [$project->unique_id, $document->unique_id ?? $document->id])); ?>" method="POST" class="d-inline">
         <?php echo csrf_field(); ?>
         <button type="submit" class="btn btn-success">Finalisasi</button>
     </form>

@@ -62,22 +62,19 @@ class OrganizationalUnitController extends Controller
     }
 
     // Display the specified organizational unit.
-    public function show($id)
+    public function show(string $organizational_unit)
     {
-        // Fetch the organizational unit with its parent, children (and their positions), and positions (and their employees) by ID
-        $organizational_unit = OrganizationalUnit::with(['parent', 'children.positions', 'positions.employees'])
-            ->findOrFail($id);
+        $organizational_unit = $this->find_organizational_unit($organizational_unit, ['parent', 'children.positions', 'positions.employees']);
 
         return view('organizational-unit.show', compact('organizational_unit'));
     }
 
     // Show the form for editing the specified organizational unit.
-    public function edit($id)
+    public function edit(string $organizational_unit)
     {
-        // Fetch the organizational unit by ID, along with types and other organizational units for the form
-        $organizational_unit = OrganizationalUnit::findOrFail($id);
+        $organizational_unit = $this->find_organizational_unit($organizational_unit);
         $types = $this->types();
-        $organizational_units = OrganizationalUnit::where('id', '!=', $id)
+        $organizational_units = OrganizationalUnit::where('id', '!=', $organizational_unit->id)
             ->orderBy('name')
             ->get();
 
@@ -85,13 +82,11 @@ class OrganizationalUnitController extends Controller
     }
 
     // Update the specified organizational unit in storage.
-    public function update(Request $request, $id)
+    public function update(Request $request, string $organizational_unit)
     {
-        // Fetch the organizational unit by ID and validate the request data against the defined rules and messages
-        $organizational_unit = OrganizationalUnit::findOrFail($id);
+        $organizational_unit = $this->find_organizational_unit($organizational_unit);
 
-        // Validate the request data against the defined rules and messages, passing the current organizational unit ID for unique code validation
-        $validation = Validator::make($request->all(), $this->rules($id), $this->messages());
+        $validation = Validator::make($request->all(), $this->rules($organizational_unit->id), $this->messages());
 
         // If validation fails, redirect back with errors and input data
         if ($validation->fails()) {
@@ -119,10 +114,9 @@ class OrganizationalUnitController extends Controller
     }
 
     // Remove the specified organizational unit from storage.
-    public function destroy($id)
+    public function destroy(string $organizational_unit)
     {
-        // Fetch the organizational unit by ID and check if it has any children or positions before deletion
-        $organizational_unit = OrganizationalUnit::findOrFail($id);
+        $organizational_unit = $this->find_organizational_unit($organizational_unit);
 
         // Check if the organizational unit has any children or positions before deletion
         if ($organizational_unit->children()->exists()) {
@@ -220,5 +214,16 @@ class OrganizationalUnitController extends Controller
         }
 
         return null;
+    }
+
+    private function find_organizational_unit(string $organizational_unit, array $relations = []): OrganizationalUnit
+    {
+        $query = OrganizationalUnit::query()->with($relations);
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $organizational_unit) === 1) {
+            return $query->where('unique_id', $organizational_unit)->firstOrFail();
+        }
+
+        return $query->findOrFail((int) $organizational_unit);
     }
 }

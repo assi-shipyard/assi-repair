@@ -54,13 +54,13 @@ class DockingManagementController extends Controller
         return redirect()->route('docking-space.index')->with('success', 'Docking space berhasil ditambahkan.');
     }
 
-    public function edit_docking_space(int $id): \Illuminate\Contracts\View\View
+    public function edit_docking_space(string $docking_space): \Illuminate\Contracts\View\View
     {
         $docking_spaces = DockingSpace::query()
             ->orderBy('name')
             ->get();
 
-        $editing_space = DockingSpace::findOrFail($id);
+        $editing_space = $this->find_docking_space($docking_space);
 
         return view('docking-space.index', [
             'dockingSpaces' => $docking_spaces,
@@ -68,7 +68,7 @@ class DockingManagementController extends Controller
         ]);
     }
 
-    public function update_docking_space(Request $request, int $id): RedirectResponse
+    public function update_docking_space(Request $request, string $docking_space): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -83,15 +83,15 @@ class DockingManagementController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $docking_space = DockingSpace::findOrFail($id);
+        $docking_space = $this->find_docking_space($docking_space);
         $docking_space->update($data);
 
         return redirect()->route('docking-space.index')->with('success', 'Docking space berhasil diperbarui.');
     }
 
-    public function destroy_docking_space(int $id): RedirectResponse
+    public function destroy_docking_space(string $docking_space): RedirectResponse
     {
-        $docking_space = DockingSpace::findOrFail($id);
+        $docking_space = $this->find_docking_space($docking_space);
         $docking_space->delete();
 
         return redirect()->route('docking-space.index')->with('success', 'Docking space berhasil dihapus.');
@@ -103,11 +103,16 @@ class DockingManagementController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $ships = \App\Models\Ship::query()
+            ->with('company')
+            ->orderBy('name')
+            ->get();
+
         $docking_spaces = DockingSpace::query()
             ->orderBy('name')
             ->get();
 
-        return view('docking-space-request.create', compact('projects', 'docking_spaces'));
+        return view('docking-space-request.create', compact('projects', 'ships', 'docking_spaces'));
     }
 
     public function index_request(Request $request): \Illuminate\Contracts\View\View
@@ -138,7 +143,28 @@ class DockingManagementController extends Controller
     {
         $data = $request->validated();
 
-        $project = Project::with('ship')->findOrFail((int) $data['project_id']);
+        $project = null;
+        $ship_id = null;
+
+        if (! empty($data['project_id'])) {
+            $project = Project::with('ship')->findOrFail((int) $data['project_id']);
+            $ship_id = (int) ($project->ship_id ?? 0);
+        } elseif (! empty($data['ship_id'])) {
+            $ship_id = (int) $data['ship_id'];
+            $project = Project::query()
+                ->with('ship')
+                ->where('ship_id', $ship_id)
+                ->orderByDesc('created_at')
+                ->first();
+
+            if (! $project) {
+                return back()->with('error', 'Kapal yang dipilih belum memiliki proyek aktif. Silakan pilih proyek yang sudah ada terlebih dahulu.')->withInput();
+            }
+        }
+
+        if (! $project || ! $ship_id) {
+            return back()->with('error', 'Pilih proyek yang sudah ada atau pilih kapal yang akan diajukan terlebih dahulu.')->withInput();
+        }
 
         if (! $project->ship_id) {
             return back()->with('error', 'Proyek tidak memiliki data kapal yang valid.')->withInput();
@@ -158,10 +184,10 @@ class DockingManagementController extends Controller
 
         $user_id = $request->user()?->id;
 
-        DB::transaction(function () use ($data, $project, $user_id, $docking_capacity_service): void {
+        DB::transaction(function () use ($data, $project, $ship_id, $user_id, $docking_capacity_service): void {
             $docking_request = ProjectDockingRequest::create([
                 'project_id' => $project->id,
-                'ship_id' => $project->ship_id,
+                'ship_id' => $ship_id,
                 'requested_by' => $user_id,
                 'requested_docking_space_id' => $data['requested_docking_space_id'] ?? null,
                 'requested_start_at' => $data['requested_start_at'],
@@ -176,13 +202,13 @@ class DockingManagementController extends Controller
         return redirect()->route('docking-space-request.index')->with('success', 'Permohonan docking space berhasil dibuat dan evaluasi kapasitas telah dihitung.');
     }
 
-    public function evaluate_request(EvaluateDockingRequest $request, int $request_id, DockingCapacityService $docking_capacity_service): RedirectResponse
+    public function evaluate_request(EvaluateDockingRequest $request, string $docking_request, DockingCapacityService $docking_capacity_service): RedirectResponse
     {
         if ($response = $this->ensure_docking_operator($request)) {
             return $response;
         }
 
-        $docking_request = ProjectDockingRequest::with('ship')->findOrFail($request_id);
+        $docking_request = $this->find_docking_request($docking_request, ['ship']);
 
         $space_ids = $request->validated('docking_space_ids') ?? [];
         $only_active_spaces = (bool) ($request->validated('only_active_spaces') ?? true);
@@ -199,13 +225,13 @@ class DockingManagementController extends Controller
         return back()->with('success', 'Evaluasi kapasitas docking space berhasil diperbarui.');
     }
 
-    public function review_request(ReviewProjectDockingRequest $request, int $request_id): RedirectResponse
+    public function review_request(ReviewProjectDockingRequest $request, string $docking_request): RedirectResponse
     {
         if ($response = $this->ensure_docking_operator($request)) {
             return $response;
         }
 
-        $docking_request = ProjectDockingRequest::findOrFail($request_id);
+        $docking_request = $this->find_docking_request($docking_request);
         $data = $request->validated();
         $status = (string) $data['request_status'];
         $user_id = $request->user()?->id;
@@ -269,13 +295,13 @@ class DockingManagementController extends Controller
         return back()->with('success', 'Status permohonan docking space berhasil diperbarui.');
     }
 
-    public function start_docking(StartDockingOccupancyRequest $request, int $request_id, DockingCapacityService $docking_capacity_service): RedirectResponse
+    public function start_docking(StartDockingOccupancyRequest $request, string $docking_request, DockingCapacityService $docking_capacity_service): RedirectResponse
     {
         if ($response = $this->ensure_docking_operator($request)) {
             return $response;
         }
 
-        $docking_request = ProjectDockingRequest::with('ship')->findOrFail($request_id);
+        $docking_request = $this->find_docking_request($docking_request, ['ship']);
 
         if ($docking_request->request_status !== 'approved') {
             return back()->with('error', 'Permohonan harus berstatus disetujui sebelum kapal dapat masuk dock.');
@@ -337,13 +363,13 @@ class DockingManagementController extends Controller
         return back()->with('success', 'Status okupansi kapal berhasil diubah menjadi sedang docking.');
     }
 
-    public function undock_to_floating(UndockToFloatingRepairRequest $request, int $occupancy_id): RedirectResponse
+    public function undock_to_floating(UndockToFloatingRepairRequest $request, string $occupancy): RedirectResponse
     {
         if ($response = $this->ensure_docking_operator($request)) {
             return $response;
         }
 
-        $occupancy = DockingOccupancy::with(['project', 'ship'])->findOrFail($occupancy_id);
+        $occupancy = $this->find_docking_occupancy($occupancy, ['project', 'ship']);
 
         if ($occupancy->occupancy_status !== 'occupied' || $occupancy->undocked_at !== null) {
             return back()->with('error', 'Data okupansi sudah tidak aktif untuk proses undock.');
@@ -374,13 +400,13 @@ class DockingManagementController extends Controller
         return back()->with('success', 'Kapal berhasil diundock dan riwayat floating repair aktif telah dibuat.');
     }
 
-    public function complete_floating(CompleteFloatingRepairRequest $request, int $occupancy_id): RedirectResponse
+    public function complete_floating(CompleteFloatingRepairRequest $request, string $occupancy): RedirectResponse
     {
         if ($response = $this->ensure_docking_operator($request)) {
             return $response;
         }
 
-        $occupancy = DockingOccupancy::findOrFail($occupancy_id);
+        $occupancy = $this->find_docking_occupancy($occupancy);
 
         $floating_history = FloatingRepairHistory::query()
             ->where('docking_occupancy_id', $occupancy->id)
@@ -660,5 +686,36 @@ class DockingManagementController extends Controller
         }
 
         return null;
+    }
+
+    private function find_docking_space(string $docking_space): DockingSpace
+    {
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $docking_space) === 1) {
+            return DockingSpace::query()->where('unique_id', $docking_space)->firstOrFail();
+        }
+
+        return DockingSpace::query()->findOrFail((int) $docking_space);
+    }
+
+    private function find_docking_request(string $docking_request, array $relations = []): ProjectDockingRequest
+    {
+        $query = ProjectDockingRequest::query()->with($relations);
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $docking_request) === 1) {
+            return $query->where('unique_id', $docking_request)->firstOrFail();
+        }
+
+        return $query->findOrFail((int) $docking_request);
+    }
+
+    private function find_docking_occupancy(string $occupancy, array $relations = []): DockingOccupancy
+    {
+        $query = DockingOccupancy::query()->with($relations);
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $occupancy) === 1) {
+            return $query->where('unique_id', $occupancy)->firstOrFail();
+        }
+
+        return $query->findOrFail((int) $occupancy);
     }
 }

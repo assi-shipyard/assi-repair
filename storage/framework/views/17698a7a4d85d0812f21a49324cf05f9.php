@@ -30,7 +30,7 @@
                 </div>
 
                 <div class="card-body">
-                    <form method="POST" action="<?php echo e($editing_space ? route('docking-space.update', $editing_space->id) : route('docking-space.store')); ?>">
+                    <form method="POST" action="<?php echo e($editing_space ? route('docking-space.update', $editing_space->unique_id ?? $editing_space->id) : route('docking-space.store')); ?>">
                         <?php echo csrf_field(); ?>
                         <?php if($editing_space): ?>
                             <?php echo method_field('PUT'); ?>
@@ -233,11 +233,11 @@
                                             <?php endif; ?>
 
                                             <div class="mt-3 d-flex gap-2">
-                                                <a href="<?php echo e(route('docking-space.edit', $space->id)); ?>" class="btn btn-sm btn-outline-primary">
+                                                <a href="<?php echo e(route('docking-space.edit', $space->unique_id ?? $space->id)); ?>" class="btn btn-sm btn-outline-primary">
                                                     Ubah
                                                 </a>
 
-                                                <form method="POST" action="<?php echo e(route('docking-space.destroy', $space->id)); ?>" onsubmit="return confirm('Hapus docking space ini?');">
+                                                <form method="POST" action="<?php echo e(route('docking-space.destroy', $space->unique_id ?? $space->id)); ?>" onsubmit="return confirm('Hapus docking space ini?');">
                                                     <?php echo csrf_field(); ?>
                                                     <?php echo method_field('DELETE'); ?>
                                                     <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -257,4 +257,4 @@
     </div>
 <?php $__env->stopSection(); ?>
 
-<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\wamp64\www\assi-repair\resources\views/docking-space/index.blade.php ENDPATH**/ ?>
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\wamp64\www\assi-repair\resources\views\docking-space\index.blade.php ENDPATH**/ ?>

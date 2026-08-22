@@ -5,7 +5,7 @@
 
 @section('buttons_beside_title')
     <a href="{{ route('project.job-document.workflow.index', $project->unique_id) }}" class="btn btn-outline-secondary">Kembali</a>
-    <form action="{{ route('project.job-document.workflow.finalize-satisfaction-notes', [$project->unique_id, $document->id]) }}" method="POST" class="d-inline">
+    <form action="{{ route('project.job-document.workflow.finalize-satisfaction-notes', [$project->unique_id, $document->unique_id ?? $document->id]) }}" method="POST" class="d-inline">
         @csrf
         <button type="submit" class="btn btn-success">Finalisasi</button>
     </form>

@@ -65,41 +65,43 @@ class EmployeeController extends Controller
     public function check_nik(Request $request)
     {
         $request->validate(['employee_id' => 'required|string']);
-        
+
         $exists = Employee::query()
             ->where('employee_id', $request->employee_id)
             ->when($request->exclude_id, function ($query) use ($request) {
                 $query->where('id', '!=', $request->exclude_id);
             })
             ->exists();
-            
+
         return response()->json(['available' => !$exists]);
     }
 
-    public function show(int $id): View
+    public function show(string $employee): View
     {
-        $employee = Employee::with([
+        $employee = $this->find_employee($employee, [
             'position',
             'manager',
             'position.organizational_unit',
-        ])->findOrFail($id);
+        ]);
 
         return view('employee.show', compact('employee'));
     }
 
-    public function edit(int $id): View
+    public function edit(string $employee): View
     {
-        $employee = Employee::with(['position.organizational_unit', 'user'])->findOrFail($id);
+        $employee = $this->find_employee($employee, ['position.organizational_unit', 'user']);
 
         $positions = Position::orderBy('name')->get();
-        $managers = Employee::where('id', '!=', $id)->orderBy('name')->get();
+        $managers = Employee::where('id', '!=', $employee->id)->orderBy('name')->get();
 
         return view('employee.edit', compact('employee', 'positions', 'managers'));
     }
 
-    public function update(Request $request, int $id): RedirectResponse
+    public function update(Request $request, string $employee): RedirectResponse
     {
-        $validation = Validator::make($request->all(), $this->rules($id, true), $this->messages(true));
+        $employee = $this->find_employee($employee);
+
+        $validation = Validator::make($request->all(), $this->rules($employee->id, true), $this->messages(true));
 
         if ($validation->fails()) {
             return redirect()->back()->withErrors($validation)->withInput();
@@ -107,13 +109,12 @@ class EmployeeController extends Controller
 
         $payload = $validation->validated();
 
-        if (($payload['manager_id'] ?? null) === $id) {
+        if ((int) ($payload['manager_id'] ?? 0) === $employee->id) {
             return redirect()->back()
                 ->withErrors(['manager_id' => 'Seorang karyawan tidak dapat menjadi manajer dirinya sendiri.'])
                 ->withInput();
         }
 
-        $employee = Employee::findOrFail($id);
         $has_linked_user = $employee->user()->exists() || User::query()->where('employee_id', $employee->employee_id)->exists();
 
         if (! $has_linked_user && empty($payload['password'])) {
@@ -131,9 +132,9 @@ class EmployeeController extends Controller
         return redirect()->route('employee.index')->with('success', 'Karyawan berhasil diperbarui.');
     }
 
-    public function destroy(int $id): RedirectResponse
+    public function destroy(string $employee): RedirectResponse
     {
-        $employee = Employee::findOrFail($id);
+        $employee = $this->find_employee($employee);
 
         if ($employee->profile_photo_path !== null) {
             Storage::disk('local')->delete($employee->profile_photo_path);
@@ -150,9 +151,9 @@ class EmployeeController extends Controller
         return redirect()->route('employee.index')->with('success', 'Karyawan berhasil dihapus.');
     }
 
-    public function photo(int $id): StreamedResponse
+    public function photo(string $employee): StreamedResponse
     {
-        $employee = Employee::findOrFail($id);
+        $employee = $this->find_employee($employee);
 
         if ($employee->profile_photo_path === null) {
             abort(404);
@@ -193,6 +194,17 @@ class EmployeeController extends Controller
         }
 
         return $rules;
+    }
+
+    private function find_employee(string $employee, array $relations = []): Employee
+    {
+        $query = Employee::query()->with($relations);
+
+        if (preg_match('/^[0-9a-fA-F-]{36}$/', $employee) === 1) {
+            return $query->where('unique_id', $employee)->firstOrFail();
+        }
+
+        return $query->findOrFail((int) $employee);
     }
 
     private function messages(bool $is_update = false): array

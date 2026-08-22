@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProjectDocumentJobPhoto extends Model
 {
+    use HasPublicUniqueId;
+
     protected $table = 'project_document_job_photos';
 
     protected $fillable = [
+        'unique_id',
         'project_document_job_id',
         'photo_category',
         'photo_path',
@@ -21,6 +25,7 @@ class ProjectDocumentJobPhoto extends Model
     protected function casts(): array
     {
         return [
+            'unique_id' => 'string',
             'project_document_job_id' => 'integer',
             'taken_at' => 'datetime',
             'uploaded_by' => 'integer',

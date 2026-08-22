@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 
 class Employee extends Model
 {
+    use HasPublicUniqueId;
+
     protected $table = 'employees';
 
     protected $fillable = [
+        'unique_id',
         'name',
         'email',
         'status',
@@ -19,6 +23,10 @@ class Employee extends Model
         'direct_manager_employee_id',
         'profile_photo_path',
         'employee_id',
+    ];
+
+    protected $casts = [
+        'unique_id' => 'string',
     ];
 
     public function user(): BelongsTo {
