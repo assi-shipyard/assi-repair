@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -50,19 +52,22 @@ class RolePermissionSeeder extends Seeder
 
         // Create all permissions if not exist
         foreach ($permissions as $perm) {
-            Permission::firstOrCreate([
-                'name' => $perm,
-                'guard_name' => 'web',
-                'permission_name' => $perm, // optional, for display
-            ]);
+            Permission::updateOrCreate(
+                [
+                    'name' => $perm,
+                    'guard_name' => 'web',
+                ],
+                [
+                    'permission_name' => $perm,
+                ]
+            );
         }
 
         // Role: admin (all permissions)
-        $admin = Role::firstOrCreate([
-            'name' => 'admin',
-            'guard_name' => 'web',
-            'role_name' => 'Admin', // optional, for display
-        ]);
+        $admin = Role::updateOrCreate(
+            ['name' => 'admin', 'guard_name' => 'web'],
+            ['role_name' => 'Admin']
+        );
         $admin->syncPermissions($permissions);
 
         // Role: director (limited permissions, only view and export)
@@ -80,7 +85,10 @@ class RolePermissionSeeder extends Seeder
             'view-role',
             'view-permission'
         ];
-        $director = Role::firstOrCreate(['name' => 'director', 'guard_name' => 'web']);
+        $director = Role::updateOrCreate(
+            ['name' => 'director', 'guard_name' => 'web'],
+            ['role_name' => 'Director']
+        );
         $director->syncPermissions($directorPermissions);
 
         // Role: marketing-manager (limited permissions, only view and export)
@@ -95,7 +103,10 @@ class RolePermissionSeeder extends Seeder
             'view-project-satisfaction-note',
             'view-project-realization',
         ];
-        $marketingManager = Role::firstOrCreate(['name' => 'marketing-manager', 'guard_name' => 'web']);
+        $marketingManager = Role::updateOrCreate(
+            ['name' => 'marketing-manager', 'guard_name' => 'web'],
+            ['role_name' => 'Marketing Manager']
+        );
         $marketingManager->syncPermissions($marketingManagerPermissions);
 
         // Role: marketing-staff (limited permission, but can edit company data, ship data, ship docking, and project)
@@ -103,7 +114,10 @@ class RolePermissionSeeder extends Seeder
             'view-dashboard', 'view-settings', 'view-profile', 'edit-profile',
             'edit-company', 'edit-ship', 'edit-ship-docking', 'edit-project',
         ];
-        $marketingStaff = Role::firstOrCreate(['name' => 'marketing-staff', 'guard_name' => 'web']);
+        $marketingStaff = Role::updateOrCreate(
+            ['name' => 'marketing-staff', 'guard_name' => 'web'],
+            ['role_name' => 'Marketing Staff']
+        );
         $marketingStaff->syncPermissions($marketingStaffPermissions);
     }
 }

@@ -129,6 +129,7 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::put('/{id}', 'update')->name('update');
         Route::delete('/{id}', 'destroy')->name('destroy');
         Route::get('/{id}/roles', 'edit_roles')->name('assign-roles');
+        Route::put('/{id}/roles', 'update_roles')->name('update-roles');
     });
 
     Route::resource('/notification-flag', \App\Http\Controllers\NotificationFlagController::class)->except(['show']);

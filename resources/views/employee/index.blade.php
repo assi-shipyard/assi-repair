@@ -4,7 +4,7 @@
 @section('body_title', 'Data Karyawan')
 
 @section('buttons_beside_title')
-    <a href="{{ route('employee.create') }}" class="btn btn-primary">Tambah Karyawan</a>
+	<a href="{{ route('employee.create') }}" class="btn btn-primary"><i class="ti ti-user-plus me-1"></i>Tambah Karyawan</a>
 @endsection
 
 @section('content')
@@ -128,7 +128,7 @@
 			</div>
 			<div class="directory-summary">
 				<div class="directory-pill">
-					<span class="directory-pill-label">Total User</span>
+					<span class="directory-pill-label">Total Karyawan</span>
 					<span class="directory-pill-value">{{ $employees->count() }}</span>
 				</div>
 				<div class="directory-pill">
@@ -147,7 +147,7 @@
 								<div class="d-flex align-items-center gap-3">
 									<span class="directory-avatar">{{ strtoupper(substr($employee->name, 0, 2)) }}</span>
 									<div>
-										<div class="text-secondary text-uppercase small fw-bold">User</div>
+										<div class="text-secondary text-uppercase small fw-bold">Karyawan</div>
 										<h3 class="card-title mb-1">{{ $employee->name }}</h3>
 										<div class="text-secondary">NIK {{ $employee->employee_id }}</div>
 									</div>
@@ -171,8 +171,8 @@
 							</div>
 
 							<div class="directory-card-actions">
-								<a href="{{ route('employee.show', $employee->unique_id ?? $employee->id) }}" class="btn btn-primary btn-sm">Lihat</a>
-								<a href="{{ route('employee.edit', $employee->unique_id ?? $employee->id) }}" class="btn btn-outline-primary btn-sm">Ubah</a>
+								<a href="{{ route('employee.show', $employee->unique_id ?? $employee->id) }}" class="btn btn-primary btn-sm" aria-label="Lihat detail {{ $employee->name }}"><i class="ti ti-eye"></i></a>
+								<a href="{{ route('employee.edit', $employee->unique_id ?? $employee->id) }}" class="btn btn-outline-primary btn-sm" aria-label="Ubah {{ $employee->name }}"><i class="ti ti-pencil"></i></a>
 							</div>
 						</div>
 					</div>

@@ -2,10 +2,6 @@
 
 @section('title', 'Ubah Karyawan')
 @section('body_title', 'Ubah Karyawan')
-@extends('layouts.app')
-
-@section('title', 'Ubah Karyawan')
-@section('body_title', 'Ubah Karyawan')
 
 @section('buttons_beside_title')
     <a href="{{ route('employee.show', $employee->unique_id ?? $employee->id) }}" class="btn btn-outline-secondary">Kembali</a>
@@ -123,6 +119,12 @@
         </div>
     </form>
 @endsection
+
+@push('scripts')
+    <script>
+        $(document).ready(function() {
+            $('#profile_photo').on('change', function() {
+                const file = this.files[0];
                         $('#remove_photo').prop('checked', false);
                     }
                     reader.readAsDataURL(file);

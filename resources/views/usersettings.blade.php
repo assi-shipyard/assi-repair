@@ -5,28 +5,55 @@
 
 @section('content')
 <div class="row justify-content-center">
-    <div class="col-xl-8">
+    <div class="col-xl-10">
         @include('partials.flash')
 
-        <form action="{{ route('settings.update-profile') }}" method="POST" enctype="multipart/form-data" class="mb-4">
+        <div class="card mb-4 settings-summary">
+            <div class="card-body p-4">
+                <div class="row align-items-center g-3">
+                    <div class="col-auto">
+                        @if ($employee?->profile_photo_path)
+                            <span class="avatar avatar-xl" style="background-image: url('{{ route('settings.photo') }}')"></span>
+                        @else
+                            <span class="avatar avatar-xl bg-primary-lt text-primary"><i class="ti ti-user fs-1"></i></span>
+                        @endif
+                    </div>
+                    <div class="col">
+                        <div class="text-secondary small">Akun Pengguna</div>
+                        <h2 class="mb-1">{{ $employee?->name ?? $user->employee_id ?? 'Administrator' }}</h2>
+                        <div class="text-secondary">{{ $employee?->position?->name ?? 'Akun sistem' }} <span class="mx-1">&bull;</span> {{ $user->employee_id ?? '-' }}</div>
+                    </div>
+                    <div class="col-12 col-md-auto"><span class="badge bg-success-lt text-success"><i class="ti ti-shield-check me-1"></i>Akun aktif</span></div>
+                </div>
+            </div>
+        </div>
+
+        <form id="profile-form" action="{{ route('settings.update-profile') }}" method="POST" enctype="multipart/form-data" class="mb-4">
             @csrf
             @method('PUT')
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title mb-0">Data Pribadi</h3>
+                    <div><h3 class="card-title mb-1">Profil Pengguna</h3><div class="text-secondary small">Perbarui data kontak dan foto akun Anda.</div></div>
                 </div>
                 <div class="card-body">
                     <div class="row align-items-center g-3 mb-4">
                         <div class="col-auto">
-                            <div class="avatar avatar-xl rounded" style="background-image: url('{{ route('settings.photo') }}'); background-size: cover; background-position: center;"></div>
+                            @if ($employee?->profile_photo_path)
+                                <span class="avatar avatar-xl" style="background-image: url('{{ route('settings.photo') }}')"></span>
+                            @else
+                                <span class="avatar avatar-xl bg-secondary-lt text-secondary"><i class="ti ti-user fs-1"></i></span>
+                            @endif
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Foto Profil</label>
-                            <input type="file" class="form-control" name="profile_photo" accept="image/*">
+                        <div class="col-md-7">
+                            <label class="form-label" for="profile_photo">Foto Profil</label>
+                            <input id="profile_photo" type="file" class="form-control" name="profile_photo" accept="image/jpeg,image/png,image/webp">
+                            <div class="form-hint">JPG, PNG, atau WEBP dengan ukuran maksimal 2 MB.</div>
                         </div>
-                        <div class="col-auto">
+                        @if ($employee?->profile_photo_path)
+                        <div class="col-auto align-self-end">
                             <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modal-delete-profile-picture">Hapus Foto</button>
                         </div>
+                        @endif
                     </div>
 
                     <div class="row g-3">
@@ -36,7 +63,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Nama Lengkap</label>
-                            <input type="text" class="form-control" name="name" value="{{ old('name', $employee->name ?? '') }}" required>
+                            <input type="text" class="form-control" name="name" value="{{ old('name', $employee?->name ?? '') }}" required maxlength="255" autocomplete="name">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Email</label>
@@ -54,22 +81,22 @@
             </div>
         </form>
 
-        <form action="{{ route('settings.update-password') }}" method="POST">
+        <form id="password-form" action="{{ route('settings.update-password') }}" method="POST">
             @csrf
             @method('PUT')
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title mb-0">Ubah Kata Sandi</h3>
+                    <div><h3 class="card-title mb-1">Keamanan Akun</h3><div class="text-secondary small">Gunakan kata sandi baru minimal 8 karakter.</div></div>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Kata Sandi Baru</label>
-                            <input type="password" class="form-control" name="password">
+                            <input id="password" type="password" class="form-control" name="password" autocomplete="new-password">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Konfirmasi Kata Sandi</label>
-                            <input type="password" class="form-control" name="password_confirmation">
+                            <input type="password" class="form-control" name="password_confirmation" autocomplete="new-password">
                         </div>
                     </div>
                 </div>
@@ -81,6 +108,33 @@
     </div>
 </div>
 @endsection
+
+@push('styles')
+    <style>
+        .settings-summary { border-top: 3px solid var(--tblr-primary); }
+    </style>
+@endpush
+
+@push('scripts')
+    <script>
+        if (window.jQuery && jQuery.fn.validate) {
+            jQuery('#profile-form').validate({
+                rules: { name: { required: true, maxlength: 255 }, email: { email: true, maxlength: 255 } },
+                errorElement: 'div',
+                errorClass: 'invalid-feedback',
+                highlight: function (element) { jQuery(element).addClass('is-invalid'); },
+                unhighlight: function (element) { jQuery(element).removeClass('is-invalid'); }
+            });
+            jQuery('#password-form').validate({
+                rules: { password: { required: true, minlength: 8 }, password_confirmation: { required: true, equalTo: '#password' } },
+                errorElement: 'div',
+                errorClass: 'invalid-feedback',
+                highlight: function (element) { jQuery(element).addClass('is-invalid'); },
+                unhighlight: function (element) { jQuery(element).removeClass('is-invalid'); }
+            });
+        }
+    </script>
+@endpush
 
 {{-- Modal --}}
 @section('modal')

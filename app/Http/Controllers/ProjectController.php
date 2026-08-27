@@ -250,7 +250,7 @@ class ProjectController extends Controller
 
         // Update the project, sync the divisions, and delete and recreate the owner surveyors
         $oldStatus = $project->status;
-        
+
         $project->update($data);
         $project->divisions()->sync($divisionIds);
         $project->owner_surveyors()->delete();
@@ -520,11 +520,15 @@ class ProjectController extends Controller
             return 'F';
         }
 
-        if (str_contains($normalized, 'cargo')) {
+        if (str_contains($normalized, 'barge') || str_contains($normalized, 'tongkang')) {
+            return 'B';
+        }
+
+        if (str_contains($normalized, 'cargo') || str_contains($normalized, 'container')) {
             return 'C';
         }
 
-        if (str_contains($normalized, 'tug')) {
+        if (str_contains($normalized, 'tug') || str_contains($normalized, 'ahts')) {
             return 'T';
         }
 

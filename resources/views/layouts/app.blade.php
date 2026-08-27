@@ -62,6 +62,7 @@
             font-size: 10pt !important;  /* Set smaller font size for search input */
         }
 	</style>
+	@stack('styles')
 </head>
 <body class="layout-fluid">
     @php

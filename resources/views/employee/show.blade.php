@@ -149,8 +149,12 @@
             <div class="employee-hero-body">
                 <div class="employee-profile">
                     <div class="employee-avatar-shell">
-                        <img src="{{ route('employee.photo', $employee->unique_id ?? $employee->id) }}" alt="Foto {{ $employee->name }}" class="employee-avatar-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
-                        <span class="employee-avatar-fallback" style="display:none;">{{ $employee_initials }}</span>
+                        @if ($employee->profile_photo_path)
+                            <img src="{{ route('employee.photo', $employee->unique_id ?? $employee->id) }}" alt="Foto {{ $employee->name }}" class="employee-avatar-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                            <span class="employee-avatar-fallback" style="display:none;">{{ $employee_initials }}</span>
+                        @else
+                            <span class="employee-avatar-fallback">{{ $employee_initials }}</span>
+                        @endif
                     </div>
                     <div>
                         <div class="text-uppercase small fw-bold mb-2" style="letter-spacing: .1em; color: rgba(220, 252, 231, 0.82);">Profil User</div>

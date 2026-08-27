@@ -1,5 +1,4 @@
 @extends('layouts.app')
-@extends('layouts.app')
 
 @section('title', 'Tambah Karyawan')
 @section('body_title', 'Tambah Karyawan')
@@ -122,6 +121,12 @@
         </div>
     </form>
 @endsection
+
+@push('scripts')
+    <script>
+        $(document).ready(function() {
+            $('#profile_photo').on('change', function() {
+                const file = this.files[0];
                 if (file) {
                     let reader = new FileReader();
                     reader.onload = function(event) {

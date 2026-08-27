@@ -4,12 +4,13 @@
 @section('body_title', 'Data Unit Organisasi')
 
 @section('buttons_beside_title')
-    <a href="{{ route('organizational-unit.create') }}" class="btn btn-primary">Tambah Unit</a>
+    <a href="{{ route('organizational-unit.create') }}" class="btn btn-primary"><i class="ti ti-building-plus me-1"></i>Tambah Unit</a>
 @endsection
 
 @section('content')
     @include('partials.flash')
 
+    <div class="card unit-directory-summary mb-4"><div class="card-body p-4 d-flex flex-wrap align-items-center gap-3"><span class="avatar avatar-lg bg-primary-lt text-primary"><i class="ti ti-sitemap fs-2"></i></span><div class="me-auto"><div class="text-secondary small">Struktur Organisasi</div><h2 class="mb-1">{{ $organizational_units->count() }} Unit Terdaftar</h2><div class="text-secondary">Telusuri struktur organisasi berdasarkan tingkatan unit.</div></div><span class="badge bg-secondary-lt text-secondary">{{ $organizational_units->where('type', 'directorate')->count() }} direktorat</span></div></div>
     <div class="card">
         <div class="card-header">
             <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs" role="tablist">
@@ -49,8 +50,8 @@
                                             <td class="text-center">{{ $organizational_unit->name }}</td>
                                             <td class="text-center">{{ $organizational_unit->parent?->name ?? '-' }}</td>
                                             <td class="text-center">
-                                                <a href="{{ route('organizational-unit.show', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-primary">Lihat</a>
-                                                <a href="{{ route('organizational-unit.edit', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-secondary">Ubah</a>
+                                                <a href="{{ route('organizational-unit.show', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-primary" aria-label="Lihat {{ $organizational_unit->name }}"><i class="ti ti-eye"></i></a>
+                                                <a href="{{ route('organizational-unit.edit', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-secondary" aria-label="Ubah {{ $organizational_unit->name }}"><i class="ti ti-pencil"></i></a>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -63,6 +64,8 @@
         </div>
     </div>
 @endsection
+
+@push('styles')<style>.unit-directory-summary { border-top: 3px solid var(--tblr-primary); }</style>@endpush
 
 @push('scripts')
     <script>
