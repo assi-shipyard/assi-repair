@@ -10,57 +10,34 @@
 @section('content')
     @include('partials.flash')
 
-    <div class="card unit-directory-summary mb-4"><div class="card-body p-4 d-flex flex-wrap align-items-center gap-3"><span class="avatar avatar-lg bg-primary-lt text-primary"><i class="ti ti-sitemap fs-2"></i></span><div class="me-auto"><div class="text-secondary small">Struktur Organisasi</div><h2 class="mb-1">{{ $organizational_units->count() }} Unit Terdaftar</h2><div class="text-secondary">Telusuri struktur organisasi berdasarkan tingkatan unit.</div></div><span class="badge bg-secondary-lt text-secondary">{{ $organizational_units->where('type', 'directorate')->count() }} direktorat</span></div></div>
+    <div class="card unit-directory-summary mb-4"><div class="card-body p-4 d-flex flex-wrap align-items-center gap-3"><span class="avatar avatar-lg bg-primary-lt text-primary"><i class="ti ti-sitemap fs-2"></i></span><div class="me-auto"><div class="text-secondary small">Struktur Organisasi</div><h2 class="mb-1">{{ $organizational_units->count() }} Unit Terdaftar</h2><div class="text-secondary">Divisi dan biro ditampilkan sejajar di bawah direktorat masing-masing.</div></div><span class="badge bg-secondary-lt text-secondary">{{ $organizational_units->where('type', 'division')->count() }} divisi</span><span class="badge bg-secondary-lt text-secondary">{{ $organizational_units->where('type', 'bureau')->count() }} biro</span></div></div>
     <div class="card">
-        <div class="card-header">
-            <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs" role="tablist">
-                @php
-                    $types = [
-                        'directorate' => 'Direktorat',
-                        'division' => 'Divisi',
-                        'workshop' => 'Bengkel',
-                        'subdivision' => 'Subdivisi',
-                    ];
-                @endphp
-                @foreach($types as $type => $label)
-                    <li class="nav-item" role="presentation">
-                        <a href="#tabs-{{ $type }}" class="nav-link {{ $loop->first ? 'active' : '' }}" data-bs-toggle="tab" aria-selected="{{ $loop->first ? 'true' : 'false' }}" role="tab" {!! !$loop->first ? 'tabindex="-1"' : '' !!}>{{ $label }}</a>
-                    </li>
-                @endforeach
-            </ul>
-        </div>
-        <div class="card-body p-0">
-            <div class="tab-content">
-                @foreach($types as $type => $label)
-                    <div class="tab-pane {{ $loop->first ? 'active show' : '' }}" id="tabs-{{ $type }}" role="tabpanel">
-                        <div class="table-responsive">
-                            <table class="table card-table table-vcenter text-nowrap datatable" id="organizational-unit-table-{{ $type }}">
-                                <thead>
-                                    <tr>
-                                        <th class="text-center">Kode</th>
-                                        <th class="text-center">Nama</th>
-                                        <th class="text-center">Induk</th>
-                                        <th class="text-center w-1">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($organizational_units->where('type', $type) as $organizational_unit)
-                                        <tr>
-                                            <td class="text-center">{{ $organizational_unit->code ?? '-' }}</td>
-                                            <td class="text-center">{{ $organizational_unit->name }}</td>
-                                            <td class="text-center">{{ $organizational_unit->parent?->name ?? '-' }}</td>
-                                            <td class="text-center">
-                                                <a href="{{ route('organizational-unit.show', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-primary" aria-label="Lihat {{ $organizational_unit->name }}"><i class="ti ti-eye"></i></a>
-                                                <a href="{{ route('organizational-unit.edit', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-secondary" aria-label="Ubah {{ $organizational_unit->name }}"><i class="ti ti-pencil"></i></a>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter datatable" id="organizational-unit-table">
+                <thead>
+                    <tr>
+                        <th>Kode</th>
+                        <th>Jenis Unit</th>
+                        <th>Nama</th>
+                        <th>Unit Induk</th>
+                        <th class="w-1">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($organizational_units as $organizational_unit)
+                        <tr>
+                            <td class="font-monospace">{{ $organizational_unit->code ?? '-' }}</td>
+                            <td>{{ $organizational_unit->type_label }}</td>
+                            <td class="fw-semibold">{{ $organizational_unit->name }}</td>
+                            <td>{{ $organizational_unit->parent?->name ?? '-' }}</td>
+                            <td class="text-nowrap">
+                                <a href="{{ route('organizational-unit.show', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-primary" aria-label="Lihat {{ $organizational_unit->name }}"><i class="ti ti-eye"></i></a>
+                                <a href="{{ route('organizational-unit.edit', $organizational_unit->unique_id ?? $organizational_unit->id) }}" class="btn btn-sm btn-outline-secondary" aria-label="Ubah {{ $organizational_unit->name }}"><i class="ti ti-pencil"></i></a>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
         </div>
     </div>
 @endsection
@@ -70,7 +47,7 @@
 @push('scripts')
     <script>
         $(document).ready(function() {
-            $('.datatable').DataTable({
+            $('#organizational-unit-table').DataTable({
                 "paging": true,
                 "lengthChange": true,
                 "searching": true,
@@ -98,10 +75,6 @@
                 },
             });
 
-            // Recalculate DataTables when a tab is shown to prevent hidden columns
-            $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-                $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust().responsive.recalc();
-            });
         });
     </script>
 @endpush

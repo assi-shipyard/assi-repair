@@ -259,6 +259,10 @@ class ShipController extends Controller
         // Validate the request
         $validation = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
+        ], [
+            'name.required' => 'Nama jenis kapal harus diisi.',
+            'name.string' => 'Nama jenis kapal harus berupa teks.',
+            'name.max' => 'Nama jenis kapal tidak boleh lebih dari 255 karakter.',
         ]);
 
         // If validation fails, redirect back with errors and input
@@ -268,12 +272,12 @@ class ShipController extends Controller
 
         // Create the new ship type
         $ship_type = new ShipType;
-        $ship_type->name = $request->name;
+        $ship_type->name = $validation->validated()['name'];
         $ship_type->save();
 
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json([
-                'message' => 'Ship type created successfully.',
+                'message' => 'Jenis kapal berhasil ditambahkan.',
                 'data' => [
                     'id' => $ship_type->id,
                     'name' => $ship_type->name,
@@ -281,7 +285,7 @@ class ShipController extends Controller
             ], 201);
         }
 
-        return redirect()->route('ship.type.index')->with('success', 'Ship type created successfully.');
+        return redirect()->route('ship-type.index')->with('success', 'Jenis kapal berhasil ditambahkan.');
     }
 
     /**
@@ -293,7 +297,7 @@ class ShipController extends Controller
         $ship_type = ShipType::findOrFail($id);
         $ship_type->delete();
 
-        return redirect()->route('ship.type.index')->with('success', 'Ship type deleted successfully.');
+        return redirect()->route('ship-type.index')->with('success', 'Jenis kapal berhasil dihapus.');
     }
 
     /**
@@ -314,6 +318,13 @@ class ShipController extends Controller
         // Validate the request
         $validation = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
+            'abbreviation' => 'nullable|string|max:255',
+        ], [
+            'name.required' => 'Nama klasifikasi harus diisi.',
+            'name.string' => 'Nama klasifikasi harus berupa teks.',
+            'name.max' => 'Nama klasifikasi tidak boleh lebih dari 255 karakter.',
+            'abbreviation.string' => 'Singkatan harus berupa teks.',
+            'abbreviation.max' => 'Singkatan tidak boleh lebih dari 255 karakter.',
         ]);
 
         // If validation fails, redirect back with errors and input
@@ -323,13 +334,13 @@ class ShipController extends Controller
 
         // Create the new ship class
         $ship_class = new ShipClass;
-        $ship_class->name = $request->name;
-        $ship_class->abbreviation = $request->abbreviation;
+        $ship_class->name = $validation->validated()['name'];
+        $ship_class->abbreviation = $validation->validated()['abbreviation'] ?? null;
         $ship_class->save();
 
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json([
-                'message' => 'Ship class created successfully.',
+                'message' => 'Klasifikasi berhasil ditambahkan.',
                 'data' => [
                     'id' => $ship_class->id,
                     'name' => $ship_class->name,
@@ -337,7 +348,7 @@ class ShipController extends Controller
             ], 201);
         }
 
-        return redirect()->route('ship.class.index')->with('success', 'Ship class created successfully.');
+        return redirect()->route('ship-classification.index')->with('success', 'Klasifikasi berhasil ditambahkan.');
     }
 
     /**
@@ -349,7 +360,7 @@ class ShipController extends Controller
         $ship_class = ShipClass::findOrFail($id);
         $ship_class->delete();
 
-        return redirect()->route('ship.class.index')->with('success', 'Ship class deleted successfully.');
+        return redirect()->route('ship-classification.index')->with('success', 'Klasifikasi berhasil dihapus.');
     }
 
 }

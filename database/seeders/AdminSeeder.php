@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Models\Employee;
-use App\Models\OrganizationalUnit;
-use App\Models\Position;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +28,6 @@ class AdminSeeder extends Seeder
     {
         $employee_id = trim((string) config('seeding.admin.employee_id', self::DEFAULT_EMPLOYEE_ID));
         $email = trim((string) config('seeding.admin.email', ''));
-        $name = trim((string) config('seeding.admin.name', 'Administrator Sistem'));
         $password = (string) config('seeding.admin.password', '');
         $password_was_generated = false;
         $existing_user = User::query()->where('employee_id', $employee_id)->exists();
@@ -57,37 +53,8 @@ class AdminSeeder extends Seeder
             $this->validate_password($password);
         }
 
-        DB::transaction(function () use ($employee_id, $email, $name, $password, $password_was_generated): void {
+        DB::transaction(function () use ($employee_id, $email, $password, $password_was_generated): void {
             $admin_role = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
-
-            $directorate = OrganizationalUnit::updateOrCreate(
-                ['code' => 'DIR-ADM'],
-                [
-                    'name' => 'Direktorat Administrasi',
-                    'type' => 'directorate',
-                    'parent_id' => null,
-                ]
-            );
-
-            $unit = OrganizationalUnit::updateOrCreate(
-                ['code' => 'DIV-ADM'],
-                [
-                    'name' => 'Divisi Administrasi',
-                    'type' => 'division',
-                    'parent_id' => $directorate->id,
-                ]
-            );
-
-            $position = Position::updateOrCreate(
-                ['code' => 'ADMIN'],
-                [
-                    'name' => 'Administrator Sistem',
-                    'level' => 1,
-                    'category' => 'assistant_manager',
-                    'is_head_position' => true,
-                    'organizational_unit_id' => $unit->id,
-                ]
-            );
 
             $user = User::query()->where('employee_id', $employee_id)->first();
 
@@ -102,18 +69,6 @@ class AdminSeeder extends Seeder
             $user->save();
 
             $user->syncRoles([$admin_role->name]);
-
-            Employee::updateOrCreate(
-                ['employee_id' => $employee_id],
-                [
-                    'user_id' => $user->id,
-                    'email' => $email !== '' ? $email : null,
-                    'name' => $name,
-                    'status' => 'active',
-                    'position_id' => $position->id,
-                    'direct_manager_employee_id' => null,
-                ]
-            );
 
             $this->report($employee_id, $password, $password_was_generated, $user->wasRecentlyCreated);
         });

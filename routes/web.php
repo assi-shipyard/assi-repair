@@ -180,17 +180,17 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
     Route::put('/docking-space/{docking_space}', [DockingManagementController::class, 'update_docking_space'])->name('docking-space.update');
     Route::delete('/docking-space/{docking_space}', [DockingManagementController::class, 'destroy_docking_space'])->name('docking-space.destroy');
 
-    Route::view('/ship-type', 'examples.placeholder', [
-        'page_title' => 'Data Jenis Kapal',
-        'body_title' => 'Data Jenis Kapal',
-        'message' => 'Halaman data jenis kapal belum diaktifkan.',
-    ])->name('ship-type.index');
+    Route::controller(ShipController::class)->prefix('ship-type')->name('ship-type.')->group(function (): void {
+        Route::get('/', 'type_index')->name('index');
+        Route::post('/', 'type_store')->name('store');
+        Route::delete('/{id}', 'type_destroy')->name('destroy');
+    });
 
-    Route::view('/ship-classification', 'examples.placeholder', [
-        'page_title' => 'Data Klasifikasi',
-        'body_title' => 'Data Klasifikasi',
-        'message' => 'Halaman data klasifikasi belum diaktifkan.',
-    ])->name('ship-classification.index');
+    Route::controller(ShipController::class)->prefix('ship-classification')->name('ship-classification.')->group(function (): void {
+        Route::get('/', 'class_index')->name('index');
+        Route::post('/', 'class_store')->name('store');
+        Route::delete('/{id}', 'class_destroy')->name('destroy');
+    });
 
     Route::view('/price-dictionary', 'examples.placeholder', [
         'page_title' => 'Data Jenis Reparasi',

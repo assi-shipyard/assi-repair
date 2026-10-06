@@ -10,6 +10,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class PositionController extends Controller
 {
@@ -24,7 +25,7 @@ class PositionController extends Controller
 
     public function create(): View
     {
-        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'directorate', 'division', 'subdivision', 'workshop')")
+        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
             ->orderBy('name')
             ->get();
         $category_options = Position::category_options();
@@ -34,7 +35,7 @@ class PositionController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validation = Validator::make($request->all(), $this->rules(), $this->messages());
+        $validation = Validator::make($request->all(), $this->rules($request), $this->messages());
 
         if ($validation->fails()) {
             return back()->withErrors($validation)->withInput();
@@ -56,7 +57,7 @@ class PositionController extends Controller
     {
         $position = $this->find_position($position);
 
-        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'directorate', 'division', 'subdivision', 'workshop')")
+        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
             ->orderBy('name')
             ->get();
         $category_options = Position::category_options();
@@ -68,7 +69,7 @@ class PositionController extends Controller
     {
         $position = $this->find_position($position);
 
-        $validation = Validator::make($request->all(), $this->rules($position->id), $this->messages());
+        $validation = Validator::make($request->all(), $this->rules($request, $position->id), $this->messages());
 
         if ($validation->fails()) {
             return back()->withErrors($validation)->withInput();
@@ -92,9 +93,8 @@ class PositionController extends Controller
         return redirect()->route('position.index')->with('success', 'Jabatan berhasil dihapus.');
     }
 
-    private function rules(?int $position_id = null): array
+    private function rules(Request $request, ?int $position_id = null): array
     {
-        $name_rule = 'required|string|max:255|unique:positions,name';
         $code_rule = 'nullable|string|max:50|unique:positions,code';
 
         if ($position_id !== null) {
@@ -103,7 +103,14 @@ class PositionController extends Controller
         }
 
         return [
-            'name' => $name_rule,
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('positions', 'name')
+                    ->where('organizational_unit_id', $request->input('organizational_unit_id'))
+                    ->ignore($position_id),
+            ],
             'category' => 'required|in:'.implode(',', array_keys(Position::category_options())),
             'is_head_position' => 'nullable|boolean',
             'code' => $code_rule,

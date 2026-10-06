@@ -13,7 +13,7 @@ class OrganizationalUnitController extends Controller
     {
         // Fetch organizational units with their parent, children, and positions, ordered by type and name
         $organizational_units = OrganizationalUnit::with(['parent', 'children', 'positions'])
-            ->orderByRaw("FIELD(type, 'directorate', 'division', 'subdivision', 'workshop')")
+            ->orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
             ->orderBy('name')
             ->get();
 
@@ -25,7 +25,9 @@ class OrganizationalUnitController extends Controller
     {
         // Fetch types and existing organizational units for the form
         $types = $this->types();
-        $organizational_units = OrganizationalUnit::orderBy('name')->get();
+        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
+            ->orderBy('name')
+            ->get();
 
         return view('organizational-unit.create', compact('types', 'organizational_units'));
     }
@@ -75,6 +77,7 @@ class OrganizationalUnitController extends Controller
         $organizational_unit = $this->find_organizational_unit($organizational_unit);
         $types = $this->types();
         $organizational_units = OrganizationalUnit::where('id', '!=', $organizational_unit->id)
+            ->orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
             ->orderBy('name')
             ->get();
 
@@ -134,32 +137,26 @@ class OrganizationalUnitController extends Controller
         return redirect()->route('organizational-unit.index')->with('success', 'Unit organisasi berhasil dihapus.');
     }
 
-    // Private helper methods for types, validation rules, messages, and parent type error checking
     private function types(): array
     {
-        return [
-            'directorate' => 'Direktorat',
-            'division' => 'Divisi',
-            'subdivision' => 'Subdivisi',
-            'workshop' => 'Workshop / Bengkel',
-        ];
+        return OrganizationalUnit::TYPE_LABELS;
     }
 
     // Validation rules for creating or updating an organizational unit, with optional unique code validation for updates
-    private function rules(?int $organizationalUnitId = null): array
+    private function rules(?int $organizational_unit_id = null): array
     {
         // Define the validation rule for the 'code' field, allowing it to be nullable, a string, a maximum of 50 characters, and unique in the organizational_units table
         $codeRule = 'nullable|string|max:50|unique:organizational_units,code';
 
         // If an organizational unit ID is provided (for updates), append it to the unique validation rule to exclude the current record from the uniqueness check
-        if ($organizationalUnitId !== null) {
-            $codeRule .= ','.$organizationalUnitId;
+        if ($organizational_unit_id !== null) {
+            $codeRule .= ','.$organizational_unit_id;
         }
 
         return [
             'name' => 'required|string|max:255',
             'code' => $codeRule,
-            'type' => 'required|in:directorate,division,subdivision,workshop',
+            'type' => 'required|in:'.implode(',', array_keys(OrganizationalUnit::TYPE_LABELS)),
             'parent_id' => 'nullable|exists:organizational_units,id',
         ];
     }
@@ -176,40 +173,27 @@ class OrganizationalUnitController extends Controller
         ];
     }
 
-    // Private helper method to check for parent type errors based on the organizational unit's type and its parent's type, ensuring that the parent-child relationship is valid according to the defined hierarchy
-    private function parent_type_error(string $type, mixed $parentId, ?int $currentId = null): ?string
+    private function parent_type_error(string $type, mixed $parent_id, ?int $current_id = null): ?string
     {
-        // If the organizational unit is a directorate, it should not have a parent unit because it is the highest level. If it does, return an error message.
-        if ($type === 'directorate') {
-            if ($parentId !== null && $parentId !== '') {
-                return 'Direktorat tidak boleh memiliki unit induk.';
+        if (OrganizationalUnit::ALLOWED_PARENT_TYPES[$type] === []) {
+            if ($parent_id !== null && $parent_id !== '') {
+                return 'CEO tidak boleh memiliki unit induk.';
             }
 
             return null;
         }
 
-        // If the organizational unit is not a directorate, it must have a parent unit. If it doesn't, return an error message.
-        if (! $parentId) {
+        if (! $parent_id) {
             return 'Unit ini memerlukan unit induk.';
         }
 
-        // Fetch the parent organizational unit by its ID to check its type and validate the parent-child relationship according to the defined hierarchy.
-        $parent = OrganizationalUnit::findOrFail($parentId);
+        $parent = OrganizationalUnit::findOrFail($parent_id);
 
-        // Define the allowed parent types for each organizational unit type, ensuring that the parent-child relationship is valid according to the defined hierarchy.
-        $allowedParentTypes = [
-            'division' => ['directorate'],
-            'subdivision' => ['division'],
-            'workshop' => ['division'],
-        ];
-
-        // Check if the parent unit is the same as the current unit to prevent self-referencing, which would create a circular relationship. If it is, return an error message.
-        if ($currentId !== null && (int) $parent->id === $currentId) {
+        if ($current_id !== null && (int) $parent->id === $current_id) {
             return 'Unit induk tidak boleh sama dengan unit itu sendiri.';
         }
 
-        // Check if the parent unit's type is allowed for the current unit's type based on the defined hierarchy. If it is not, return an error message indicating that the parent unit type is not valid for the selected unit type.
-        if (! in_array($parent->type, $allowedParentTypes[$type] ?? [], true)) {
+        if (! in_array($parent->type, OrganizationalUnit::ALLOWED_PARENT_TYPES[$type], true)) {
             return 'Jenis unit induk tidak sesuai dengan unit yang dipilih.';
         }
 

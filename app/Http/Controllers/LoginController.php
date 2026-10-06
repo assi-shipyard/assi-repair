@@ -170,7 +170,7 @@ class LoginController extends Controller
 
         $request->session()->put([
             'employee_id' => $employee?->employee_id ?? $user->employee_id,
-            'employee_name' => $employee?->name,
+            'employee_name' => $employee?->name ?? ($user->hasRole('admin') ? config('seeding.admin.name') : null),
             'employee_position' => $employee?->position?->name,
         ]);
     }

@@ -12,6 +12,30 @@ class OrganizationalUnit extends Model
 {
     use HasPublicUniqueId;
 
+    public const TYPE_LABELS = [
+        'ceo' => 'CEO',
+        'chrgao' => 'CHRGAO',
+        'cfo' => 'CFO',
+        'cpo' => 'CPO',
+        'directorate' => 'Direktorat',
+        'division' => 'Divisi',
+        'bureau' => 'Biro',
+        'subdivision' => 'Subdivisi',
+        'workshop' => 'Workshop / Bengkel',
+    ];
+
+    public const ALLOWED_PARENT_TYPES = [
+        'ceo' => [],
+        'chrgao' => ['ceo'],
+        'cfo' => ['ceo'],
+        'cpo' => ['ceo'],
+        'directorate' => ['chrgao', 'cfo', 'cpo'],
+        'division' => ['directorate'],
+        'bureau' => ['directorate'],
+        'subdivision' => ['division'],
+        'workshop' => ['division', 'cpo'],
+    ];
+
     protected $fillable = [
         'unique_id',
         'name',
@@ -49,12 +73,6 @@ class OrganizationalUnit extends Model
 
     public function getTypeLabelAttribute(): string
     {
-        return match ($this->type) {
-            'directorate' => 'Direktorat',
-            'division' => 'Divisi',
-            'subdivision' => 'Subdivisi',
-            'workshop' => 'Workshop / Bengkel',
-            default => ucfirst((string) $this->type),
-        };
+        return self::TYPE_LABELS[$this->type] ?? ucfirst((string) $this->type);
     }
 }

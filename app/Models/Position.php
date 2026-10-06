@@ -12,16 +12,18 @@ class Position extends Model
     use HasPublicUniqueId;
 
     public const CATEGORY_LEVELS = [
-        'director' => 1,
+        'c_suite' => 1,
         'manager' => 2,
+        'head_of_bureau' => 2,
         'assistant_manager' => 3,
         'supervisor_staff' => 4,
         'pelaksana' => 5,
     ];
 
     public const CATEGORY_OPTIONS = [
-        'director' => 'Direktur (CEO/CFO/CHRO/CPO)',
-        'manager' => 'Manajer (Kepala Divisi)',
+        'c_suite' => 'Eksekutif C-Suite (CEO/CHRGAO/CFO/CPO)',
+        'manager' => 'Manajer Divisi',
+        'head_of_bureau' => 'Kepala Biro',
         'assistant_manager' => 'Asisten Manajer / Kepala Bengkel',
         'supervisor_staff' => 'Supervisor/Staf',
         'pelaksana' => 'Pelaksana',
