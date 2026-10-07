@@ -29,7 +29,7 @@ class CompanyController extends Controller
     public function index(): View
     {
         // Fetch all companies to display in the index view
-        $companies = Company::all();
+        $companies = Company::withCount('ships')->orderBy('name')->get();
 
         return view('company.index', compact('companies'));
     }
@@ -95,8 +95,9 @@ class CompanyController extends Controller
         }
 
         $documents = $company->documents()->get();
+        $ships = $company->ships()->with(['type', 'classification'])->orderBy('name')->get();
 
-        return view('company.show', compact('company', 'documents'));
+        return view('company.show', compact('company', 'documents', 'ships'));
     }
 
     // Show edit company form
@@ -375,8 +376,9 @@ class CompanyController extends Controller
         }
 
         $documents = $company->documents()->get();
+        $ships = $company->ships()->with(['type', 'classification'])->orderBy('name')->get();
 
-        return view('company.show', compact('company', 'documents'));
+        return view('company.show', compact('company', 'documents', 'ships'));
     }
 
     public function delete_document($companyId, $documentId): RedirectResponse

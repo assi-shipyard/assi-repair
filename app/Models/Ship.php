@@ -44,6 +44,16 @@ class Ship extends Model
 		return $this->belongsTo(ShipClass::class, 'ship_class_id');
 	}
 
+	public function documents(): HasMany
+	{
+		return $this->hasMany(ShipDocument::class, 'ship_id');
+	}
+
+	public function projects(): HasMany
+	{
+		return $this->hasMany(Project::class, 'ship_id');
+	}
+
 	public function docking_requests(): HasMany
 	{
 		return $this->hasMany(ProjectDockingRequest::class, 'ship_id');

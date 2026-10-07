@@ -4,8 +4,12 @@
 @section('body_title', 'Detail Perusahaan')
 
 @section('buttons_beside_title')
-    <a href="{{ route('company.edit', $company->unique_id) }}" class="btn btn-outline-primary">Ubah</a>
-    <a href="{{ route('company.index') }}" class="btn btn-outline-secondary">Kembali</a>
+    <a href="{{ route('company.edit', $company->unique_id) }}" class="btn btn-outline-primary">
+        <span class="ti ti-edit me-1"></span>Ubah
+    </a>
+    <a href="{{ route('company.index') }}" class="btn btn-outline-secondary">
+        <span class="ti ti-arrow-left me-1"></span>Kembali
+    </a>
 @endsection
 
 @section('content')
@@ -15,8 +19,6 @@
         $logo_url = $company->logo_path
             ? Storage::disk('public')->url('company_logos/' . $company->logo_path)
             : asset('assets/img/default_profile.jpg');
-        $document_total = $documents->count();
-        $contact_total = collect([$company->phone_1, $company->phone_2, $company->email])->filter()->count();
         $profile_completion = collect([
             $company->address,
             $company->phone_1,
@@ -30,181 +32,106 @@
 
     <style>
         .detail-hero {
-            position: relative;
-            overflow: hidden;
             border: 0;
-            border-radius: 1.25rem;
-            background: linear-gradient(135deg, #0f172a 0%, #155e75 55%, #67e8f9 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #155e75 60%, #22a6c4 100%);
             color: #f8fafc;
-            box-shadow: 0 2rem 4rem -2.75rem rgba(15, 23, 42, 0.85);
-        }
-
-        .detail-hero::after {
-            content: '';
-            position: absolute;
-            inset: auto -4rem -5rem auto;
-            width: 14rem;
-            height: 14rem;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.12);
-        }
-
-        .detail-hero-body {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1.5rem;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1.75rem;
-        }
-
-        .detail-hero-profile {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
         }
 
         .detail-hero-avatar {
-            width: 5.5rem;
-            height: 5.5rem;
-            border-radius: 1.35rem;
+            flex: 0 0 auto;
+            width: 4rem;
+            height: 4rem;
+            border-radius: .85rem;
             background-size: cover;
             background-position: center;
-            border: 3px solid rgba(255, 255, 255, 0.25);
-            box-shadow: 0 1.25rem 2.5rem -1.75rem rgba(15, 23, 42, 0.9);
-        }
-
-        .detail-hero-kpis {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: .75rem;
-            min-width: min(100%, 24rem);
+            border: 2px solid rgba(255, 255, 255, 0.3);
         }
 
         .detail-kpi {
-            padding: .9rem 1rem;
-            border-radius: 1rem;
-            background: rgba(15, 23, 42, 0.22);
+            padding: .4rem .85rem;
+            border-radius: .6rem;
+            background: rgba(15, 23, 42, 0.25);
             border: 1px solid rgba(255, 255, 255, 0.14);
-            backdrop-filter: blur(10px);
+            text-align: center;
+            min-width: 5.5rem;
         }
 
         .detail-kpi-label {
             display: block;
-            font-size: .72rem;
+            font-size: .68rem;
             text-transform: uppercase;
-            letter-spacing: .08em;
+            letter-spacing: .06em;
             color: rgba(226, 232, 240, 0.82);
         }
 
         .detail-kpi-value {
             display: block;
-            margin-top: .35rem;
-            font-size: 1.45rem;
+            font-size: 1.2rem;
             font-weight: 700;
+            line-height: 1.3;
         }
 
-        .detail-surface {
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            border-radius: 1.15rem;
-            box-shadow: 0 1.5rem 3rem -2.5rem rgba(15, 23, 42, 0.45);
+        .detail-list-item {
+            display: flex;
+            gap: .75rem;
+            padding: .6rem 1rem;
+            border-bottom: 1px solid var(--tblr-border-color);
         }
 
-        .detail-info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 1rem;
+        .detail-list-item:last-child {
+            border-bottom: 0;
         }
 
-        .detail-info-item {
-            padding: 1rem;
-            border-radius: 1rem;
-            background: var(--tblr-bg-surface-secondary);
-            border: 1px solid rgba(15, 23, 42, 0.05);
-        }
-
-        .detail-info-label {
-            font-size: .75rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
+        .detail-list-item .ti {
+            flex: 0 0 auto;
+            margin-top: .15rem;
             color: var(--tblr-secondary);
-            margin-bottom: .35rem;
         }
 
-        .detail-side-stack {
-            display: grid;
-            gap: 1rem;
+        .detail-list-label {
+            font-size: .72rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: var(--tblr-secondary);
         }
 
-        .detail-side-card {
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            border-radius: 1.15rem;
-            background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.92));
-        }
-
-        .document-card {
-            height: 100%;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            border-radius: 1rem;
-            box-shadow: 0 1rem 2.5rem -2rem rgba(15, 23, 42, 0.6);
-        }
-
-        .document-card .card-body {
-            display: flex;
-            flex-direction: column;
-            gap: .9rem;
-        }
-
-        .document-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        @media (max-width: 767.98px) {
-            .detail-hero-kpis,
-            .detail-info-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .detail-hero-body {
-                padding: 1.25rem;
-            }
+        .detail-table-scroll {
+            max-height: 24rem;
+            overflow-y: auto;
         }
     </style>
 
     <div class="d-flex flex-column gap-3">
         <div class="card detail-hero">
-            <div class="detail-hero-body">
-                <div class="detail-hero-profile">
-                    <div class="detail-hero-avatar" style="background-image: url('{{ $logo_url }}');"></div>
-                    <div>
-                        <div class="text-uppercase small fw-bold" style="letter-spacing: .1em; color: rgba(226, 232, 240, 0.78);">Profil Perusahaan</div>
-                        <h1 class="mb-1 text-white">{{ $company->name }}</h1>
-                        <div style="color: rgba(226, 232, 240, 0.82);">{{ $company->email ?? 'Email belum diatur' }}</div>
-                        <div class="mt-2 d-flex flex-wrap gap-2">
-                            <span class="badge bg-white text-cyan">{{ $company->registration_number ?? 'Registrasi belum diatur' }}</span>
-                            <span class="badge" style="background: rgba(255,255,255,.16); color: #f8fafc;">NPWP {{ $company->tax_id ?? '-' }}</span>
+            <div class="card-body py-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3 min-w-0">
+                        <div class="detail-hero-avatar" style="background-image: url('{{ $logo_url }}');"></div>
+                        <div class="min-w-0">
+                            <h2 class="mb-1 text-white">{{ $company->name }}</h2>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="badge bg-white text-cyan">{{ $company->registration_number ?? 'Registrasi belum diatur' }}</span>
+                                <span class="badge" style="background: rgba(255,255,255,.16); color: #f8fafc;">NPWP {{ $company->tax_id ?? '-' }}</span>
+                                <span class="badge {{ $profile_completion >= 5 ? 'bg-green' : 'bg-yellow' }}">
+                                    {{ $profile_completion >= 5 ? 'Profil lengkap' : 'Perlu dilengkapi' }}
+                                </span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="detail-hero-kpis">
-                    <div class="detail-kpi">
-                        <span class="detail-kpi-label">Dokumen</span>
-                        <span class="detail-kpi-value">{{ $document_total }}</span>
-                    </div>
-                    <div class="detail-kpi">
-                        <span class="detail-kpi-label">Kontak Tersedia</span>
-                        <span class="detail-kpi-value">{{ $contact_total }}</span>
-                    </div>
-                    <div class="detail-kpi">
-                        <span class="detail-kpi-label">Profil Terisi</span>
-                        <span class="detail-kpi-value">{{ $profile_completion }}/7</span>
+                    <div class="d-flex gap-2">
+                        <div class="detail-kpi">
+                            <span class="detail-kpi-label">Kapal</span>
+                            <span class="detail-kpi-value">{{ $ships->count() }}</span>
+                        </div>
+                        <div class="detail-kpi">
+                            <span class="detail-kpi-label">Dokumen</span>
+                            <span class="detail-kpi-value">{{ $documents->count() }}</span>
+                        </div>
+                        <div class="detail-kpi">
+                            <span class="detail-kpi-label">Profil</span>
+                            <span class="detail-kpi-value">{{ $profile_completion }}/7</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -212,39 +139,64 @@
 
         <div class="row g-3">
             <div class="col-lg-4">
-                <div class="detail-side-stack">
-                    <div class="card detail-side-card">
-                        <div class="card-header border-0 pb-0">
-                            <h3 class="card-title mb-0">Kontak Utama</h3>
+                <div class="d-flex flex-column gap-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><span class="ti ti-id me-2"></span>Informasi Perusahaan</h3>
                         </div>
-                        <div class="card-body pt-3">
-                            <div class="detail-info-item mb-3">
-                                <div class="detail-info-label">Email</div>
-                                <div class="fw-semibold text-break">{{ $company->email ?? '-' }}</div>
+                        <div class="p-0">
+                            <div class="detail-list-item">
+                                <span class="ti ti-map-pin"></span>
+                                <div>
+                                    <div class="detail-list-label">Alamat</div>
+                                    <div class="fw-semibold">{{ $company->address ?? '-' }}</div>
+                                </div>
                             </div>
-                            <div class="detail-info-item mb-3">
-                                <div class="detail-info-label">Telepon Utama</div>
-                                <div class="fw-semibold">{{ $company->phone_1 ?? '-' }}</div>
+                            <div class="detail-list-item">
+                                <span class="ti ti-mail"></span>
+                                <div class="min-w-0">
+                                    <div class="detail-list-label">Email</div>
+                                    <div class="fw-semibold text-break">{{ $company->email ?? '-' }}</div>
+                                </div>
                             </div>
-                            <div class="detail-info-item">
-                                <div class="detail-info-label">Telepon Alternatif</div>
-                                <div class="fw-semibold">{{ $company->phone_2 ?? '-' }}</div>
+                            <div class="detail-list-item">
+                                <span class="ti ti-phone"></span>
+                                <div>
+                                    <div class="detail-list-label">Telepon</div>
+                                    <div class="fw-semibold">{{ $company->phone_1 ?? '-' }}</div>
+                                    @if ($company->phone_2)
+                                        <div class="fw-semibold">{{ $company->phone_2 }}</div>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="detail-list-item">
+                                <span class="ti ti-user-star"></span>
+                                <div>
+                                    <div class="detail-list-label">Direktur Utama</div>
+                                    <div class="fw-semibold">{{ $company->ceo_name ?? '-' }}</div>
+                                </div>
+                            </div>
+                            <div class="detail-list-item">
+                                <span class="ti ti-user"></span>
+                                <div>
+                                    <div class="detail-list-label">PIC</div>
+                                    <div class="fw-semibold">{{ $company->pic_name ?? '-' }}</div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="card detail-side-card">
-                        <div class="card-header border-0 pb-0">
-                            <h3 class="card-title mb-0">Unggah Logo</h3>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><span class="ti ti-photo me-2"></span>Logo Perusahaan</h3>
                         </div>
-                        <div class="card-body pt-3">
+                        <div class="card-body">
                             <form action="{{ route('company.upload-logo', $company->unique_id) }}" method="POST" enctype="multipart/form-data">
                                 @csrf
-                                <div class="mb-3">
-                                    <label class="form-label">Logo Perusahaan</label>
+                                <div class="input-group">
                                     <input class="form-control" type="file" name="company_logo" accept="image/*" required>
+                                    <button class="btn btn-primary" type="submit">Unggah</button>
                                 </div>
-                                <button class="btn btn-primary w-100" type="submit">Unggah Logo Baru</button>
                             </form>
                         </div>
                     </div>
@@ -252,90 +204,99 @@
             </div>
 
             <div class="col-lg-8">
-                <div class="card detail-surface mb-3">
-                    <div class="card-header border-0 pb-0">
-                        <h3 class="card-title mb-0">Informasi Perusahaan</h3>
+                <div class="d-flex flex-column gap-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><span class="ti ti-ship me-2"></span>Kapal Milik Perusahaan</h3>
+                            <div class="card-actions">
+                                <span class="badge bg-blue-lt text-blue">{{ $ships->count() }} kapal</span>
+                            </div>
+                        </div>
+                        @if ($ships->isEmpty())
+                            <div class="card-body text-center text-secondary py-4">
+                                <span class="ti ti-ship-off fs-1"></span>
+                                <div class="mt-2">Perusahaan ini belum memiliki kapal.</div>
+                            </div>
+                        @else
+                            <div class="table-responsive detail-table-scroll">
+                                <table class="table table-vcenter table-sm card-table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Nama Kapal</th>
+                                            <th>Jenis</th>
+                                            <th>Klasifikasi</th>
+                                            <th class="w-1"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($ships as $ship)
+                                            <tr>
+                                                <td class="fw-semibold">{{ $ship->name }}</td>
+                                                <td>{{ $ship->type?->name ?? '-' }}</td>
+                                                <td>{{ $ship->classification?->name ?? '-' }}</td>
+                                                <td>
+                                                    <a href="{{ route('ship.show', $ship->unique_id ?? $ship->id) }}" class="btn btn-sm btn-outline-primary">
+                                                        <span class="ti ti-eye me-1"></span>Lihat
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
                     </div>
-                    <div class="card-body pt-3">
-                        <div class="detail-info-grid">
-                            <div class="detail-info-item">
-                                <div class="detail-info-label">Alamat</div>
-                                <div class="fw-semibold">{{ $company->address ?? '-' }}</div>
-                            </div>
-                            <div class="detail-info-item">
-                                <div class="detail-info-label">CEO</div>
-                                <div class="fw-semibold">{{ $company->ceo_name ?? '-' }}</div>
-                            </div>
-                            <div class="detail-info-item">
-                                <div class="detail-info-label">PIC</div>
-                                <div class="fw-semibold">{{ $company->pic_name ?? '-' }}</div>
-                            </div>
-                            <div class="detail-info-item">
-                                <div class="detail-info-label">Nomor Registrasi</div>
-                                <div class="fw-semibold">{{ $company->registration_number ?? '-' }}</div>
-                            </div>
-                            <div class="detail-info-item">
-                                <div class="detail-info-label">NPWP</div>
-                                <div class="fw-semibold">{{ $company->tax_id ?? '-' }}</div>
-                            </div>
-                            <div class="detail-info-item">
-                                <div class="detail-info-label">Status Profil</div>
-                                <div class="fw-semibold">{{ $profile_completion >= 5 ? 'Siap digunakan' : 'Perlu dilengkapi' }}</div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><span class="ti ti-files me-2"></span>Dokumen Perusahaan</h3>
+                            <div class="card-actions">
+                                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal">
+                                    <span class="ti ti-upload me-1"></span>Unggah Dokumen
+                                </button>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <div class="card detail-surface">
-                    <div class="card-body">
-                        <div class="document-toolbar mb-3">
-                            <div>
-                                <h3 class="card-title mb-1">Dokumen Perusahaan</h3>
-                                <div class="text-secondary">Kelola dokumen legal dan pendukung perusahaan.</div>
+                        @if ($documents->isEmpty())
+                            <div class="card-body text-center text-secondary py-4">
+                                <span class="ti ti-file-off fs-1"></span>
+                                <div class="mt-2">Belum ada dokumen. Unggah dokumen untuk melengkapi arsip perusahaan.</div>
                             </div>
-                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal">Unggah Dokumen</button>
-                        </div>
-
-                        <div class="row g-3">
-                            @forelse ($documents as $document)
-                                <div class="col-12 col-md-6">
-                                    <div class="card document-card">
-                                        <div class="card-body">
-                                            <div class="d-flex align-items-start justify-content-between gap-3">
-                                                <div>
-                                                    <div class="text-secondary text-uppercase small fw-bold">{{ $document->document_type }}</div>
-                                                    <h4 class="mb-1">{{ $document->document_name }}</h4>
-                                                </div>
-                                                <span class="badge bg-cyan-lt text-cyan">Dokumen</span>
-                                            </div>
-
-                                            <div class="detail-info-item mb-0">
-                                                <div class="detail-info-label">Nama File</div>
-                                                <a href="{{ Storage::disk('public')->url($document->document_path) }}" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none text-break">
-                                                    {{ basename((string) $document->document_path) }}
-                                                </a>
-                                            </div>
-
-                                            <div class="d-flex gap-2 flex-wrap mt-auto">
-                                                <a href="{{ Storage::disk('public')->url($document->document_path) }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">Lihat File</a>
-                                                <form action="{{ route('company.delete-document', [$company->unique_id, $document->unique_id ?? $document->id]) }}" method="POST" onsubmit="return confirm('Hapus dokumen ini?')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button class="btn btn-outline-danger btn-sm" type="submit">Hapus</button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            @empty
-                                <div class="col-12">
-                                    <div class="detail-info-item text-center py-5">
-                                        <div class="fw-semibold mb-1">Belum ada dokumen perusahaan</div>
-                                        <div class="text-secondary">Unggah dokumen untuk melengkapi arsip perusahaan.</div>
-                                    </div>
-                                </div>
-                            @endforelse
-                        </div>
+                        @else
+                            <div class="table-responsive">
+                                <table class="table table-vcenter table-sm card-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Dokumen</th>
+                                            <th>Tipe</th>
+                                            <th>File</th>
+                                            <th class="w-1"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($documents as $document)
+                                            <tr>
+                                                <td class="fw-semibold">{{ $document->document_name }}</td>
+                                                <td><span class="badge bg-cyan-lt text-cyan">{{ $document->document_type }}</span></td>
+                                                <td class="text-break">
+                                                    <a href="{{ Storage::disk('public')->url($document->document_path) }}" target="_blank" rel="noopener noreferrer">
+                                                        {{ basename((string) $document->document_path) }}
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    <form action="{{ route('company.delete-document', [$company->unique_id, $document->unique_id ?? $document->id]) }}" method="POST" onsubmit="return confirm('Hapus dokumen ini?')">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button class="btn btn-sm btn-outline-danger" type="submit" title="Hapus dokumen">
+                                                            <span class="ti ti-trash"></span>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>

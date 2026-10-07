@@ -93,7 +93,7 @@
                         <h2 class="accordion-header" id="revision-heading-<?php echo e($document_type); ?>"><button class="accordion-button <?php echo e($loop->first ? '' : 'collapsed'); ?>" type="button" data-bs-toggle="collapse" data-bs-target="#revision-collapse-<?php echo e($document_type); ?>" aria-expanded="<?php echo e($loop->first ? 'true' : 'false'); ?>"><span class="fw-semibold"><?php echo e($documentTypeLabels[$document_type]); ?></span><span class="badge bg-secondary-lt text-secondary ms-2"><?php echo e($stage_documents->count()); ?> revisi</span></button></h2>
                         <div id="revision-collapse-<?php echo e($document_type); ?>" class="accordion-collapse collapse <?php echo e($loop->first ? 'show' : ''); ?>" data-bs-parent="#revision-history">
                             <div class="accordion-body p-0">
-                                <?php $__empty_0 = true; $__currentLoopData = $stage_documents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $workflow_document): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_0 = false; ?>
+                                <?php $__empty_1 = true; $__currentLoopData = $stage_documents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $workflow_document): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                                     <?php ($status_class = $document_status_classes[$workflow_document->status] ?? 'bg-primary-lt text-primary'); ?>
                                     <a href="<?php echo e(route('project.job-document.workflow.show', [$project->unique_id, $workflow_document->unique_id ?? $workflow_document->id])); ?>" class="revision-row list-group-item list-group-item-action">
                                         <div class="row align-items-center g-2">
@@ -104,7 +104,7 @@
                                             <div class="col-auto"><i class="ti ti-chevron-right text-secondary"></i></div>
                                         </div>
                                     </a>
-                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_0): ?>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                                     <div class="text-secondary small px-3 py-4">Belum ada revisi untuk tahap ini.</div>
                                 <?php endif; ?>
                             </div>

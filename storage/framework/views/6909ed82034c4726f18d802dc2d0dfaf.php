@@ -2,163 +2,150 @@
 <?php $__env->startSection('body_title', 'Data Perusahaan'); ?>
 
 <?php $__env->startSection('buttons_beside_title'); ?>
-    <a href="<?php echo e(route('company.create')); ?>" class="btn btn-primary">Tambah Perusahaan</a>
+    <a href="<?php echo e(route('company.create')); ?>" class="btn btn-primary">
+        <span class="ti ti-plus me-1"></span>Tambah Perusahaan
+    </a>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('content'); ?>
     <?php echo $__env->make('partials.flash', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <style>
-        .directory-toolbar {
+        .directory-stat {
             display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
             align-items: center;
-            justify-content: space-between;
-            padding: 1.25rem;
-            border-radius: 1rem;
-            background: linear-gradient(135deg, rgba(12, 74, 110, 0.08), rgba(8, 145, 178, 0.14));
-            border: 1px solid rgba(8, 145, 178, 0.15);
-        }
-
-        .directory-search {
-            position: relative;
-            flex: 1 1 24rem;
-        }
-
-        .directory-search .ti {
-            position: absolute;
-            top: 50%;
-            left: 1rem;
-            transform: translateY(-50%);
-            color: var(--tblr-secondary);
-        }
-
-        .directory-search-input {
-            padding-left: 2.75rem;
-            border-radius: 999px;
-        }
-
-        .directory-summary {
-            display: flex;
             gap: .75rem;
-            flex-wrap: wrap;
         }
 
-        .directory-pill {
-            min-width: 10rem;
-            padding: .85rem 1rem;
-            border-radius: .9rem;
-            background-color: rgba(255, 255, 255, 0.72);
-            border: 1px solid rgba(15, 23, 42, 0.06);
-        }
-
-        .directory-pill-label {
-            display: block;
-            font-size: .75rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: var(--tblr-secondary);
-        }
-
-        .directory-pill-value {
-            display: block;
-            margin-top: .2rem;
-            font-size: 1.4rem;
+        .directory-avatar {
+            flex: 0 0 auto;
+            width: 2.75rem;
+            height: 2.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: .75rem;
             font-weight: 700;
-            color: var(--tblr-dark);
         }
 
         .directory-card {
             height: 100%;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            border-radius: 1rem;
-            box-shadow: 0 1rem 2.5rem -1.75rem rgba(15, 23, 42, 0.45);
+            transition: border-color .15s ease;
         }
 
-        .directory-card .card-body {
+        .directory-card:hover {
+            border-color: var(--tblr-primary);
+        }
+
+        .directory-contact {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
-        }
-
-        .directory-card-meta {
-            display: grid;
-            gap: .75rem;
-        }
-
-        .directory-card-meta-item {
-            padding: .85rem 1rem;
-            border-radius: .85rem;
+            gap: .4rem;
+            padding: .6rem .75rem;
+            border-radius: .5rem;
             background-color: var(--tblr-bg-surface-secondary);
-        }
-
-        .directory-card-actions {
-            display: flex;
-            gap: .5rem;
-            flex-wrap: wrap;
-            margin-top: auto;
-        }
-
-        .directory-empty {
-            display: none;
         }
     </style>
 
     <div class="d-flex flex-column gap-3">
-        <div class="directory-toolbar">
-            <div class="directory-search">
-                <span class="ti ti-search"></span>
-                <input type="search" class="form-control directory-search-input" id="company-search" placeholder="Cari nama perusahaan, telepon, atau email..." autocomplete="off">
-            </div>
-            <div class="directory-summary">
-                <div class="directory-pill">
-                    <span class="directory-pill-label">Total Perusahaan</span>
-                    <span class="directory-pill-value"><?php echo e($companies->count()); ?></span>
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="card card-sm">
+                    <div class="card-body directory-stat">
+                        <span class="directory-avatar bg-cyan-lt text-cyan"><span class="ti ti-building fs-2"></span></span>
+                        <div>
+                            <div class="text-secondary small">Total Perusahaan</div>
+                            <div class="h2 mb-0"><?php echo e($companies->count()); ?></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="directory-pill">
-                    <span class="directory-pill-label">Hasil Tampil</span>
-                    <span class="directory-pill-value" id="company-visible-count"><?php echo e($companies->count()); ?></span>
+            </div>
+            <div class="col-6">
+                <div class="card card-sm">
+                    <div class="card-body directory-stat">
+                        <span class="directory-avatar bg-green-lt text-green"><span class="ti ti-filter fs-2"></span></span>
+                        <div>
+                            <div class="text-secondary small">Hasil Tampil</div>
+                            <div class="h2 mb-0" id="company-visible-count"><?php echo e($companies->count()); ?></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-7 col-lg-8">
+                        <label class="form-label" for="company-search">Pencarian</label>
+                        <div class="input-icon">
+                            <span class="input-icon-addon"><span class="ti ti-search"></span></span>
+                            <input type="search" class="form-control" id="company-search" placeholder="Cari nama perusahaan, telepon, atau email..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-5 col-lg-4">
+                        <div class="d-flex gap-2">
+                            <select class="form-select" id="company-sort" aria-label="Urutkan">
+                                <option value="asc">Nama A-Z</option>
+                                <option value="desc">Nama Z-A</option>
+                                <option value="ships">Kapal terbanyak</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary" id="company-reset" title="Atur ulang pencarian">
+                                <span class="ti ti-filter-off"></span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="row g-3" id="company-card-list">
-            <?php $__empty_0 = true; $__currentLoopData = $companies; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $company): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_0 = false; ?>
-                <div class="col-12 col-md-6 col-xl-4 company-card-item" data-search="<?php echo e(strtolower(trim(implode(' ', array_filter([$company->name, $company->phone_1, $company->phone_2, $company->email]))))); ?>">
+            <?php $__empty_1 = true; $__currentLoopData = $companies; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $company): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                <div class="col-12 col-md-6 col-xl-4 company-card-item"
+                    data-name="<?php echo e(strtolower($company->name)); ?>"
+                    data-ships="<?php echo e($company->ships_count); ?>"
+                    data-search="<?php echo e(strtolower(trim(implode(' ', array_filter([$company->name, $company->phone_1, $company->phone_2, $company->email]))))); ?>">
                     <div class="card directory-card">
-                        <div class="card-body">
-                            <div class="d-flex align-items-start justify-content-between gap-3">
-                                <div>
-                                    <div class="text-secondary text-uppercase small fw-bold">Perusahaan</div>
-                                    <h3 class="card-title mb-1"><?php echo e($company->name); ?></h3>
-                                </div>
-                                <span class="badge bg-cyan-lt text-cyan">Aktif</span>
-                            </div>
-
-                            <div class="directory-card-meta">
-                                <div class="directory-card-meta-item">
-                                    <div class="text-secondary small mb-1">Telepon Utama</div>
-                                    <div class="fw-semibold"><?php echo e($company->phone_1 ?? '-'); ?></div>
-                                </div>
-                                <div class="directory-card-meta-item">
-                                    <div class="text-secondary small mb-1">Telepon Sekunder</div>
-                                    <div class="fw-semibold"><?php echo e($company->phone_2 ?? '-'); ?></div>
-                                </div>
-                                <div class="directory-card-meta-item">
-                                    <div class="text-secondary small mb-1">Email</div>
-                                    <div class="fw-semibold text-break"><?php echo e($company->email ?? '-'); ?></div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="directory-avatar bg-cyan-lt text-cyan"><?php echo e(strtoupper(mb_substr($company->name, 0, 1))); ?></span>
+                                <div class="min-w-0 flex-fill">
+                                    <h3 class="card-title mb-0 text-truncate"><?php echo e($company->name); ?></h3>
+                                    <div class="text-secondary small">
+                                        <span class="ti ti-ship me-1"></span><?php echo e($company->ships_count); ?> kapal
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="directory-card-actions">
-                                <a href="<?php echo e(route('company.show', $company->unique_id)); ?>" class="btn btn-primary btn-sm">Lihat</a>
-                                <a href="<?php echo e(route('company.edit', $company->unique_id)); ?>" class="btn btn-outline-primary btn-sm">Ubah</a>
+                            <div class="directory-contact">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="ti ti-phone text-secondary"></span>
+                                    <span><?php echo e($company->phone_1 ?? '-'); ?></span>
+                                </div>
+                                <?php if($company->phone_2): ?>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="ti ti-phone-plus text-secondary"></span>
+                                        <span><?php echo e($company->phone_2); ?></span>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="ti ti-mail text-secondary"></span>
+                                    <span class="text-break"><?php echo e($company->email ?? '-'); ?></span>
+                                </div>
+                            </div>
+
+                            <div class="btn-list mt-auto">
+                                <a href="<?php echo e(route('company.show', $company->unique_id)); ?>" class="btn btn-primary btn-sm">
+                                    <span class="ti ti-eye me-1"></span>Lihat
+                                </a>
+                                <a href="<?php echo e(route('company.edit', $company->unique_id)); ?>" class="btn btn-outline-primary btn-sm">
+                                    <span class="ti ti-edit me-1"></span>Ubah
+                                </a>
                             </div>
                         </div>
                     </div>
                 </div>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_0): ?>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                 <div class="col-12">
                     <div class="card">
                         <div class="card-body text-center text-secondary py-5">Belum ada data perusahaan.</div>
@@ -168,39 +155,60 @@
         </div>
 
         <?php if($companies->isNotEmpty()): ?>
-            <div class="card directory-empty" id="company-empty-state">
+            <div class="card d-none" id="company-empty-state">
                 <div class="card-body text-center py-5">
-                    <div class="text-secondary">Tidak ada perusahaan yang cocok dengan pencarian.</div>
+                    <span class="ti ti-search-off fs-1 text-secondary"></span>
+                    <div class="text-secondary mt-2">Tidak ada perusahaan yang cocok dengan pencarian.</div>
                 </div>
             </div>
         <?php endif; ?>
     </div>
 <?php $__env->stopSection(); ?>
 
-
 <?php $__env->startPush('scripts'); ?>
     <script>
         $(document).ready(function() {
             const $search_input = $('#company-search');
-            const $cards = $('.company-card-item');
+            const $sort = $('#company-sort');
+            const $list = $('#company-card-list');
             const $empty_state = $('#company-empty-state');
             const $visible_count = $('#company-visible-count');
 
-            $search_input.on('input', function() {
-                const query = $(this).val().toString().trim().toLowerCase();
+            function apply_filters() {
+                const query = $search_input.val().toString().trim().toLowerCase();
                 let visible_total = 0;
 
-                $cards.each(function() {
-                    const matches = $(this).data('search').toString().includes(query);
+                $('.company-card-item').each(function() {
+                    const matches = $(this).attr('data-search').includes(query);
                     $(this).toggle(matches);
-
-                    if (matches) {
-                        visible_total += 1;
-                    }
+                    visible_total += matches ? 1 : 0;
                 });
 
                 $visible_count.text(visible_total);
-                $empty_state.toggle(visible_total === 0);
+                $empty_state.toggleClass('d-none', visible_total !== 0);
+            }
+
+            function apply_sort() {
+                const mode = $sort.val();
+                const sorted = $('.company-card-item').get().sort(function(a, b) {
+                    if (mode === 'ships') {
+                        return Number($(b).attr('data-ships')) - Number($(a).attr('data-ships'));
+                    }
+
+                    const result = $(a).attr('data-name').localeCompare($(b).attr('data-name'), 'id');
+                    return mode === 'desc' ? -result : result;
+                });
+                $list.append(sorted);
+            }
+
+            $search_input.on('input', apply_filters);
+            $sort.on('change', apply_sort);
+
+            $('#company-reset').on('click', function() {
+                $search_input.val('');
+                $sort.val('asc');
+                apply_sort();
+                apply_filters();
             });
         });
     </script>

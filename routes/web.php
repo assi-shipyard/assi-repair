@@ -14,6 +14,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectJobDocumentPageController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ShipController;
+use App\Http\Controllers\ShipDocumentController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -66,6 +67,10 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::get('/{ship}/edit', 'edit')->name('edit');
         Route::put('/{ship}', 'update')->name('update');
         Route::delete('/{ship}', 'destroy')->name('destroy');
+
+        Route::post('/{ship}/documents', [ShipDocumentController::class, 'store'])->name('documents.store');
+        Route::get('/{ship}/documents/{document}', [ShipDocumentController::class, 'download'])->name('documents.download');
+        Route::delete('/{ship}/documents/{document}', [ShipDocumentController::class, 'destroy'])->name('documents.destroy');
 
         Route::get('/type', 'type_index')->name('type.index');
         Route::post('/type', 'type_store')->name('type.store');

@@ -28,8 +28,11 @@ class ShipController extends Controller
     public function index()
     {
         $ships = Ship::with(['company', 'type', 'classification'])->orderBy('name')->get();
+        $companies = Company::orderBy('name')->get(['id', 'name']);
+        $ship_types = ShipType::orderBy('name')->get(['id', 'name']);
+        $ship_classes = ShipClass::orderBy('name')->get(['id', 'name']);
 
-        return view('ship.index', compact('ships'));
+        return view('ship.index', compact('ships', 'companies', 'ship_types', 'ship_classes'));
     }
 
     /**
@@ -78,8 +81,10 @@ class ShipController extends Controller
     public function show($id)
     {
         $ship = $this->find_ship_by_unique_id($id, ['company', 'type', 'classification']);
+        $projects = $ship->projects()->with('leader')->orderByDesc('start_date_estimation')->get();
+        $documents = $ship->documents()->latest()->get();
 
-        return view('ship.show', compact('ship'));
+        return view('ship.show', compact('ship', 'projects', 'documents'));
     }
 
     /**

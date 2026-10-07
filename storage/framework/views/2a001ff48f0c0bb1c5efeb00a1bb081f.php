@@ -2,177 +2,184 @@
 <?php $__env->startSection('body_title', 'Detail Kapal'); ?>
 
 <?php $__env->startSection('buttons_beside_title'); ?>
-    <a href="<?php echo e(route('ship.edit', $ship->unique_id ?? $ship->id)); ?>" class="btn btn-outline-primary">Ubah</a>
-    <a href="<?php echo e(route('ship.index')); ?>" class="btn btn-outline-secondary">Kembali</a>
+    <a href="<?php echo e(route('ship.edit', $ship->unique_id ?? $ship->id)); ?>" class="btn btn-outline-primary">
+        <span class="ti ti-edit me-1"></span>Ubah
+    </a>
+    <a href="<?php echo e(route('ship.index')); ?>" class="btn btn-outline-secondary">
+        <span class="ti ti-arrow-left me-1"></span>Kembali
+    </a>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('content'); ?>
     <?php echo $__env->make('partials.flash', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <?php
+        $ship_identifier = $ship->unique_id ?? $ship->id;
         $ship_build_year = $ship->build_year ? \Illuminate\Support\Carbon::parse($ship->build_year)->format('Y') : null;
         $gross_tonnage = is_numeric($ship->gross_tonnage) ? number_format((float) $ship->gross_tonnage, 0, ',', '.') : ($ship->gross_tonnage ?? null);
         $net_tonnage = is_numeric($ship->net_tonnage) ? number_format((float) $ship->net_tonnage, 0, ',', '.') : ($ship->net_tonnage ?? null);
-        $ship_identifier = $ship->unique_id ?? $ship->id;
-        $dimension_completion = collect([
-            $ship->length_overall,
-            $ship->breadth,
-            $ship->height,
-            $ship->empty_draft,
-            $ship->loaded_draft,
-        ])->filter()->count();
-        $registration_completion = collect([
-            $ship->imo_number,
-            $ship->mmsi_number,
-            $ship->call_sign,
-            $ship->flag,
-            $ship_build_year,
-        ])->filter()->count();
+
+        $status_map = [
+            'In Progress' => ['label' => 'Sedang Berjalan', 'group' => 'ongoing', 'color' => 'bg-blue', 'order' => 0],
+            'Not Started' => ['label' => 'Akan Datang', 'group' => 'upcoming', 'color' => 'bg-yellow', 'order' => 1],
+            'Completed' => ['label' => 'Selesai', 'group' => 'history', 'color' => 'bg-green', 'order' => 2],
+        ];
+        $sorted_projects = $projects->sortBy(fn ($project) => $status_map[$project->status]['order'] ?? 3)->values();
+        $ongoing_total = $projects->where('status', 'In Progress')->count();
+        $upcoming_total = $projects->where('status', 'Not Started')->count();
+        $history_total = $projects->where('status', 'Completed')->count();
+
+        $dimensions = [
+            ['LOA', $ship->length_overall, 'm'],
+            ['Breadth', $ship->breadth, 'm'],
+            ['Height', $ship->height, 'm'],
+            ['Draft Kosong', $ship->empty_draft, 'm'],
+            ['Draft Muat', $ship->loaded_draft, 'm'],
+            ['Gross Tonnage', $gross_tonnage, 'GT'],
+            ['Net Tonnage', $net_tonnage, 'NT'],
+        ];
+        $engine_rows = [
+            ['Merek', $ship->engine_brand],
+            ['Model', $ship->engine_model],
+            ['Tipe Mesin', $ship->engine_type],
+            ['Daya', $ship->engine_power],
+            ['RPM', $ship->engine_rpm],
+            ['Tipe BBM', $ship->engine_fuel_type],
+            ['Kapasitas BBM', $ship->engine_fuel_capacity],
+            ['Konsumsi BBM', $ship->engine_fuel_consumption],
+        ];
     ?>
 
     <style>
         .ship-hero {
             border: 0;
-            border-radius: 1.25rem;
-            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #38bdf8 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 60%, #38bdf8 100%);
             color: #f8fafc;
-            box-shadow: 0 2rem 4rem -2.75rem rgba(15, 23, 42, 0.82);
         }
 
-        .ship-hero-body {
+        .ship-hero-icon {
+            flex: 0 0 auto;
+            width: 4rem;
+            height: 4rem;
             display: flex;
-            flex-wrap: wrap;
-            gap: 1.5rem;
             align-items: center;
-            justify-content: space-between;
-            padding: 1.75rem;
-        }
-
-        .ship-hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: .5rem;
-            padding: .55rem .85rem;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.12);
-            color: rgba(248, 250, 252, 0.95);
-            font-size: .82rem;
-        }
-
-        .ship-kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: .75rem;
-            min-width: min(100%, 25rem);
+            justify-content: center;
+            border-radius: .85rem;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.25);
         }
 
         .ship-kpi {
-            padding: .9rem 1rem;
-            border-radius: 1rem;
-            background: rgba(15, 23, 42, 0.22);
+            padding: .4rem .85rem;
+            border-radius: .6rem;
+            background: rgba(15, 23, 42, 0.25);
             border: 1px solid rgba(255, 255, 255, 0.14);
+            text-align: center;
+            min-width: 5.5rem;
         }
 
         .ship-kpi-label {
             display: block;
-            font-size: .72rem;
+            font-size: .68rem;
             text-transform: uppercase;
-            letter-spacing: .08em;
+            letter-spacing: .06em;
             color: rgba(226, 232, 240, 0.82);
         }
 
         .ship-kpi-value {
             display: block;
-            margin-top: .3rem;
-            font-size: 1.45rem;
+            font-size: 1.2rem;
             font-weight: 700;
+            line-height: 1.3;
         }
 
-        .ship-panel {
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            border-radius: 1.15rem;
-            box-shadow: 0 1.5rem 3rem -2.5rem rgba(15, 23, 42, 0.45);
-        }
-
-        .ship-stat-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+        .ship-list-item {
+            display: flex;
+            justify-content: space-between;
             gap: 1rem;
+            padding: .5rem 1rem;
+            border-bottom: 1px solid var(--tblr-border-color);
         }
 
-        .ship-stat-card {
-            padding: 1rem;
-            border-radius: 1rem;
-            background: var(--tblr-bg-surface-secondary);
-            border: 1px solid rgba(15, 23, 42, 0.05);
+        .ship-list-item:last-child {
+            border-bottom: 0;
         }
 
-        .ship-stat-label {
-            font-size: .75rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
+        .ship-list-label {
             color: var(--tblr-secondary);
-            margin-bottom: .35rem;
+            white-space: nowrap;
+        }
+
+        .ship-list-value {
+            font-weight: 600;
+            text-align: right;
+            word-break: break-word;
         }
 
         .ship-dimension-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+            gap: .5rem;
         }
 
-        .ship-dimension-card {
-            padding: 1rem;
-            border-radius: 1rem;
-            background: linear-gradient(180deg, rgba(239, 246, 255, 0.96), rgba(224, 242, 254, 0.88));
-            border: 1px solid rgba(56, 189, 248, 0.14);
+        .ship-dimension {
+            padding: .5rem .75rem;
+            border-radius: .5rem;
+            background: var(--tblr-bg-surface-secondary);
+        }
+
+        .ship-dimension-label {
+            font-size: .7rem;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            color: var(--tblr-secondary);
         }
 
         .ship-dimension-value {
-            font-size: 1.65rem;
+            font-size: 1.15rem;
             font-weight: 700;
-            line-height: 1.1;
+            line-height: 1.3;
         }
 
-        @media (max-width: 991.98px) {
-            .ship-kpi-grid,
-            .ship-stat-grid,
-            .ship-dimension-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .ship-hero-body {
-                padding: 1.25rem;
-            }
+        .ship-table-scroll {
+            max-height: 26rem;
+            overflow-y: auto;
         }
     </style>
 
     <div class="d-flex flex-column gap-3">
         <div class="card ship-hero">
-            <div class="ship-hero-body">
-                <div>
-                    <div class="text-uppercase small fw-bold mb-2" style="letter-spacing: .1em; color: rgba(226, 232, 240, 0.78);">Profil Kapal</div>
-                    <h1 class="mb-1 text-white"><?php echo e($ship->name); ?></h1>
-                    <div class="mb-3" style="color: rgba(226, 232, 240, 0.84);"><?php echo e($ship->company?->name ?? 'Perusahaan belum diatur'); ?></div>
-                    <div class="d-flex flex-wrap gap-2">
-                        <span class="ship-hero-badge"><?php echo e($ship->type?->name ?? 'Jenis belum diatur'); ?></span>
-                        <span class="ship-hero-badge"><?php echo e($ship->classification?->abbreviation ?? $ship->classification?->name ?? 'Kelas belum diatur'); ?></span>
-                        <span class="ship-hero-badge">ID <?php echo e($ship_identifier); ?></span>
+            <div class="card-body py-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3 min-w-0">
+                        <div class="ship-hero-icon"><span class="ti ti-ship fs-1"></span></div>
+                        <div class="min-w-0">
+                            <h2 class="mb-1 text-white"><?php echo e($ship->name); ?></h2>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="badge bg-white text-blue"><?php echo e($ship->type?->name ?? 'Jenis belum diatur'); ?></span>
+                                <span class="badge" style="background: rgba(255,255,255,.16); color: #f8fafc;"><?php echo e($ship->classification?->abbreviation ?? $ship->classification?->name ?? 'Kelas belum diatur'); ?></span>
+                                <span class="badge" style="background: rgba(255,255,255,.16); color: #f8fafc;"><?php echo e($ship->company?->name ?? 'Pemilik belum diatur'); ?></span>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div class="ship-kpi-grid">
-                    <div class="ship-kpi">
-                        <span class="ship-kpi-label">Registrasi Terisi</span>
-                        <span class="ship-kpi-value"><?php echo e($registration_completion); ?>/5</span>
-                    </div>
-                    <div class="ship-kpi">
-                        <span class="ship-kpi-label">Dimensi Terisi</span>
-                        <span class="ship-kpi-value"><?php echo e($dimension_completion); ?>/5</span>
-                    </div>
-                    <div class="ship-kpi">
-                        <span class="ship-kpi-label">Build Year</span>
-                        <span class="ship-kpi-value"><?php echo e($ship_build_year ?? '-'); ?></span>
+                    <div class="d-flex gap-2">
+                        <div class="ship-kpi">
+                            <span class="ship-kpi-label">Berjalan</span>
+                            <span class="ship-kpi-value"><?php echo e($ongoing_total); ?></span>
+                        </div>
+                        <div class="ship-kpi">
+                            <span class="ship-kpi-label">Akan Datang</span>
+                            <span class="ship-kpi-value"><?php echo e($upcoming_total); ?></span>
+                        </div>
+                        <div class="ship-kpi">
+                            <span class="ship-kpi-label">Selesai</span>
+                            <span class="ship-kpi-value"><?php echo e($history_total); ?></span>
+                        </div>
+                        <div class="ship-kpi">
+                            <span class="ship-kpi-label">Tahun Bangun</span>
+                            <span class="ship-kpi-value"><?php echo e($ship_build_year ?? '-'); ?></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -180,146 +187,303 @@
 
         <div class="row g-3">
             <div class="col-lg-4">
-                <div class="card ship-panel h-100">
-                    <div class="card-header border-0 pb-0">
-                        <h3 class="card-title mb-0">Aksi Cepat</h3>
+                <div class="d-flex flex-column gap-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><span class="ti ti-id me-2"></span>Identitas & Registrasi</h3>
+                        </div>
+                        <div>
+                            <div class="ship-list-item">
+                                <span class="ship-list-label">Pemilik</span>
+                                <span class="ship-list-value">
+                                    <?php if($ship->company): ?>
+                                        <a href="<?php echo e(route('company.show', $ship->company->unique_id)); ?>"><?php echo e($ship->company->name); ?></a>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                            <div class="ship-list-item">
+                                <span class="ship-list-label">IMO Number</span>
+                                <span class="ship-list-value"><?php echo e($ship->imo_number ?? '-'); ?></span>
+                            </div>
+                            <div class="ship-list-item">
+                                <span class="ship-list-label">MMSI Number</span>
+                                <span class="ship-list-value"><?php echo e($ship->mmsi_number ?? '-'); ?></span>
+                            </div>
+                            <div class="ship-list-item">
+                                <span class="ship-list-label">Call Sign</span>
+                                <span class="ship-list-value"><?php echo e($ship->call_sign ?? '-'); ?></span>
+                            </div>
+                            <div class="ship-list-item">
+                                <span class="ship-list-label">Bendera</span>
+                                <span class="ship-list-value"><?php echo e($ship->flag ?? '-'); ?></span>
+                            </div>
+                            <div class="ship-list-item">
+                                <span class="ship-list-label">Tahun Bangun</span>
+                                <span class="ship-list-value"><?php echo e($ship_build_year ?? '-'); ?></span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body pt-3 d-flex flex-column gap-3">
-                        <div class="ship-stat-card">
-                            <div class="ship-stat-label">Perusahaan Pemilik</div>
-                            <div class="fw-semibold"><?php echo e($ship->company?->name ?? '-'); ?></div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><span class="ti ti-engine me-2"></span>Mesin Utama</h3>
                         </div>
-                        <div class="ship-stat-card">
-                            <div class="ship-stat-label">Gross Tonnage</div>
-                            <div class="fw-semibold"><?php echo e($gross_tonnage ?? '-'); ?></div>
-                        </div>
-                        <div class="ship-stat-card">
-                            <div class="ship-stat-label">Net Tonnage</div>
-                            <div class="fw-semibold"><?php echo e($net_tonnage ?? '-'); ?></div>
-                        </div>
-                        <div class="d-grid gap-2 mt-auto">
-                            <a href="<?php echo e(route('ship.edit', $ship_identifier)); ?>" class="btn btn-primary">Ubah Data Kapal</a>
-                            <a href="<?php echo e(route('ship.index')); ?>" class="btn btn-outline-secondary">Kembali ke Daftar</a>
+                        <div>
+                            <?php $__currentLoopData = $engine_rows; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as [$engine_label, $engine_value]): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <div class="ship-list-item">
+                                    <span class="ship-list-label"><?php echo e($engine_label); ?></span>
+                                    <span class="ship-list-value"><?php echo e($engine_value ?? '-'); ?></span>
+                                </div>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="col-lg-8">
-                <div class="card ship-panel mb-3">
-                    <div class="card-header border-0 pb-0">
-                        <h3 class="card-title mb-0">Identitas & Registrasi</h3>
-                    </div>
-                    <div class="card-body pt-3">
-                        <div class="ship-stat-grid">
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">IMO Number</div>
-                                <div class="fw-semibold"><?php echo e($ship->imo_number ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">MMSI Number</div>
-                                <div class="fw-semibold"><?php echo e($ship->mmsi_number ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Call Sign</div>
-                                <div class="fw-semibold"><?php echo e($ship->call_sign ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Bendera</div>
-                                <div class="fw-semibold"><?php echo e($ship->flag ?? '-'); ?></div>
-                            </div>
+                <div class="d-flex flex-column gap-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><span class="ti ti-ruler-measure me-2"></span>Dimensi & Kapasitas</h3>
                         </div>
-                    </div>
-                </div>
+                        <div class="card-body">
+                            <div class="ship-dimension-grid">
+                                <?php $__currentLoopData = $dimensions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as [$dimension_label, $dimension_value, $dimension_unit]): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <div class="ship-dimension">
+                                        <div class="ship-dimension-label"><?php echo e($dimension_label); ?></div>
+                                        <div class="ship-dimension-value">
+                                            <?php echo e($dimension_value ?? '-'); ?>
 
-                <div class="card ship-panel mb-3">
-                    <div class="card-header border-0 pb-0">
-                        <h3 class="card-title mb-0">Dimensi & Kapasitas</h3>
-                    </div>
-                    <div class="card-body pt-3">
-                        <div class="ship-dimension-grid mb-3">
-                            <div class="ship-dimension-card">
-                                <div class="ship-stat-label">LOA</div>
-                                <div class="ship-dimension-value"><?php echo e($ship->length_overall ?? '-'); ?></div>
-                                <div class="text-secondary small">meter</div>
-                            </div>
-                            <div class="ship-dimension-card">
-                                <div class="ship-stat-label">Breadth</div>
-                                <div class="ship-dimension-value"><?php echo e($ship->breadth ?? '-'); ?></div>
-                                <div class="text-secondary small">meter</div>
-                            </div>
-                            <div class="ship-dimension-card">
-                                <div class="ship-stat-label">Height</div>
-                                <div class="ship-dimension-value"><?php echo e($ship->height ?? '-'); ?></div>
-                                <div class="text-secondary small">meter</div>
-                            </div>
-                            <div class="ship-dimension-card">
-                                <div class="ship-stat-label">Draft Kosong</div>
-                                <div class="ship-dimension-value"><?php echo e($ship->empty_draft ?? '-'); ?></div>
-                                <div class="text-secondary small">meter</div>
-                            </div>
-                        </div>
-                        <div class="ship-stat-grid">
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Gross Tonnage</div>
-                                <div class="fw-semibold"><?php echo e($gross_tonnage ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Net Tonnage</div>
-                                <div class="fw-semibold"><?php echo e($net_tonnage ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Draft Muat</div>
-                                <div class="fw-semibold"><?php echo e($ship->loaded_draft ?? '-'); ?></div>
+                                            <?php if($dimension_value !== null): ?>
+                                                <span class="text-secondary small fw-normal"><?php echo e($dimension_unit); ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="card ship-panel">
-                    <div class="card-header border-0 pb-0">
-                        <h3 class="card-title mb-0">Mesin Utama</h3>
-                    </div>
-                    <div class="card-body pt-3">
-                        <div class="ship-stat-grid">
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Merek</div>
-                                <div class="fw-semibold"><?php echo e($ship->engine_brand ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Model</div>
-                                <div class="fw-semibold"><?php echo e($ship->engine_model ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Daya</div>
-                                <div class="fw-semibold"><?php echo e($ship->engine_power ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">RPM</div>
-                                <div class="fw-semibold"><?php echo e($ship->engine_rpm ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Tipe Mesin</div>
-                                <div class="fw-semibold"><?php echo e($ship->engine_type ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Tipe BBM</div>
-                                <div class="fw-semibold"><?php echo e($ship->engine_fuel_type ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Kapasitas BBM</div>
-                                <div class="fw-semibold"><?php echo e($ship->engine_fuel_capacity ?? '-'); ?></div>
-                            </div>
-                            <div class="ship-stat-card">
-                                <div class="ship-stat-label">Konsumsi BBM</div>
-                                <div class="fw-semibold"><?php echo e($ship->engine_fuel_consumption ?? '-'); ?></div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><span class="ti ti-history me-2"></span>Riwayat Proyek</h3>
+                            <div class="card-actions">
+                                <ul class="nav nav-pills nav-pills-sm" id="project-filter">
+                                    <li class="nav-item"><a href="#" class="nav-link active py-1 px-2" data-group="all">Semua (<?php echo e($projects->count()); ?>)</a></li>
+                                    <li class="nav-item"><a href="#" class="nav-link py-1 px-2" data-group="ongoing">Berjalan (<?php echo e($ongoing_total); ?>)</a></li>
+                                    <li class="nav-item"><a href="#" class="nav-link py-1 px-2" data-group="upcoming">Akan Datang (<?php echo e($upcoming_total); ?>)</a></li>
+                                    <li class="nav-item"><a href="#" class="nav-link py-1 px-2" data-group="history">Selesai (<?php echo e($history_total); ?>)</a></li>
+                                </ul>
                             </div>
                         </div>
+                        <?php if($projects->isEmpty()): ?>
+                            <div class="card-body text-center text-secondary py-4">
+                                <span class="ti ti-clipboard-off fs-1"></span>
+                                <div class="mt-2">Kapal ini belum memiliki proyek perbaikan.</div>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive ship-table-scroll">
+                                <table class="table table-vcenter table-sm card-table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Kode</th>
+                                            <th>Tipe</th>
+                                            <th>Periode</th>
+                                            <th>Progres</th>
+                                            <th>Status</th>
+                                            <th class="w-1"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php $__currentLoopData = $sorted_projects; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $project): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <?php
+                                                $status = $status_map[$project->status] ?? ['label' => $project->status, 'group' => 'history', 'color' => 'bg-secondary'];
+                                                $period_start = $project->start_date_actual ?? $project->start_date_estimation;
+                                                $period_end = $project->end_date_actual ?? $project->end_date_estimation;
+                                                $progress_value = (float) $project->progress;
+                                            ?>
+                                            <tr class="project-row" data-group="<?php echo e($status['group']); ?>">
+                                                <td class="fw-semibold"><?php echo e($project->project_code); ?></td>
+                                                <td><?php echo e($project->project_type); ?></td>
+                                                <td class="text-nowrap">
+                                                    <?php echo e($period_start?->format('d/m/Y') ?? '-'); ?> - <?php echo e($period_end?->format('d/m/Y') ?? '-'); ?>
+
+                                                    <?php if (! ($project->start_date_actual)): ?>
+                                                        <span class="text-secondary small">(estimasi)</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td style="min-width: 7rem;">
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <div class="progress flex-fill" style="height: .4rem;">
+                                                            <div class="progress-bar" style="width: <?php echo e(min(100, max(0, $progress_value))); ?>%"></div>
+                                                        </div>
+                                                        <span class="small text-secondary"><?php echo e(rtrim(rtrim(number_format($progress_value, 2, ',', '.'), '0'), ',')); ?>%</span>
+                                                    </div>
+                                                </td>
+                                                <td><span class="badge <?php echo e($status['color']); ?> text-white"><?php echo e($status['label']); ?></span></td>
+                                                <td>
+                                                    <a href="<?php echo e(route('project.show', $project->unique_id)); ?>" class="btn btn-sm btn-outline-primary">
+                                                        <span class="ti ti-eye me-1"></span>Lihat
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                        <tr id="project-empty-row" class="d-none">
+                                            <td colspan="6" class="text-center text-secondary py-3">Tidak ada proyek pada kategori ini.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><span class="ti ti-files me-2"></span>Dokumen Kapal</h3>
+                            <div class="card-actions">
+                                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadShipDocumentModal">
+                                    <span class="ti ti-upload me-1"></span>Unggah Dokumen
+                                </button>
+                            </div>
+                        </div>
+                        <?php if($documents->isEmpty()): ?>
+                            <div class="card-body text-center text-secondary py-4">
+                                <span class="ti ti-file-off fs-1"></span>
+                                <div class="mt-2">Belum ada dokumen. Unggah sertifikat atau dokumen pendukung kapal.</div>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-vcenter table-sm card-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Dokumen</th>
+                                            <th>Tipe</th>
+                                            <th>Diunggah</th>
+                                            <th class="w-1"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php $__currentLoopData = $documents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $document): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <tr>
+                                                <td class="fw-semibold"><?php echo e($document->document_name); ?></td>
+                                                <td><span class="badge bg-blue-lt text-blue"><?php echo e($document->document_type); ?></span></td>
+                                                <td class="text-nowrap text-secondary"><?php echo e($document->created_at?->format('d/m/Y H:i')); ?></td>
+                                                <td>
+                                                    <div class="btn-list flex-nowrap">
+                                                        <a href="<?php echo e(route('ship.documents.download', [$ship_identifier, $document->unique_id])); ?>" class="btn btn-sm btn-outline-primary" title="Unduh dokumen">
+                                                            <span class="ti ti-download"></span>
+                                                        </a>
+                                                        <form action="<?php echo e(route('ship.documents.destroy', [$ship_identifier, $document->unique_id])); ?>" method="POST" onsubmit="return confirm('Hapus dokumen ini?')">
+                                                            <?php echo csrf_field(); ?>
+                                                            <?php echo method_field('DELETE'); ?>
+                                                            <button class="btn btn-sm btn-outline-danger" type="submit" title="Hapus dokumen">
+                                                                <span class="ti ti-trash"></span>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 <?php $__env->stopSection(); ?>
+
+<?php $__env->startSection('modal'); ?>
+    <div class="modal modal-blur fade" id="uploadShipDocumentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form action="<?php echo e(route('ship.documents.store', $ship_identifier)); ?>" method="POST" enctype="multipart/form-data" id="form-upload-ship-document">
+                    <?php echo csrf_field(); ?>
+                    <div class="modal-header">
+                        <h5 class="modal-title">Unggah Dokumen Kapal</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required">Nama Dokumen</label>
+                            <input type="text" class="form-control" name="document_name" maxlength="255" placeholder="Contoh: Sertifikat Kelas" value="<?php echo e(old('document_name')); ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Tipe Dokumen</label>
+                            <input type="text" class="form-control" name="document_type" maxlength="255" placeholder="Contoh: Sertifikat" value="<?php echo e(old('document_type')); ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">File Dokumen</label>
+                            <input type="file" class="form-control" name="document_file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
+                            <div class="form-hint">Format: PDF, Word, Excel, JPG, PNG. Maksimal 10MB.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary ms-auto"><span class="ti ti-upload me-1"></span>Unggah</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startPush('scripts'); ?>
+    <script>
+        $(document).ready(function() {
+            $('#project-filter .nav-link').on('click', function(event) {
+                event.preventDefault();
+
+                const group = $(this).data('group');
+                $('#project-filter .nav-link').removeClass('active');
+                $(this).addClass('active');
+
+                const $rows = $('.project-row');
+                $rows.each(function() {
+                    $(this).toggle(group === 'all' || $(this).data('group') === group);
+                });
+
+                $('#project-empty-row').toggleClass('d-none', $rows.filter(':visible').length > 0);
+            });
+
+            $('#form-upload-ship-document').validate({
+                rules: {
+                    document_name: { required: true, maxlength: 255 },
+                    document_type: { required: true, maxlength: 255 },
+                    document_file: { required: true, extension: 'pdf|doc|docx|xls|xlsx|jpg|jpeg|png' }
+                },
+                messages: {
+                    document_name: {
+                        required: 'Nama dokumen wajib diisi.',
+                        maxlength: 'Nama dokumen maksimal 255 karakter.'
+                    },
+                    document_type: {
+                        required: 'Tipe dokumen wajib diisi.',
+                        maxlength: 'Tipe dokumen maksimal 255 karakter.'
+                    },
+                    document_file: {
+                        required: 'File dokumen wajib diunggah.',
+                        extension: 'Format file harus pdf, doc, docx, xls, xlsx, jpg, jpeg, atau png.'
+                    }
+                },
+                errorElement: 'span',
+                errorPlacement: function(error, element) {
+                    error.addClass('invalid-feedback');
+                    element.closest('.mb-3').append(error);
+                },
+                highlight: function(element) {
+                    $(element).addClass('is-invalid');
+                },
+                unhighlight: function(element) {
+                    $(element).removeClass('is-invalid');
+                }
+            });
+        });
+    </script>
+<?php $__env->stopPush(); ?>
 
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /home/snowy/projects/assi-repair/resources/views/ship/show.blade.php ENDPATH**/ ?>

@@ -16,31 +16,68 @@ class ProjectController extends Controller
 {
     public function index(Request $request)
     {
-        // Fetch projects with related data and apply search filter if provided
-        $projects = Project::with(['ship', 'leader', 'ppc', 'divisions', 'owner_surveyors'])
-            ->when($request->filled('search_project'), function ($query) use ($request) {
-                $search = trim((string) $request->input('search_project'));
+        $filters = Validator::make($request->all(), [
+            'search_project' => 'nullable|string|max:100',
+            'status' => 'nullable|in:Not Started,In Progress,Completed',
+            'project_type' => 'nullable|string|max:100',
+            'ship_id' => 'nullable|integer|exists:ships,id',
+            'division_id' => 'nullable|integer|exists:organizational_units,id',
+            'start_from' => 'nullable|date',
+            'start_to' => 'nullable|date|after_or_equal:start_from',
+            'sort' => 'nullable|in:latest,oldest,progress_desc,progress_asc,ship_name',
+        ])->valid();
 
-                $query->where(function ($subQuery) use ($search) {
-                    $subQuery->where('project_code', 'like', '%'.$search.'%')
-                        ->orWhere('project_type', 'like', '%'.$search.'%')
-                        ->orWhereHas('ship', function ($shipQuery) use ($search) {
-                            $shipQuery->where('name', 'like', '%'.$search.'%');
+        $search = trim((string) ($filters['search_project'] ?? ''));
+        $sort = $filters['sort'] ?? 'latest';
+
+        $query = Project::with(['ship.type', 'ship.company', 'leader', 'ppc', 'divisions', 'owner_surveyors'])
+            ->when($search !== '', function ($query) use ($search) {
+                $like = '%'.addcslashes($search, '%_\\').'%';
+
+                $query->where(function ($sub_query) use ($like) {
+                    $sub_query->where('project_code', 'like', $like)
+                        ->orWhere('project_type', 'like', $like)
+                        ->orWhereHas('ship', function ($ship_query) use ($like) {
+                            $ship_query->where('name', 'like', $like)
+                                ->orWhere('imo_number', 'like', $like)
+                                ->orWhere('call_sign', 'like', $like);
                         });
                 });
             })
-            ->latest()
-            ->get();
+            ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
+            ->when($filters['project_type'] ?? null, fn ($q, $v) => $q->where('project_type', $v))
+            ->when($filters['ship_id'] ?? null, fn ($q, $v) => $q->where('ship_id', $v))
+            ->when($filters['division_id'] ?? null, fn ($q, $v) => $q->whereHas('divisions', fn ($d) => $d->where('organizational_units.id', $v)))
+            ->when($filters['start_from'] ?? null, fn ($q, $v) => $q->whereDate('start_date_estimation', '>=', $v))
+            ->when($filters['start_to'] ?? null, fn ($q, $v) => $q->whereDate('start_date_estimation', '<=', $v));
 
-        // If the request is an AJAX request, return a JSON response with the rendered HTML and project count
+        match ($sort) {
+            'oldest' => $query->oldest(),
+            'progress_desc' => $query->orderByDesc('progress'),
+            'progress_asc' => $query->orderBy('progress'),
+            'ship_name' => $query->orderBy(Ship::select('name')->whereColumn('ships.id', 'projects.ship_id')),
+            default => $query->latest(),
+        };
+
+        $projects = $query->paginate(12)->withQueryString();
+
+        $status_counts = Project::query()
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $ships = Ship::orderBy('name')->get(['id', 'name']);
+        $divisions = OrganizationalUnit::where('type', 'division')->orderBy('name')->get(['id', 'name']);
+        $project_types = Project::query()->distinct()->orderBy('project_type')->pluck('project_type');
+
         if ($request->ajax()) {
             return new JsonResponse([
                 'html' => view('project.partials.projectcards', compact('projects'))->render(),
-                'count' => $projects->count(),
+                'count' => $projects->total(),
             ]);
         }
 
-        return view('project.index', compact('projects'));
+        return view('project.index', compact('projects', 'status_counts', 'ships', 'divisions', 'project_types', 'filters'));
     }
 
     public function create()
@@ -166,7 +203,7 @@ class ProjectController extends Controller
     public function show(string $id)
     {
         // Fetch the project with related data based on the unique_id. If not found, redirect back with an error message.
-        $project = Project::with(['ship.company', 'leader', 'ppc', 'divisions', 'owner_surveyors', 'created_by', 'job_documents'])
+        $project = Project::with(['ship.company', 'ship.type', 'ship.classification', 'leader', 'ppc', 'divisions', 'owner_surveyors', 'created_by', 'job_documents'])
             ->firstWhere('unique_id', $id);
 
         // If the project is not found, redirect back to the project index with an error message
