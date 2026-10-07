@@ -1,145 +1,158 @@
+{{--
+|--------------------------------------------------------------------------
+| Main application layout (SIREKA ASSI)
+|--------------------------------------------------------------------------
+| Child views extend this layout and fill the following sections/stacks:
+|   @section('title')               <title> text
+|   @section('pre_body_title')      content above the page title (e.g. breadcrumb)
+|   @section('body_title')          page heading
+|   @section('buttons_beside_title') action buttons aligned right of the heading
+|   @section('content')             main page content
+|   @section('modal')               modals, rendered outside the page wrapper
+|   @push('styles')                 page CSS, rendered in <head>
+|   @push('scripts')                page JS, rendered LAST (jQuery, Tabler, etc. are ready)
+|
+| Frontend asset strategy:
+|   - Tabler (core JS/CSS, flags, payments, vendors) and Tabler Icons are
+|     installed through npm and bundled by Vite (resources/js/app.js).
+|     Upgrade with `npm update @tabler/core && npm run build`.
+|   - jQuery, jQuery Validation, jQuery UI, DataTables and Select2 are static
+|     files in public/assets/dist.
+|   - Vue, Axios, Moment, ApexCharts, SweetAlert2, Tempus Dominus, Pusher and
+|     Echo are loaded from CDNs.
+|
+| Script order matters: Vite's module script is deferred (runs before
+| DOMContentLoaded); everything else below is synchronous, so jQuery plugins
+| are available to every @push('scripts') block.
+|--------------------------------------------------------------------------
+--}}
+@php
+    $current_user = auth()->user();
+
+    // Unread notification badge count and the 5 most recent items for the dropdown.
+    // Two cheap queries instead of hydrating every unread notification.
+    $unread_notification_count = $current_user?->unreadNotifications()->count() ?? 0;
+    $recent_notifications = $unread_notification_count > 0
+        ? $current_user->unreadNotifications()->latest()->limit(5)->get()
+        : collect();
+
+    // User context is stored in session at login (see LoginController).
+    $employee_name = session('employee_name') ?? '-';
+    $employee_position = session('employee_position');
+    $employee_id = session('employee_id');
+    $employee_summary = $employee_position && $employee_id
+        ? $employee_position . ' - ' . $employee_id
+        : '-';
+@endphp
 <!DOCTYPE html>
 <html lang="id">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>@yield('title', 'SIREKA ASSI')</title>
     <link rel="shortcut icon" href="{{ secure_asset('assets/img/favicon.ico') }}" type="image/x-icon">
 
-	{{-- Page Title --}}
-    <title>@yield('title', 'SIREKA ASSI')</title>
+    {{-- Tabler core, flags, payments, vendors + Tabler Icons (bundled by Vite) --}}
+    @vite('resources/js/app.js')
 
-    {{-- Tabler Core CSS --}}
-    <link href="{{ secure_asset('assets/dist/css/tabler.min.css?1692870487') }}" rel="stylesheet"/>
-    <link href="{{ secure_asset('assets/dist/css/tabler-flags.min.css?1692870487') }}" rel="stylesheet"/>
-    <link href="{{ secure_asset('assets/dist/css/tabler-payments.min.css?1692870487') }}" rel="stylesheet"/>
-    <link href="{{ secure_asset('assets/dist/css/tabler-vendors.min.css?1692870487') }}" rel="stylesheet"/>
-    <link href="{{ secure_asset('assets/dist/css/demo.min.css?1692870487') }}" rel="stylesheet"/>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-    {{-- DataTables CSS --}}
-    <link href="{{ secure_asset('assets/dist/css/datatables.min.css') }}" rel="stylesheet"/>
-    {{-- Select2 CSS --}}
-    <link href="{{ secure_asset('assets/dist/css/select2.min.css') }}" rel="stylesheet"/>
-    <link href="{{ secure_asset('assets/dist/css/select2-bootstrap-5-theme.min.css') }}" rel="stylesheet"/>
-    {{-- jQuery UI CSS --}}
-    <link href="{{ secure_asset('assets/dist/css/jquery-ui.min.css') }}" rel="stylesheet"/>
-    <link href="{{ secure_asset('assets/dist/css/jquery-ui.structure.min.css') }}" rel="stylesheet"/>
-    <link href="{{ secure_asset('assets/dist/css/jquery-ui.theme.min.css') }}" rel="stylesheet"/>
+    {{-- Inter font (UI font) --}}
+    <link rel="preconnect" href="https://rsms.me/">
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 
-    {{-- Custom CSS --}}
-	<style>
-        /* Font for the Web Page */
-		@import url('https://rsms.me/inter/inter.css');
-		:root {
-			--tblr-font-sans-serif: 'Inter Var', -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif;
-		}
-		body {
-			font-feature-settings: "cv03", "cv04", "cv11";
-		}
+    {{-- Third-party plugin CSS (static files) --}}
+    <link href="{{ secure_asset('assets/dist/css/datatables.min.css') }}" rel="stylesheet">
+    <link href="{{ secure_asset('assets/dist/css/select2.min.css') }}" rel="stylesheet">
+    <link href="{{ secure_asset('assets/dist/css/select2-bootstrap-5-theme.min.css') }}" rel="stylesheet">
+    <link href="{{ secure_asset('assets/dist/css/jquery-ui.min.css') }}" rel="stylesheet">
+    <link href="{{ secure_asset('assets/dist/css/jquery-ui.structure.min.css') }}" rel="stylesheet">
+    <link href="{{ secure_asset('assets/dist/css/jquery-ui.theme.min.css') }}" rel="stylesheet">
 
-        /* Font for Exporting PDF or Print Document */
-		@font-face {
+    <style>
+        :root {
+            --tblr-font-sans-serif: 'Inter Var', -apple-system, BlinkMacSystemFont, 'San Francisco', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        }
+        body {
+            font-feature-settings: "cv03", "cv04", "cv11";
+        }
+
+        /* Tahoma is mandatory for exported/printed documents (project rule). */
+        @font-face {
             font-family: 'Tahoma';
             src: url({{ secure_asset('assets/fonts/tahoma.ttf') }});
+            font-display: swap;
         }
         @font-face {
             font-family: 'Tahoma Bold';
             src: url({{ secure_asset('assets/fonts/tahomabd.ttf') }});
+            font-display: swap;
         }
 
-        /* Override font size for Select2 container input field */
-        .select2-container .select2-selection--single {
-            font-size: 11pt !important;
-        }
-
-        /* Override font size for the dropdown options */
-        .select2-container .select2-results__option {
-            font-size: 10pt !important;  /* Set smaller font size for options */
-        }
-
-        /* Override font size for the search input field */
-        .select2-container .select2-search__field {
-            font-size: 10pt !important;  /* Set smaller font size for search input */
-        }
-	</style>
-	@stack('styles')
+        /* Select2 font sizes (dropdown field, options and search box) */
+        .select2-container .select2-selection--single { font-size: 11pt !important; }
+        .select2-container .select2-results__option,
+        .select2-container .select2-search__field { font-size: 10pt !important; }
+    </style>
+    @stack('styles')
 </head>
 <body class="layout-fluid">
-    @php
-		// Get unread notifications for the authenticated user
-        $unread_notifications = auth()->user()?->unreadNotifications ?? collect();
-        $unread_notification_count = $unread_notifications->count();
-
-        $employee_name = session('employee_name') ?? '-';
-        $employee_position = session('employee_position');
-        $employee_id = session('employee_id');
-        $employee_summary = $employee_position && $employee_id
-            ? $employee_position . ' - ' . $employee_id
-            : '-';
-    @endphp
-
+    {{-- Top navbar (hidden when printing) --}}
     <header class="navbar navbar-expand-md d-print-none">
         <div class="container-xl">
-            {{-- Hamburger menu button --}}
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false" aria-label="Buka menu navigasi">
                 <span class="navbar-toggler-icon"></span>
             </button>
 
-            {{-- Logo --}}
             <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
                 <a href="{{ route('dashboard') }}">
-                    <img src="{{ secure_asset('assets/img/assi_logo_with_name.png') }}" width="110" alt="Tabler" class="navbar-brand-image">
+                    <img src="{{ secure_asset('assets/img/assi_logo_with_name.png') }}" width="110" alt="SIREKA ASSI" class="navbar-brand-image">
                 </a>
             </h1>
 
             <div class="navbar-nav flex-row order-md-last">
-                <div class="d-none d-md-flex">
-                    <div class="nav-item dropdown d-none d-md-flex me-3">
-                        {{-- Notifications --}}
-                        @auth
-                        <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="Show notifications">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" /><path d="M9 17v1a3 3 0 0 0 6 0v-1" /></svg>
-                            <span class="badge bg-red" id="notification-badge" style="{{ $unread_notification_count === 0 ? 'display: none;' : '' }}">{{ $unread_notification_count }}</span>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h3 class="card-title">Notifikasi Terbaru</h3>
-                                </div>
-                                <div class="list-group list-group-flush list-group-hoverable" id="notification-list">
-                                    @forelse ($unread_notifications->take(5) as $notification)
-                                        <div class="list-group-item">
-                                            <div class="row align-items-center">
-                                                <div class="col-auto"><span class="status-dot status-dot-animated bg-red d-block"></span></div>
-                                                <div class="col text-truncate">
-                                                    <a href="{{ $notification->data['url'] ?? '#' }}" class="text-body d-block">{{ $notification->data['title'] }}</a>
-                                                    <div class="d-block text-secondary text-truncate mt-n1">
-                                                        {{ $notification->data['message'] }}
+                {{-- Notifications (desktop only). The list is live-updated by Echo, see script below. --}}
+                @auth
+                    <div class="d-none d-md-flex">
+                        <div class="nav-item dropdown me-3">
+                            <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="Tampilkan notifikasi">
+                                <i class="ti ti-bell fs-2"></i>
+                                <span class="badge bg-red" id="notification-badge" @style(['display: none' => $unread_notification_count === 0])>{{ $unread_notification_count }}</span>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h3 class="card-title">Notifikasi Terbaru</h3>
+                                    </div>
+                                    <div class="list-group list-group-flush list-group-hoverable" id="notification-list">
+                                        @forelse ($recent_notifications as $notification)
+                                            <div class="list-group-item">
+                                                <div class="row align-items-center">
+                                                    <div class="col-auto"><span class="status-dot status-dot-animated bg-red d-block"></span></div>
+                                                    <div class="col text-truncate">
+                                                        <a href="{{ $notification->data['url'] ?? '#' }}" class="text-body d-block">{{ $notification->data['title'] ?? '-' }}</a>
+                                                        <div class="d-block text-secondary text-truncate mt-n1">{{ $notification->data['message'] ?? '' }}</div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    @empty
-                                        <div class="list-group-item text-center text-muted" id="no-notifications-msg">
-                                            Tidak ada notifikasi baru.
-                                        </div>
-                                    @endforelse
+                                        @empty
+                                            <div class="list-group-item text-center text-muted" id="no-notifications-msg">
+                                                Tidak ada notifikasi baru.
+                                            </div>
+                                        @endforelse
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        @endauth
                     </div>
-                </div>
+                @endauth
 
-                {{-- User Profile --}}
+                {{-- User menu --}}
                 <div class="nav-item dropdown">
-                    <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="Open user menu">
+                    <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="Buka menu pengguna">
                         <span class="avatar avatar-sm" style="background-image: url({{ secure_asset('assets/img/default_profile.jpg') }})"></span>
                         <div class="d-none d-xl-block ps-2">
                             <div class="fw-bold">{{ $employee_name }}</div>
-                            <div class="mt-1 small text-secondary">
-                                {{ $employee_summary }}
-                            </div>
+                            <div class="mt-1 small text-secondary">{{ $employee_summary }}</div>
                         </div>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
@@ -149,13 +162,13 @@
                 </div>
             </div>
 
-            {{-- Navbar Menu --}}
+            {{-- Main menu --}}
             <div class="collapse navbar-collapse" id="navbar-menu">
                 <div class="d-flex flex-column flex-md-row flex-fill align-items-stretch align-items-md-center">
                     <ul class="navbar-nav">
                         {{-- Data Compilations --}}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false" >
+                            <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
                                 <span class="nav-link-icon d-md-none d-lg-inline-block">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-database">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -194,7 +207,7 @@
 
                         {{-- Docking --}}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false" >
+                            <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
                                 <span class="nav-link-icon d-md-none d-lg-inline-block">
                                     <svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-anchor">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -230,7 +243,7 @@
 
                         {{-- Project --}}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false" >
+                            <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
                                 <span class="nav-link-icon d-md-none d-lg-inline-block">
                                     <svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-file-pencil">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -256,10 +269,10 @@
                         </li>
 
                         {{-- Administrator --}}
-                        {{-- Disable this dropdown menu using Spatie and only 'admin' role can see it --}}
+                        {{-- Spatie role gate: hides the menu only; routes must also be protected server-side --}}
                         @role('admin')
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false" >
+                                <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
                                     <span class="nav-link-icon d-md-none d-lg-inline-block">
                                         <svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-users">
                                             <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -309,9 +322,7 @@
         </div>
     </header>
 
-    {{-- Page Body --}}
     <div class="page-wrapper">
-        {{-- Page Body Header --}}
         <div class="page-header d-print-none">
             <div class="container-xl">
                 <div class="row g-2 align-items-center">
@@ -328,28 +339,22 @@
             </div>
         </div>
 
-        {{-- Page Content --}}
         <div class="page-body">
             <div class="container-xl">
                 @yield('content')
             </div>
         </div>
 
-        {{-- Footer --}}
         <footer class="footer footer-transparent d-print-none">
             <div class="container-xl">
                 <div class="row text-center align-items-center flex-row-reverse">
                     <div class="col-lg-auto ms-lg-auto">
                         <ul class="list-inline list-inline-dots mb-0">
                             <li class="list-inline-item">
-                                <a href="https://www.instagram.com/adiluhung_shipyard" class="link-secondary" target="_blank" rel="noopener">
-                                    Instagram
-                                </a>
+                                <a href="https://www.instagram.com/adiluhung_shipyard" class="link-secondary" target="_blank" rel="noopener">Instagram</a>
                             </li>
                             <li class="list-inline-item">
-                                <a href="https://www.youtube.com/@assishipyard" class="link-secondary" target="_blank" rel="noopener">
-                                    YouTube
-                                </a>
+                                <a href="https://www.youtube.com/@assishipyard" class="link-secondary" target="_blank" rel="noopener">YouTube</a>
                             </li>
                         </ul>
                     </div>
@@ -357,13 +362,9 @@
                         <ul class="list-inline list-inline-dots mb-0">
                             <li class="list-inline-item">
                                 Copyright &copy; {{ date('Y') }}
-                                <a href="https://www.assishipyard.com" class="link-secondary">
-                                    PT. Adiluhung Saranasegara Indonesia
-                                </a>
+                                <a href="https://www.assishipyard.com" class="link-secondary">PT. Adiluhung Saranasegara Indonesia</a>
                             </li>
-                            <li class="list-inline-item">
-                                Sistem Informasi Reparasi Kapal (SIREKA)
-                            </li>
+                            <li class="list-inline-item">Sistem Informasi Reparasi Kapal (SIREKA)</li>
                         </ul>
                     </div>
                 </div>
@@ -373,60 +374,40 @@
 
     @yield('modal')
 
-    {{-- Core scripts --}}
-    <script src="{{ secure_asset('assets/dist/js/tabler.min.js?1692870487') }}" defer></script>
-    <script src="{{ secure_asset('assets/dist/js/demo.min.js?1692870487') }}" defer></script>
-    <script src="{{ secure_asset('assets/dist/libs/list.js/dist/list.min.js?1692870487') }}" defer></script>
-
-    {{-- jQuery --}}
+    {{-- jQuery and its plugins (must stay synchronous and in this order) --}}
     <script src="{{ secure_asset('assets/dist/js/jquery-3.7.1.min.js') }}"></script>
-    {{-- Validation --}}
     <script src="{{ secure_asset('assets/dist/js/jquery-validation/jquery.validate.min.js') }}"></script>
     <script src="{{ secure_asset('assets/dist/js/jquery-validation/additional-methods.min.js') }}"></script>
-
-    {{-- UI helpers --}}
     <script src="{{ secure_asset('assets/dist/js/jquery-ui/jquery-ui.min.js') }}"></script>
-
-    {{-- External libraries --}}
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@eonasdan/tempus-dominus@6.9.4/dist/js/tempus-dominus.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-
-    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/locale/id.min.js"></script>
-
-    {{-- DataTables and Select2 --}}
     <script src="{{ secure_asset('assets/dist/js/datatables.min.js') }}"></script>
     <script src="{{ secure_asset('assets/dist/js/select2.full.min.js') }}"></script>
 
-	{{-- Select2 Initialization --}}
+    {{-- CDN libraries --}}
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@eonasdan/tempus-dominus@6.9.4/dist/js/tempus-dominus.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1/dist/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/locale/id.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <script>
+        // Send the CSRF token with every jQuery and Axios request.
+        const csrf_token = document.querySelector('meta[name="csrf-token"]').content;
+        $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': csrf_token } });
+        axios.defaults.headers.common['X-CSRF-TOKEN'] = csrf_token;
+
+        // Any <select class="dropdown-list"> becomes a Select2 box.
         $('.dropdown-list').select2({
             theme: 'bootstrap-5',
             width: '100%',
             allowClear: true,
         });
 
-        $('.dropdown-list').next('.select2-container').find('.select2-selection--single').css('font-size', '11pt');
-        $('.dropdown-list').next('.select2-container').find('.select2-results__option').css('font-size', '11pt');
-        $('.dropdown-list').next('.select2-container').find('.select2-search__field').css('font-size', '11pt');
-    </script>
-
-	{{-- ApexCharts --}}
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-    <script src="{{ secure_asset('assets/dist/libs/litepicker/dist/litepicker.js?1692870487') }}" defer></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-	{{-- Decimal Input Formatting --}}
-    <script>
+        // <input id="decimal-input">: format as 1,234.50 while typing.
         $('#decimal-input').on('input', function () {
-            const input = $(this).val().replace(/,/g, '');
-            const number = parseFloat(input);
+            const number = parseFloat($(this).val().replace(/,/g, ''));
 
             if (!isNaN(number)) {
                 $(this).val(number.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -434,101 +415,47 @@
         });
     </script>
 
-	{{-- Theme Settings Initialization --}}
-    <script>
-		// Theme Settings
-        document.addEventListener('DOMContentLoaded', function () {
-            const themeConfig = {
-                theme: 'light',
-                'theme-base': 'gray',
-                'theme-font': 'sans-serif',
-                'theme-primary': 'blue',
-                'theme-radius': '1',
-            };
-            const url = new URL(window.location.href);
-            const form = document.getElementById('offcanvasSettings');
-            const resetButton = document.getElementById('reset-changes');
-
-            if (form && resetButton) {
-                    const checkItems = function () {
-                        for (const key in themeConfig) {
-                            const value = window.localStorage['tabler-' + key] || themeConfig[key];
-                            if (value) {
-                                const radios = form.querySelectorAll(`[name="${key}"]`);
-                                if (radios) {
-                                radios.forEach((radio) => {
-                                        radio.checked = radio.value === value;
-                                });
-                            }
-                        }
-                    }
-                    };
-                    form.addEventListener('change', function (event) {
-                        const { name, value } = event.target;
-                        for (const key in themeConfig) {
-                        if (name === key) {
-                                document.documentElement.setAttribute('data-bs-' + key, value);
-                                window.localStorage.setItem('tabler-' + key, value);
-                            url.searchParams.set(key, value);
-                        }
-                    }
-                        window.history.pushState({}, '', url);
-                });
-                    resetButton.addEventListener('click', function () {
-                        for (const key in themeConfig) {
-                            document.documentElement.removeAttribute('data-bs-' + key);
-                            window.localStorage.removeItem('tabler-' + key);
-                        url.searchParams.delete(key);
-                    }
-                    checkItems();
-                        window.history.pushState({}, '', url);
-                });
-                    checkItems();
-            }
-        });
-    </script>
-
     @auth
-    <script>
-		// Enable Pusher logging for debugging (optional)
-        window.Pusher = Pusher;
-        window.Echo = new Echo({
-            broadcaster: 'reverb',
-            key: '{{ config('broadcasting.connections.reverb.key') }}',
-            wsHost: window.location.hostname,
-            wsPort: {{ config('broadcasting.connections.reverb.options.port', 80) }},
-            wssPort: {{ config('broadcasting.connections.reverb.options.port', 443) }},
-            forceTLS: (window.location.protocol === 'https:'),
-            enabledTransports: ['ws', 'wss'],
-        });
+        {{-- Realtime notifications (Laravel Reverb over the Pusher protocol) --}}
+        <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
+        <script>
+            window.Pusher = Pusher;
+            window.Echo = new Echo({
+                broadcaster: 'reverb',
+                key: @js(config('broadcasting.connections.reverb.key')),
+                wsHost: window.location.hostname,
+                wsPort: @js((int) config('broadcasting.connections.reverb.options.port', 80)),
+                wssPort: @js((int) config('broadcasting.connections.reverb.options.port', 443)),
+                forceTLS: window.location.protocol === 'https:',
+                enabledTransports: ['ws', 'wss'],
+            });
 
-		// Listen for notifications for the authenticated user
-        window.Echo.private('App.Models.User.{{ auth()->user()->id }}')
-            .notification((notification) => {
-                $('#no-notifications-msg').remove();
+            // Notification payload is user-influenced text: always insert it as text, never as HTML.
+            window.Echo.private(@js('App.Models.User.' . auth()->id()))
+                .notification((notification) => {
+                    $('#no-notifications-msg').remove();
 
-                const badge = $('#notification-badge');
-                const count = parseInt(badge.text() || 0);
+                    const badge = $('#notification-badge');
+                    badge.text((parseInt(badge.text(), 10) || 0) + 1).show();
 
-                badge.text(count + 1);
-                badge.show();
-
-                const notificationHtml = `
-                    <div class="list-group-item">
-                        <div class="row align-items-center">
-                            <div class="col-auto"><span class="status-dot status-dot-animated bg-red d-block"></span></div>
-                            <div class="col text-truncate">
-                                <a href="${notification.url ? notification.url : '#'}" class="text-body d-block">${notification.title}</a>
-                                <div class="d-block text-secondary text-truncate mt-n1">
-                                    ${notification.message}
+                    const url = /^(https?:\/\/|\/)/.test(notification.url || '') ? notification.url : '#';
+                    const item = $(`
+                        <div class="list-group-item">
+                            <div class="row align-items-center">
+                                <div class="col-auto"><span class="status-dot status-dot-animated bg-red d-block"></span></div>
+                                <div class="col text-truncate">
+                                    <a class="text-body d-block notification-title"></a>
+                                    <div class="d-block text-secondary text-truncate mt-n1 notification-message"></div>
                                 </div>
                             </div>
-                        </div>
-                    </div>`;
+                        </div>`);
 
-                $('#notification-list').prepend(notificationHtml);
-            });
-    </script>
+                    item.find('.notification-title').attr('href', url).text(notification.title ?? '-');
+                    item.find('.notification-message').text(notification.message ?? '');
+                    $('#notification-list').prepend(item);
+                });
+        </script>
     @endauth
 
     @stack('scripts')

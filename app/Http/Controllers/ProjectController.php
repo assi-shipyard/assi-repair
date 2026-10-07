@@ -98,8 +98,6 @@ class ProjectController extends Controller
             return str_contains(strtolower((string) $employee->position?->name), 'ppc');
         });
 
-        // Keep code empty until ship and project type are selected by user.
-        $nextProjectCode = '';
         $projectTypeOptions = [
             'Docking Repair',
             'Floating Repair',
@@ -107,7 +105,7 @@ class ProjectController extends Controller
             'Other',
         ];
 
-        return view('project.create', compact('ships', 'employees', 'divisions', 'ppc_employees', 'nextProjectCode', 'projectTypeOptions'));
+        return view('project.create', ['ships' => $ships, 'employees' => $employees, 'divisions' => $divisions, 'ppc_employees' => $ppc_employees, 'project_type_options' => $projectTypeOptions]);
     }
 
     public function generate_code_preview(Request $request): JsonResponse
@@ -225,7 +223,7 @@ class ProjectController extends Controller
         }
 
         // Fetch ships, employees, and divisions for the form
-        $ships = Ship::with('company')->orderBy('name')->get();
+        $ships = Ship::with(['company', 'type'])->orderBy('name')->get();
         $employees = Employee::with('position.organizational_unit')->orderBy('name')->get();
         $divisions = OrganizationalUnit::query()
             ->where('type', 'division')
@@ -238,7 +236,16 @@ class ProjectController extends Controller
             'Other',
         ];
 
-        return view('project.edit', compact('project', 'ships', 'employees', 'divisions', 'projectTypeOptions'));
+        $ppc_employees = $employees->filter(fn (Employee $employee) => str_contains(strtolower((string) $employee->position?->name), 'ppc'));
+
+        return view('project.edit', [
+            'project' => $project,
+            'ships' => $ships,
+            'employees' => $employees,
+            'ppc_employees' => $ppc_employees,
+            'divisions' => $divisions,
+            'project_type_options' => $projectTypeOptions,
+        ]);
     }
 
     public function update(Request $request, string $id)
@@ -319,7 +326,7 @@ class ProjectController extends Controller
 
         // Check if the project's progress is greater than 0. If so, prevent deletion and redirect back with an error message
         if ((float) $project->progress > 0) {
-            return redirect()->route('project.index')->with('error', 'Proyek tidak dapat dihapus karena memiliki progress lebih dari 0%.');
+            return redirect()->route('project.index')->with('error', 'Proyek tidak dapat dihapus karena memiliki progres lebih dari 0%.');
         }
 
         // Store the project code for the success message, then delete the project and redirect back to the project index with a success message
@@ -346,20 +353,20 @@ class ProjectController extends Controller
             'division_manager_employee_id' => 'nullable|exists:employees,id',
             'division_ids' => 'required|array|min:1',
             'division_ids.*' => 'exists:organizational_units,id',
-            'project_type' => 'required|string',
+            'project_type' => 'required|string|max:100',
             'start_date_estimation' => 'nullable|date',
             'end_date_estimation' => 'nullable|date|after_or_equal:start_date_estimation',
             'start_date_actual' => 'nullable|date',
             'end_date_actual' => 'nullable|date|after_or_equal:start_date_actual',
             'progress' => 'nullable|numeric|min:0|max:100',
             'status' => 'nullable|in:Not Started,In Progress,Completed',
-            'comment' => 'nullable|string',
+            'comment' => 'nullable|string|max:2000',
             'owner_surveyors' => 'nullable|array',
-            'owner_surveyors.*.name' => 'nullable|string',
-            'owner_surveyors.*.company' => 'nullable|string',
-            'owner_surveyors.*.position' => 'nullable|string',
-            'owner_surveyors.*.email' => 'nullable|email',
-            'owner_surveyors.*.phone' => 'nullable|string',
+            'owner_surveyors.*.name' => 'nullable|string|max:150',
+            'owner_surveyors.*.company' => 'nullable|string|max:150',
+            'owner_surveyors.*.position' => 'nullable|string|max:150',
+            'owner_surveyors.*.email' => 'nullable|email|max:150',
+            'owner_surveyors.*.phone' => 'nullable|string|max:30',
         ];
     }
 
@@ -380,9 +387,9 @@ class ProjectController extends Controller
             'project_type.required' => 'Tipe proyek wajib diisi.',
             'end_date_estimation.after_or_equal' => 'Tanggal estimasi selesai harus sama atau setelah tanggal estimasi mulai.',
             'end_date_actual.after_or_equal' => 'Tanggal selesai aktual harus sama atau setelah tanggal mulai aktual.',
-            'progress.numeric' => 'Progress harus berupa angka.',
-            'progress.min' => 'Progress tidak boleh kurang dari 0%.',
-            'progress.max' => 'Progress tidak boleh lebih dari 100%.',
+            'progress.numeric' => 'Progres harus berupa angka.',
+            'progress.min' => 'Progres tidak boleh kurang dari 0%.',
+            'progress.max' => 'Progres tidak boleh lebih dari 100%.',
             'status.in' => 'Status proyek tidak valid.',
             'owner_surveyors.*.email.email' => 'Email owner surveyor harus berupa alamat email yang valid.',
         ];

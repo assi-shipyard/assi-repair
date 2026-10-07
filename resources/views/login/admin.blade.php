@@ -7,11 +7,7 @@
     <link rel="shortcut icon" href="{{ secure_asset('assets/img/favicon.ico') }}" type="image/x-icon">
     <title>Login Admin - Sistem Informasi Reparasi Kapal ASSI</title>
 
-    <link href="{{ secure_asset('assets/dist/css/tabler.min.css?1692870487') }}" rel="stylesheet">
-    <link href="{{ secure_asset('assets/dist/css/tabler-flags.min.css?1692870487') }}" rel="stylesheet">
-    <link href="{{ secure_asset('assets/dist/css/tabler-payments.min.css?1692870487') }}" rel="stylesheet">
-    <link href="{{ secure_asset('assets/dist/css/tabler-vendors.min.css?1692870487') }}" rel="stylesheet">
-    <link href="{{ secure_asset('assets/dist/css/demo.min.css?1692870487') }}" rel="stylesheet">
+    @vite('resources/js/app.js')
     <style>
         @import url('https://rsms.me/inter/inter.css');
         :root {
@@ -79,8 +75,6 @@
         </div>
     </div>
 
-    <script src="{{ secure_asset('assets/dist/js/tabler.min.js') }}" defer></script>
-    <script src="{{ secure_asset('assets/dist/js/demo.min.js') }}" defer></script>
     <script src="{{ secure_asset('assets/dist/js/jquery-3.7.1.min.js') }}"></script>
     <script src="{{ secure_asset('assets/dist/js/jquery-validation/jquery.validate.min.js') }}"></script>
 
