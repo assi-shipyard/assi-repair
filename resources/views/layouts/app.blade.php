@@ -13,12 +13,13 @@
 |   @push('scripts')                page JS, rendered LAST (jQuery, Tabler, etc. are ready)
 |
 | Frontend asset strategy:
-|   - Tabler (core JS/CSS, flags, payments, vendors) and Tabler Icons are
+|   - Tabler (core JS/CSS, flags, payments, vendors), Tabler Icons and Vanilla
+|     Calendar Pro (date pickers, resources/js/date_picker.js) are
 |     installed through npm and bundled by Vite (resources/js/app.js).
 |     Upgrade with `npm update @tabler/core && npm run build`.
 |   - jQuery, jQuery Validation, jQuery UI, DataTables and Select2 are static
 |     files in public/assets/dist.
-|   - Vue, Axios, Moment, ApexCharts, SweetAlert2, Tempus Dominus, Pusher and
+|   - Vue, Axios, Moment, ApexCharts, SweetAlert2, Pusher and
 |     Echo are loaded from CDNs.
 |
 | Script order matters: Vite's module script is deferred (runs before
@@ -385,7 +386,6 @@
     {{-- CDN libraries --}}
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@eonasdan/tempus-dominus@6.9.4/dist/js/tempus-dominus.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1/dist/axios.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/locale/id.min.js"></script>

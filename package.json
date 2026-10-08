@@ -15,6 +15,7 @@
     },
     "dependencies": {
         "@tabler/core": "^1.6.1",
-        "@tabler/icons-webfont": "^3.49.0"
+        "@tabler/icons-webfont": "^3.49.0",
+        "vanilla-calendar-pro": "^3.4.0"
     }
 }

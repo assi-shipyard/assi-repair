@@ -97,7 +97,7 @@
                 <div class="row align-items-center g-4 position-relative">
                     <div class="col-xl-7">
                         <div class="text-uppercase small fw-semibold text-secondary mb-2">Pusat Kendali Operasional</div>
-                        <h1 class="mb-3">Pantau seluruh proyek dan armada pelanggan dari satu dashboard.</h1>
+                        <h1 class="mb-3 text-white">Pantau seluruh proyek dan armada pelanggan dari satu dashboard.</h1>
                         <p class="text-secondary mb-4">Tampilan ini merangkum proyek pending, proyek berjalan, proyek selesai, daftar pelanggan, armada kapal, dan tren penyelesaian proyek per tanggal.</p>
                         <div class="d-flex flex-wrap gap-2">
                             <a href="<?php echo e(route('project.index')); ?>" class="btn btn-light">Lihat daftar proyek</a>
