@@ -50,7 +50,13 @@
                         <div class="list-group-item bg-transparent px-0 py-2">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge bg-primary-subtle text-primary">4</span>
-                                <span class="fw-medium">Sistem mengevaluasi ketersediaan dan kapasitas</span>
+                                <span class="fw-medium">Lampirkan dokumen kapal</span>
+                            </div>
+                        </div>
+                        <div class="list-group-item bg-transparent px-0 py-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary-subtle text-primary">5</span>
+                                <span class="fw-medium">Pemeriksaan sistem, persetujuan Engineering, lalu Produksi</span>
                             </div>
                         </div>
                     </div>
@@ -73,7 +79,7 @@
                         </li>
                         <li class="d-flex gap-2 mb-0">
                             <span class="text-primary"><i class="ti ti-alert-circle"></i></span>
-                            <span>Jika jadwal berpotongan dengan ruang docking yang dipilih, permohonan akan ditolak dan diminta untuk menyesuaikan waktu.</span>
+                            <span>Sistem memeriksa bentrok jadwal dan kesesuaian dimensi kapal. Jika lolos, permohonan diteruskan ke persetujuan Engineering, lalu Produksi.</span>
                         </li>
                     </ul>
                 </div>
@@ -89,7 +95,7 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <form id="docking-request-form" method="POST" action="{{ route('docking-space-request.store') }}">
+                    <form id="docking-request-form" method="POST" action="{{ route('docking-space-request.store') }}" enctype="multipart/form-data">
                         @csrf
 
                         <div class="row g-3">
@@ -175,6 +181,17 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label required">Dokumen kapal</label>
+                                <div id="document-rows" class="d-flex flex-column gap-2"></div>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-document-row">Tambah dokumen</button>
+                                <div class="form-hint mt-1">Wajib melampirkan Ship Particular. Format: pdf, doc, docx, xls, xlsx, dwg, jpg, png (maks. 20MB per file, 10 dokumen). Dokumen akan ditinjau Engineering.</div>
+                                @error('documents')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                @foreach ($errors->get('documents.*') as $messages)
+                                    @foreach ($messages as $message)<div class="text-danger small mt-1">{{ $message }}</div>@endforeach
+                                @endforeach
                             </div>
 
                             <div class="col-12">
@@ -314,6 +331,7 @@
                 },
                 rules: {
                     project_id: { required: true },
+                    ship_id: { required: true },
                     requested_start_at: { required: true },
                     requested_end_at: {
                         greaterThanOrEqual: '[name="requested_start_at"]',
@@ -322,6 +340,7 @@
                 },
                 messages: {
                     project_id: { required: 'Proyek wajib dipilih.' },
+                    ship_id: { required: 'Kapal wajib dipilih.' },
                     requested_start_at: { required: 'Jadwal mulai docking wajib diisi.' },
                     requested_end_at: {
                         greaterThanOrEqual: 'Jadwal selesai docking tidak boleh lebih awal dari jadwal mulai.',
@@ -329,6 +348,33 @@
                     request_notes: { maxlength: 'Catatan permohonan maksimal 2000 karakter.' },
                 },
             });
+
+            const documentTypes = @json(\App\Models\DockingRequestDocument::TYPE_LABELS);
+            let documentIndex = 0;
+
+            function addDocumentRow(defaultType) {
+                const index = documentIndex++;
+                const options = Object.entries(documentTypes).map(function (entry) {
+                    return '<option value="' + entry[0] + '"' + (entry[0] === defaultType ? ' selected' : '') + '>' + entry[1] + '</option>';
+                }).join('');
+                const row = $(
+                    '<div class="row g-2 js-document-row">' +
+                    '<div class="col-md-4"><select class="form-select" name="documents[' + index + '][type]">' + options + '</select></div>' +
+                    '<div class="col"><input type="file" class="form-control" name="documents[' + index + '][file]" accept=".pdf,.doc,.docx,.xls,.xlsx,.dwg,.jpg,.jpeg,.png"></div>' +
+                    '<div class="col-auto"><button type="button" class="btn btn-outline-danger js-remove-document">Hapus</button></div>' +
+                    '</div>'
+                );
+                $('#document-rows').append(row);
+                row.find('input[type="file"]').rules('add', { required: true, messages: { required: 'File dokumen wajib diunggah.' } });
+            }
+
+            $('#add-document-row').on('click', function () { addDocumentRow('other'); });
+            $('#document-rows').on('click', '.js-remove-document', function () {
+                if ($('.js-document-row').length > 1) {
+                    $(this).closest('.js-document-row').remove();
+                }
+            });
+            addDocumentRow('ship_particular');
         });
     </script>
 @endpush

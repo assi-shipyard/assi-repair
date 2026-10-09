@@ -11,14 +11,17 @@
     @include('partials.flash')
 
     @php
-        $can_manage_docking = auth()->user()?->hasRole('admin')
-            || auth()->user()?->can('docking.manage')
-            || auth()->user()?->can('project.manage')
-            || auth()->user()?->can('project.update');
+        $current_user = auth()->user();
+        $can_manage_docking = $current_user?->hasRole('admin')
+            || $current_user?->can('docking.manage')
+            || $current_user?->can('project.manage')
+            || $current_user?->can('project.update');
+        $can_approve_engineering = $current_user?->hasRole('admin') || $current_user?->can('approve-docking-engineering');
+        $can_approve_production = $current_user?->hasRole('admin') || $current_user?->can('approve-docking-production');
 
         $status_labels = [
-            'submitted' => 'Diajukan',
-            'reviewed' => 'Ditinjau',
+            'submitted' => 'Menunggu Engineering',
+            'engineering_approved' => 'Menunggu Produksi',
             'approved' => 'Disetujui / menunggu kedatangan',
             'rejected' => 'Ditolak',
             'cancelled' => 'Dibatalkan',
@@ -26,7 +29,7 @@
 
         $status_badges = [
             'submitted' => 'bg-blue-lt text-blue',
-            'reviewed' => 'bg-amber-lt text-amber',
+            'engineering_approved' => 'bg-amber-lt text-amber',
             'approved' => 'bg-success-lt text-success',
             'rejected' => 'bg-red-lt text-red',
             'cancelled' => 'bg-secondary-lt text-secondary',
@@ -34,7 +37,7 @@
 
         $status_counts = [
             'submitted' => 0,
-            'reviewed' => 0,
+            'engineering_approved' => 0,
             'approved' => 0,
             'rejected' => 0,
             'cancelled' => 0,
@@ -53,7 +56,7 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <div class="text-muted small">Diajukan</div>
+                            <div class="text-muted small">Menunggu Engineering</div>
                             <div class="fw-bold fs-2 mb-0">{{ $status_counts['submitted'] }}</div>
                         </div>
                         <span class="avatar bg-primary text-white"><i class="ti ti-send"></i></span>
@@ -66,8 +69,8 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <div class="text-muted small">Ditinjau</div>
-                            <div class="fw-bold fs-2 mb-0">{{ $status_counts['reviewed'] }}</div>
+                            <div class="text-muted small">Menunggu Produksi</div>
+                            <div class="fw-bold fs-2 mb-0">{{ $status_counts['engineering_approved'] }}</div>
                         </div>
                         <span class="avatar bg-amber text-white"><i class="ti ti-search"></i></span>
                     </div>
@@ -109,7 +112,7 @@
                     <label class="form-label">Filter Status SOP</label>
                     <select name="status" class="form-select">
                         <option value="">Semua Tahap</option>
-                        @foreach (['submitted', 'reviewed', 'approved', 'rejected', 'cancelled'] as $item_status)
+                        @foreach (array_keys($status_labels) as $item_status)
                             <option value="{{ $item_status }}" @selected($status === $item_status)>{{ $status_labels[$item_status] ?? strtoupper($item_status) }}</option>
                         @endforeach
                     </select>
@@ -125,7 +128,7 @@
         <div class="card-header border-0">
             <div>
                 <h3 class="card-title mb-1">Timeline permohonan docking</h3>
-                <div class="text-secondary">1) Permohonan docking, 2) menunggu kedatangan kapal, 3) masuk dock &amp; proyek dimulai, 4) review BOQ dan notes kepuasan</div>
+                <div class="text-secondary">1) Pemeriksaan sistem, 2) persetujuan Engineering, 3) persetujuan Produksi, 4) menunggu kedatangan kapal &amp; masuk dock</div>
             </div>
         </div>
         <div class="table-responsive">
@@ -135,18 +138,14 @@
                         <th>Proyek / Ship</th>
                         <th>Jadwal</th>
                         <th>Docking Space</th>
-                        <th>Status SOP</th>
-                        <th>Kecocokan</th>
+                        <th>Status &amp; Persetujuan</th>
+                        <th>Dokumen</th>
                         <th>Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($docking_requests as $docking_request)
                         @php
-                            $best_evaluation = $docking_request->capacity_evaluations
-                                ->sortByDesc('compatibility_score')
-                                ->first();
-
                             $status_key = $docking_request->request_status;
                             $status_label = $status_labels[$status_key] ?? strtoupper($status_key);
                             $status_badge = $status_badges[$status_key] ?? 'bg-secondary-lt text-secondary';
@@ -162,49 +161,55 @@
                             </td>
                             <td>
                                 <div class="fw-medium">{{ $docking_request->requested_docking_space?->name ?? '-' }}</div>
-                                <div class="text-secondary small">Preferensi request</div>
+                                <div class="text-secondary small">Ditetapkan sistem</div>
                             </td>
                             <td>
                                 <span class="badge {{ $status_badge }}">{{ $status_label }}</span>
-                            </td>
-                            <td>
-                                @if ($best_evaluation)
-                                    <div class="fw-medium">{{ $best_evaluation->docking_space?->name ?? '-' }}</div>
-                                    <div class="text-secondary small">{{ $best_evaluation->compatibility_score }}% cocok</div>
-                                @else
-                                    <span class="text-secondary">Belum ada evaluasi</span>
+                                @if ($docking_request->engineering_approved_at)
+                                    <div class="text-secondary small mt-1">Engineering: {{ $docking_request->engineering_approver?->employee_id ?? '-' }}, {{ $docking_request->engineering_approved_at->format('d/m/Y H:i') }}</div>
+                                @endif
+                                @if ($docking_request->production_approved_at)
+                                    <div class="text-secondary small">Produksi: {{ $docking_request->production_approver?->employee_id ?? '-' }}, {{ $docking_request->production_approved_at->format('d/m/Y H:i') }}</div>
+                                @endif
+                                @if ($docking_request->request_status === 'rejected')
+                                    <div class="text-danger small mt-1">Ditolak {{ $docking_request->rejection_stage === 'production' ? 'Produksi' : 'Engineering' }}: {{ $docking_request->rejection_reason }}</div>
                                 @endif
                             </td>
                             <td>
+                                @forelse ($docking_request->documents as $document)
+                                    <div class="small">
+                                        <a href="{{ route('docking-space-request.documents.download', [$docking_request->unique_id, $document->unique_id]) }}">{{ $document->document_name }}</a>
+                                    </div>
+                                @empty
+                                    <span class="text-secondary">-</span>
+                                @endforelse
+                            </td>
+                            <td>
                                 <div class="d-flex flex-column gap-2">
+                                    @if (($docking_request->request_status === 'submitted' && $can_approve_engineering) || ($docking_request->request_status === 'engineering_approved' && $can_approve_production))
+                                        <a class="btn btn-sm btn-outline-primary w-100" href="{{ route('docking-approval.show', [$docking_request->request_status === 'submitted' ? 'engineering' : 'production', $docking_request->unique_id]) }}">Tinjau detail</a>
+                                    @endif
+
+                                    @if ($docking_request->request_status === 'submitted' && $can_approve_engineering)
+                                        @include('docking-space-request.partials.review-form', ['docking_request' => $docking_request, 'route_name' => 'docking-space-request.engineering-review', 'approve_label' => 'Setujui (Engineering)'])
+                                    @endif
+
+                                    @if ($docking_request->request_status === 'engineering_approved' && $can_approve_production)
+                                        @include('docking-space-request.partials.review-form', ['docking_request' => $docking_request, 'route_name' => 'docking-space-request.production-review', 'approve_label' => 'Setujui (Produksi)'])
+                                    @endif
+
+                                    @if (in_array($docking_request->request_status, ['submitted', 'engineering_approved'], true) && ((int) $docking_request->requested_by === (int) $current_user?->id || $current_user?->hasRole('admin')))
+                                        <form method="POST" action="{{ route('docking-space-request.cancel', $docking_request->unique_id) }}">
+                                            @csrf
+                                            <button class="btn btn-sm btn-outline-secondary w-100" type="submit">Batalkan</button>
+                                        </form>
+                                    @endif
+
                                     @if ($can_manage_docking)
                                         <form method="POST" action="{{ route('docking-space-request.evaluate', $docking_request->unique_id ?? $docking_request->id) }}">
                                             @csrf
                                             <button class="btn btn-sm btn-outline-primary w-100" type="submit">Evaluasi ulang</button>
                                         </form>
-
-                                        @if (in_array($docking_request->request_status, ['submitted', 'reviewed'], true))
-                                            <form method="POST" action="{{ route('docking-space-request.review', $docking_request->unique_id ?? $docking_request->id) }}" class="d-flex flex-column gap-2 js-review-approve-form">
-                                                @csrf
-                                                <input type="hidden" name="request_status" value="approved">
-                                                <select class="form-select form-select-sm" name="approved_docking_space_id" required>
-                                                    <option value="">Pilih docking space</option>
-                                                    @foreach ($docking_spaces as $docking_space)
-                                                        <option value="{{ $docking_space->id }}" @selected((int) $docking_request->requested_docking_space_id === (int) $docking_space->id)>
-                                                            {{ $docking_space->name }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                                <button class="btn btn-sm btn-success w-100" type="submit">Setujui</button>
-                                            </form>
-
-                                            <form method="POST" action="{{ route('docking-space-request.review', $docking_request->unique_id ?? $docking_request->id) }}">
-                                                @csrf
-                                                <input type="hidden" name="request_status" value="rejected">
-                                                <input type="hidden" name="rejection_reason" value="Ditolak dari halaman daftar permohonan docking space.">
-                                                <button class="btn btn-sm btn-outline-danger w-100" type="submit">Tolak</button>
-                                            </form>
-                                        @endif
 
                                         @if ($docking_request->request_status === 'approved')
                                             <form method="POST" action="{{ route('docking-space-request.start-docking', $docking_request->unique_id ?? $docking_request->id) }}" class="d-flex flex-column gap-2 js-start-docking-form">
@@ -215,8 +220,6 @@
                                                 <button class="btn btn-sm btn-primary w-100" type="submit">Masuk dock</button>
                                             </form>
                                         @endif
-                                    @else
-                                        <span class="text-secondary small">Tidak ada akses aksi.</span>
                                     @endif
                                 </div>
                             </td>
@@ -248,22 +251,31 @@
                 return new Date(value) >= new Date(comparedValue);
             });
 
-            $('.js-review-approve-form').each(function () {
+            $('.js-review-form').each(function () {
                 $(this).validate({
                     errorClass: 'is-invalid',
-                    validClass: 'is-valid',
                     errorElement: 'div',
                     errorPlacement: function (error, element) {
                         error.addClass('invalid-feedback');
                         element.closest('div').append(error);
                     },
-                    rules: {
-                        approved_docking_space_id: { required: true },
-                    },
-                    messages: {
-                        approved_docking_space_id: { required: 'Docking space persetujuan wajib dipilih.' },
-                    },
+                    rules: { notes: { maxlength: 2000 } },
+                    messages: { notes: { maxlength: 'Catatan maksimal 2000 karakter.' } },
                 });
+            });
+
+            $('.js-review-form button[value="reject"]').on('click', function (event) {
+                const form = $(this).closest('form');
+                const notes = form.find('[name="notes"]');
+                notes.rules('add', { required: true, messages: { required: 'Alasan penolakan wajib diisi.' } });
+
+                if (!form.valid()) {
+                    event.preventDefault();
+                }
+            });
+
+            $('.js-review-form button[value="approve"]').on('click', function () {
+                $(this).closest('form').find('[name="notes"]').rules('remove', 'required');
             });
 
             $('.js-start-docking-form').each(function () {

@@ -9,6 +9,7 @@ use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\NotificationSettingController;
+use App\Http\Controllers\DockingApprovalController;
 use App\Http\Controllers\DockingManagementController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectJobDocumentPageController;
@@ -203,12 +204,20 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         'message' => 'Halaman data jenis reparasi belum diaktifkan.',
     ])->name('price-dictionary.index');
 
+    Route::controller(DockingApprovalController::class)->prefix('docking-approval')->name('docking-approval.')->group(function (): void {
+        Route::get('/{stage}', 'index')->whereIn('stage', ['engineering', 'production'])->name('index');
+        Route::get('/{stage}/{docking_request}', 'show')->whereIn('stage', ['engineering', 'production'])->name('show');
+    });
+
     Route::controller(DockingManagementController::class)->group(function (): void {
         Route::get('/docking-space-request/create', 'create_request')->name('docking-space-request.create');
         Route::post('/docking-space-request', 'store_request')->name('docking-space-request.store');
         Route::get('/docking-space-request', 'index_request')->name('docking-space-request.index');
         Route::post('/docking-space-request/{docking_request}/evaluate', 'evaluate_request')->name('docking-space-request.evaluate');
-        Route::post('/docking-space-request/{docking_request}/review', 'review_request')->name('docking-space-request.review');
+        Route::post('/docking-space-request/{docking_request}/engineering-review', 'engineering_review')->name('docking-space-request.engineering-review');
+        Route::post('/docking-space-request/{docking_request}/production-review', 'production_review')->name('docking-space-request.production-review');
+        Route::post('/docking-space-request/{docking_request}/cancel', 'cancel_request')->name('docking-space-request.cancel');
+        Route::get('/docking-space-request/{docking_request}/documents/{document}', 'download_request_document')->name('docking-space-request.documents.download');
         Route::post('/docking-space-request/{docking_request}/start-docking', 'start_docking')->name('docking-space-request.start-docking');
 
         Route::get('/docking-space-availability', 'docking_space_availability')->name('docking-space-availability');

@@ -199,6 +199,18 @@
                                             <a href="<?php echo e(route('docking-space-request.create')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space-request.create') ? 'active' : ''); ?>">Buat Docking Request</a>
                                             <a href="<?php echo e(route('docking-space-request.index')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space-request.index') ? 'active' : ''); ?>">Daftar Docking Request</a>
 
+                                            <?php if(auth()->user()?->hasRole('admin') || auth()->user()?->can('approve-docking-engineering') || auth()->user()?->can('approve-docking-production')): ?>
+                                                <div class="dropdown-divider"></div>
+
+                                                <h6 class="dropdown-header">Persetujuan</h6>
+                                                <?php if(auth()->user()?->hasRole('admin') || auth()->user()?->can('approve-docking-engineering')): ?>
+                                                    <a href="<?php echo e(route('docking-approval.index', 'engineering')); ?>" class="dropdown-item <?php echo e(request()->is('docking-approval/engineering*') ? 'active' : ''); ?>">Persetujuan Engineering</a>
+                                                <?php endif; ?>
+                                                <?php if(auth()->user()?->hasRole('admin') || auth()->user()?->can('approve-docking-production')): ?>
+                                                    <a href="<?php echo e(route('docking-approval.index', 'production')); ?>" class="dropdown-item <?php echo e(request()->is('docking-approval/production*') ? 'active' : ''); ?>">Persetujuan Produksi</a>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+
                                             <div class="dropdown-divider"></div>
 
                                             <h6 class="dropdown-header">Docking Schedule</h6>

@@ -227,6 +227,18 @@
                                             <a href="{{ route('docking-space-request.create') }}" class="dropdown-item {{ request()->routeIs('docking-space-request.create') ? 'active' : '' }}">Buat Docking Request</a>
                                             <a href="{{ route('docking-space-request.index') }}" class="dropdown-item {{ request()->routeIs('docking-space-request.index') ? 'active' : '' }}">Daftar Docking Request</a>
 
+                                            @if (auth()->user()?->hasRole('admin') || auth()->user()?->can('approve-docking-engineering') || auth()->user()?->can('approve-docking-production'))
+                                                <div class="dropdown-divider"></div>
+
+                                                <h6 class="dropdown-header">Persetujuan</h6>
+                                                @if (auth()->user()?->hasRole('admin') || auth()->user()?->can('approve-docking-engineering'))
+                                                    <a href="{{ route('docking-approval.index', 'engineering') }}" class="dropdown-item {{ request()->is('docking-approval/engineering*') ? 'active' : '' }}">Persetujuan Engineering</a>
+                                                @endif
+                                                @if (auth()->user()?->hasRole('admin') || auth()->user()?->can('approve-docking-production'))
+                                                    <a href="{{ route('docking-approval.index', 'production') }}" class="dropdown-item {{ request()->is('docking-approval/production*') ? 'active' : '' }}">Persetujuan Produksi</a>
+                                                @endif
+                                            @endif
+
                                             <div class="dropdown-divider"></div>
 
                                             <h6 class="dropdown-header">Docking Schedule</h6>

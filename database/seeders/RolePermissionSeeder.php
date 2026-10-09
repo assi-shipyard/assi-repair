@@ -32,6 +32,9 @@ class RolePermissionSeeder extends Seeder
             // Ship Docking
             'add-ship-docking', 'edit-ship-docking', 'delete-ship-docking', 'view-ship-docking', 'view-ship-docking-data', 'export-ship-docking-data',
 
+            // Docking Request Approval
+            'approve-docking-engineering', 'approve-docking-production',
+
             // Project
             'create-new-project', 'edit-project', 'delete-project', 'view-project', 'view-project-data', 'export-project-data',
 
@@ -119,5 +122,24 @@ class RolePermissionSeeder extends Seeder
             ['role_name' => 'Marketing Staff']
         );
         $marketingStaff->syncPermissions($marketingStaffPermissions);
+
+        $approval_roles = [
+            'engineering-approver' => ['Engineering Approver', 'approve-docking-engineering'],
+            'production-approver' => ['Production Approver', 'approve-docking-production'],
+        ];
+
+        foreach ($approval_roles as $name => [$label, $approval_permission]) {
+            $role = Role::updateOrCreate(
+                ['name' => $name, 'guard_name' => 'web'],
+                ['role_name' => $label]
+            );
+            $role->syncPermissions([
+                'view-dashboard', 'view-profile', 'edit-profile',
+                'view-ship', 'view-ship-data',
+                'view-docking-space', 'view-docking-space-data',
+                'view-ship-docking', 'view-ship-docking-data',
+                $approval_permission,
+            ]);
+        }
     }
 }

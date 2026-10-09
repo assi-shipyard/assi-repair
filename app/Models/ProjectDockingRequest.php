@@ -28,6 +28,13 @@ class ProjectDockingRequest extends Model
         'approved_by',
         'approved_at',
         'rejection_reason',
+        'engineering_approved_by',
+        'engineering_approved_at',
+        'engineering_notes',
+        'production_approved_by',
+        'production_approved_at',
+        'production_notes',
+        'rejection_stage',
     ];
 
     protected $casts = [
@@ -36,7 +43,11 @@ class ProjectDockingRequest extends Model
         'requested_end_at' => 'datetime',
         'reviewed_at' => 'datetime',
         'approved_at' => 'datetime',
+        'engineering_approved_at' => 'datetime',
+        'production_approved_at' => 'datetime',
     ];
+
+    public const PENDING_STATUSES = ['submitted', 'engineering_approved'];
 
     public function project(): BelongsTo
     {
@@ -76,5 +87,20 @@ class ProjectDockingRequest extends Model
     public function docking_occupancies(): HasMany
     {
         return $this->hasMany(DockingOccupancy::class, 'project_docking_request_id');
+    }
+
+    public function engineering_approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'engineering_approved_by');
+    }
+
+    public function production_approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'production_approved_by');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(DockingRequestDocument::class, 'project_docking_request_id');
     }
 }

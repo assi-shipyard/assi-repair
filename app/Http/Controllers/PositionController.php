@@ -98,7 +98,6 @@ class PositionController extends Controller
         $code_rule = 'nullable|string|max:50|unique:positions,code';
 
         if ($position_id !== null) {
-            $name_rule .= ','.$position_id;
             $code_rule .= ','.$position_id;
         }
 
