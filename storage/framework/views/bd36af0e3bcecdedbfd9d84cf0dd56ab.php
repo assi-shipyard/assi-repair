@@ -4,7 +4,7 @@
 ?>
 
 <div class="row row-cards">
-    <?php $__empty_1 = true; $__currentLoopData = $projects; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $project): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+    <?php $__empty_0 = true; $__currentLoopData = $projects; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $project): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_0 = false; ?>
         <?php
             $ship = $project->ship;
             $status = $project->status ?? 'Not Started';
@@ -45,7 +45,7 @@
                         <div class="text-truncate"><i class="ti ti-user me-1"></i>Pimpinan: <?php echo e($project->leader?->name ?? '-'); ?></div>
                         <div class="<?php echo e($overdue ? 'text-danger' : ''); ?>">
                             <i class="ti ti-calendar me-1"></i>
-                            <?php echo e($project->start_date_estimation?->format('d/m/Y') ?? '-'); ?> s/d <?php echo e($project->end_date_estimation?->format('d/m/Y') ?? '-'); ?>
+                            <?php echo e($project->start_date_estimation?->tanggal_indonesia() ?? '-'); ?> s/d <?php echo e($project->end_date_estimation?->tanggal_indonesia() ?? '-'); ?>
 
                             <?php if($overdue): ?> <span class="badge bg-danger-lt text-danger ms-1">Terlambat</span> <?php endif; ?>
                         </div>
@@ -65,7 +65,7 @@
                 </div>
             </div>
         </div>
-    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_0): ?>
         <div class="col-12">
             <div class="card">
                 <div class="card-body text-center text-secondary py-5">

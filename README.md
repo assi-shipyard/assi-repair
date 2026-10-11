@@ -7,6 +7,34 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Kamus Harga
+
+The **Kamus Harga** menu manages independent price books. One book can be the
+shipyard's main reference; other books may optionally be associated with a
+company for information, and a company may have multiple books for different
+agreements. Each project explicitly selects any book on its create/edit form,
+regardless of the ship's customer. No book is selected automatically; existing
+projects remain unassigned until a book is selected. Selecting or changing a
+book does not modify saved BoQ prices. Existing **Data Jenis Reparasi**
+remains separate and unchanged.
+
+The book dashboard uses responsive cards with material/service counts. Search
+by book code, book name, or customer name, and filter by book type and customer.
+Filters are applied across all books and retained when navigating result pages.
+
+Each book contains **Material** and **Jasa** entries with an item code, name, unit,
+IDR unit price, and an optional minimum billable quantity in that same unit
+(for example, 15 kg of steel or 8 hours of crane service). The same code can
+have separate prices for different units. No conversion between units or
+inheritance from the main book is performed.
+
+Authenticated users can read books; only administrators can change them.
+Resource URLs use UUIDs. Each mutation stores a transactional before/after
+database audit record. Books containing entries or used by projects cannot be deleted.
+Run `php artisan migrate` to install the price-book tables.
+This menu manages the price catalog only; it does not change existing project
+document pricing or apply minimum quantities to project totals yet.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

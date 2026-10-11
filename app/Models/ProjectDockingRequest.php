@@ -35,6 +35,14 @@ class ProjectDockingRequest extends Model
         'production_approved_at',
         'production_notes',
         'rejection_stage',
+        'recommended_docking_space_id',
+        'production_recommendation',
+        'recommended_start_at',
+        'recommended_end_at',
+        'marketing_responded_by',
+        'marketing_responded_at',
+        'marketing_response',
+        'marketing_notes',
     ];
 
     protected $casts = [
@@ -45,9 +53,12 @@ class ProjectDockingRequest extends Model
         'approved_at' => 'datetime',
         'engineering_approved_at' => 'datetime',
         'production_approved_at' => 'datetime',
+        'recommended_start_at' => 'datetime',
+        'recommended_end_at' => 'datetime',
+        'marketing_responded_at' => 'datetime',
     ];
 
-    public const PENDING_STATUSES = ['submitted', 'engineering_approved'];
+    public const PENDING_STATUSES = ['submitted', 'engineering_approved', 'awaiting_marketing'];
 
     public function project(): BelongsTo
     {
@@ -67,6 +78,27 @@ class ProjectDockingRequest extends Model
     public function requested_docking_space(): BelongsTo
     {
         return $this->belongsTo(DockingSpace::class, 'requested_docking_space_id');
+    }
+
+    public function recommended_docking_space(): BelongsTo
+    {
+        return $this->belongsTo(DockingSpace::class, 'recommended_docking_space_id');
+    }
+
+    // Engineering's recommendation overrides the dock originally requested.
+    public function effective_docking_space_id(): ?int
+    {
+        return $this->recommended_docking_space_id ?? $this->requested_docking_space_id;
+    }
+
+    public function marketing_responder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'marketing_responded_by');
+    }
+
+    public function postponements(): HasMany
+    {
+        return $this->hasMany(DockingRequestPostponement::class, 'project_docking_request_id')->latest();
     }
 
     public function reviewer(): BelongsTo

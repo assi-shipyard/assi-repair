@@ -2,13 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Project\ProjectPriceBookRequest;
+use App\Models\PriceBook;
+use App\Services\PriceBookService;
 use App\Models\Employee;
+use App\Models\ProjectJobDocumentHistory;
+use Illuminate\Support\Collection;
 use App\Models\OrganizationalUnit;
+use App\Models\DockingOccupancy;
 use App\Models\Project;
+use App\Models\ProjectDockingRequest;
 use App\Models\Ship;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Services\DockingRequestDocumentStorage;
+use App\Services\ProjectActivityService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -80,7 +90,40 @@ class ProjectController extends Controller
         return view('project.index', compact('projects', 'status_counts', 'ships', 'divisions', 'project_types', 'filters'));
     }
 
-    public function create()
+    public function history(Request $request)
+    {
+        $filters = Validator::make($request->all(), [
+            'search_project' => 'nullable|string|max:100',
+            'year' => 'nullable|integer|min:2000|max:2100',
+            'project_type' => 'nullable|string|max:100',
+        ])->valid();
+
+        $search = trim((string) ($filters['search_project'] ?? ''));
+
+        $projects = Project::with(['ship.type', 'ship.company', 'leader'])
+            ->where('status', 'Completed')
+            ->when($search !== '', function ($query) use ($search): void {
+                $like = '%'.addcslashes($search, '%_\\').'%';
+
+                $query->where(function ($sub_query) use ($like): void {
+                    $sub_query->where('project_code', 'like', $like)
+                        ->orWhereHas('ship', fn ($ship_query) => $ship_query->where('name', 'like', $like));
+                });
+            })
+            ->when($filters['project_type'] ?? null, fn ($q, $v) => $q->where('project_type', $v))
+            ->when($filters['year'] ?? null, fn ($q, $v) => $q->whereYear(DB::raw('COALESCE(end_date_actual, end_date_estimation)'), $v))
+            ->orderByRaw('COALESCE(end_date_actual, end_date_estimation) DESC')
+            ->paginate(15)
+            ->withQueryString();
+
+        $project_types = Project::where('status', 'Completed')->distinct()->orderBy('project_type')->pluck('project_type');
+        $completed_total = Project::where('status', 'Completed')->count();
+        $active_total = Project::whereIn('status', ['Not Started', 'In Progress'])->count();
+
+        return view('project.history', compact('projects', 'project_types', 'filters', 'completed_total', 'active_total'));
+    }
+
+    public function create(Request $request)
     {
         // Fetch ships, employees, and divisions for the form
         $ships = Ship::with(['company', 'type'])->orderBy('name')->get();
@@ -105,7 +148,15 @@ class ProjectController extends Controller
             'Other',
         ];
 
-        return view('project.create', ['ships' => $ships, 'employees' => $employees, 'divisions' => $divisions, 'ppc_employees' => $ppc_employees, 'project_type_options' => $projectTypeOptions]);
+        $approved_docking_requests = ProjectDockingRequest::with(['ship', 'requested_docking_space'])
+            ->where('request_status', 'approved')
+            ->whereNull('project_id')
+            ->orderBy('requested_start_at')
+            ->get();
+
+        $selected_docking_request = $approved_docking_requests->firstWhere('unique_id', (string) $request->query('docking_request'))?->unique_id ?? '';
+
+        return view('project.create', ['price_books' => PriceBook::with('company')->orderByDesc('reference_slot')->orderBy('name')->get(), 'selected_docking_request' => $selected_docking_request, 'approved_docking_requests' => $approved_docking_requests, 'ships' => $ships, 'employees' => $employees, 'divisions' => $divisions, 'ppc_employees' => $ppc_employees, 'project_type_options' => $projectTypeOptions]);
     }
 
     public function generate_code_preview(Request $request): JsonResponse
@@ -144,7 +195,7 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(ProjectPriceBookRequest $request, DockingRequestDocumentStorage $document_storage, ProjectActivityService $activity_service, PriceBookService $price_book_service)
     {
         // Validate the incoming request data against the defined rules and messages
         $validation = Validator::make($request->all(), $this->validation_rules(), $this->validation_messages());
@@ -155,7 +206,7 @@ class ProjectController extends Controller
         }
 
         // Retrieve the validated data, division IDs, and normalized surveyor rows from the request
-        $data = $validation->validated();
+        $data = [...$validation->validated(), ...$price_book_service->project_selection($request->validated())];
         $divisionValidation = $this->validate_project_team_division($data);
 
         if ($divisionValidation !== null) {
@@ -164,6 +215,21 @@ class ProjectController extends Controller
 
         $divisionIds = $data['division_ids'] ?? [];
         $surveyorRows = $this->normalize_surveyors($data['owner_surveyors'] ?? []);
+
+        $docking_request = null;
+
+        if (! empty($data['docking_request_id'])) {
+            $docking_request = ProjectDockingRequest::with('documents')
+                ->where('unique_id', $data['docking_request_id'])
+                ->where('request_status', 'approved')
+                ->whereNull('project_id')
+                ->where('ship_id', $data['ship_id'])
+                ->first();
+
+            if (! $docking_request) {
+                return back()->withErrors(['docking_request_id' => 'Permohonan docking tidak valid, belum disetujui, atau sudah terhubung ke proyek lain.'])->withInput();
+            }
+        }
 
         // Re-generate project code on server to avoid stale or manipulated client-side values.
         $data['project_code'] = $this->generate_unique_project_code(
@@ -177,12 +243,23 @@ class ProjectController extends Controller
         $data['created_by'] = auth()->id();
 
         // Remove the division_ids and owner_surveyors from the data array before creating the project
-        unset($data['division_ids'], $data['owner_surveyors'], $data['division_manager_employee_id']);
+        unset($data['division_ids'], $data['owner_surveyors'], $data['division_manager_employee_id'], $data['docking_request_id']);
 
         // Create the project, sync the divisions, and create the owner surveyors
-        $project = Project::create($data);
-        $project->divisions()->sync($divisionIds);
-        $project->owner_surveyors()->createMany($surveyorRows);
+        $project = DB::transaction(function () use ($data, $divisionIds, $surveyorRows, $docking_request, $document_storage, $activity_service): Project {
+            $project = Project::create($data);
+            $project->divisions()->sync($divisionIds);
+            $project->owner_surveyors()->createMany($surveyorRows);
+
+            if ($docking_request) {
+                $docking_request->update(['project_id' => $project->id]);
+                DockingOccupancy::where('project_docking_request_id', $docking_request->id)->update(['project_id' => $project->id]);
+                $document_storage->move_to_project($docking_request, $project);
+                $activity_service->record($project, 'docking_linked', 'Proyek dimulai dari permohonan docking yang disetujui.');
+            }
+
+            return $project;
+        });
 
         $createdFlag = \App\Models\NotificationFlag::where('code', 'project.created')->first();
         if ($createdFlag) {
@@ -200,22 +277,76 @@ class ProjectController extends Controller
 
     public function show(string $id)
     {
-        // Fetch the project with related data based on the unique_id. If not found, redirect back with an error message.
-        $project = Project::with(['ship.company', 'ship.type', 'ship.classification', 'leader', 'ppc', 'divisions', 'owner_surveyors', 'created_by', 'job_documents'])
+        $project = Project::with(['price_book', 'ship.company', 'ship.type', 'ship.classification', 'leader', 'ppc', 'divisions', 'owner_surveyors', 'created_by', 'job_documents'])
             ->firstWhere('unique_id', $id);
 
-        // If the project is not found, redirect back to the project index with an error message
         if (! $project) {
             return redirect()->route('project.index')->with('error', 'Proyek tidak ditemukan.');
         }
 
-        return view('project.show', compact('project'));
+        $occupancies = DockingOccupancy::with('docking_space')
+            ->where('project_id', $project->id)
+            ->where('occupancy_status', '!=', 'cancelled')
+            ->orderByDesc('docked_at')
+            ->get();
+
+        $docking_requests = ProjectDockingRequest::with('requested_docking_space')
+            ->where('project_id', $project->id)
+            ->latest()
+            ->get();
+
+        $timeline = $this->build_timeline($project);
+
+        return view('project.show', compact('project', 'occupancies', 'docking_requests', 'timeline'));
+    }
+
+    // Merges project-level changes with job document history into one newest-first feed.
+    private function build_timeline(Project $project): Collection
+    {
+        $activities = $project->activities()->latest('created_at')->limit(200)->get()->map(fn ($activity): array => [
+            'at' => $activity->created_at,
+            'event' => $activity->event,
+            'description' => $activity->description,
+            'actor' => $activity->actor_name,
+            'changes' => $activity->changes ?? [],
+        ]);
+
+        $document_labels = [
+            'repair_list' => 'Daftar Perbaikan', 'initial_boq' => 'BOQ Awal', 'satisfaction_notes' => 'Catatan Kepuasan',
+            'final_boq' => 'BOQ Akhir', 'docking_report' => 'Laporan Docking',
+        ];
+        $action_labels = [
+            'created' => 'dibuat', 'updated' => 'diperbarui', 'revision_created' => 'revisi baru dibuat', 'submitted' => 'diajukan untuk negosiasi', 'returned_to_draft' => 'dikembalikan ke draft', 'approved' => 'disetujui', 'superseded' => 'digantikan revisi baru', 'copied' => 'disalin dari revisi sebelumnya',
+            'job_created' => 'pekerjaan ditambahkan', 'job_updated' => 'pekerjaan diperbarui', 'job_deleted' => 'pekerjaan dihapus',
+            'material_created' => 'material ditambahkan', 'material_updated' => 'material diperbarui', 'material_deleted' => 'material dihapus',
+            'photo_created' => 'foto ditambahkan', 'photo_updated' => 'foto diperbarui', 'photo_deleted' => 'foto dihapus',
+        ];
+
+        $histories = ProjectJobDocumentHistory::with('document')
+            ->whereHas('document', fn ($query) => $query->where('project_id', $project->id))
+            ->latest('created_at')
+            ->limit(200)
+            ->get();
+
+        $actor_names = Employee::query()
+            ->whereIn('user_id', $histories->pluck('actor_id')->filter()->unique())
+            ->pluck('name', 'user_id');
+
+        $document_events = $histories->map(fn ($history): array => [
+            'at' => $history->created_at,
+            'event' => 'document',
+            'description' => ($document_labels[$history->document?->document_type] ?? 'Dokumen').' Rev. '.($history->document?->revision_no ?? '-').': '.($action_labels[$history->action] ?? $history->action),
+            'actor' => $actor_names[$history->actor_id] ?? null,
+            'changes' => [],
+        ]);
+
+        return $activities->concat($document_events)->sortByDesc('at')->values();
     }
 
     public function edit(string $id)
     {
         // Fetch the project with related divisions and owner surveyors based on the unique_id. If not found, redirect back with an error message.
-        $project = Project::with(['divisions', 'owner_surveyors'])->firstWhere('unique_id', $id);
+        $project = Project::with(['price_book', 'divisions', 'owner_surveyors'])->firstWhere('unique_id', $id);
 
         // If the project is not found, redirect back to the project index with an error message
         if (! $project) {
@@ -239,6 +370,7 @@ class ProjectController extends Controller
         $ppc_employees = $employees->filter(fn (Employee $employee) => str_contains(strtolower((string) $employee->position?->name), 'ppc'));
 
         return view('project.edit', [
+            'price_books' => PriceBook::with('company')->orderByDesc('reference_slot')->orderBy('name')->get(),
             'project' => $project,
             'ships' => $ships,
             'employees' => $employees,
@@ -248,7 +380,7 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function update(Request $request, string $id)
+    public function update(ProjectPriceBookRequest $request, string $id, ProjectActivityService $activity_service, PriceBookService $price_book_service)
     {
         // Fetch the project based on the unique_id. If not found, redirect back with an error message.
         $project = Project::firstWhere('unique_id', $id);
@@ -267,7 +399,7 @@ class ProjectController extends Controller
         }
 
         // Retrieve the validated data, division IDs, and normalized surveyor rows from the request
-        $data = $validation->validated();
+        $data = [...$validation->validated(), ...$price_book_service->project_selection($request->validated())];
         $divisionValidation = $this->validate_project_team_division($data);
 
         if ($divisionValidation !== null) {
@@ -295,10 +427,32 @@ class ProjectController extends Controller
         // Update the project, sync the divisions, and delete and recreate the owner surveyors
         $oldStatus = $project->status;
 
+        $old_divisions = $project->divisions()->pluck('name')->sort()->values()->all();
+        $old_surveyors = $project->owner_surveyors()->pluck('name')->sort()->values()->all();
+
         $project->update($data);
         $project->divisions()->sync($divisionIds);
         $project->owner_surveyors()->delete();
         $project->owner_surveyors()->createMany($surveyorRows);
+
+        $new_divisions = $project->divisions()->pluck('name')->sort()->values()->all();
+        $new_surveyors = $project->owner_surveyors()->pluck('name')->sort()->values()->all();
+
+        if ($old_divisions !== $new_divisions) {
+            $activity_service->record($project, 'divisions_changed', 'Divisi pelaksana diperbarui', [[
+                'field' => 'Divisi pelaksana',
+                'old' => implode(', ', $old_divisions) ?: null,
+                'new' => implode(', ', $new_divisions) ?: null,
+            ]]);
+        }
+
+        if ($old_surveyors !== $new_surveyors) {
+            $activity_service->record($project, 'surveyors_changed', 'Surveyor pemilik kapal diperbarui', [[
+                'field' => 'Surveyor',
+                'old' => implode(', ', $old_surveyors) ?: null,
+                'new' => implode(', ', $new_surveyors) ?: null,
+            ]]);
+        }
 
         if ($oldStatus !== 'Completed' && $project->status === 'Completed') {
             $finishedFlag = \App\Models\NotificationFlag::where('code', 'project.finished')->first();
@@ -361,6 +515,7 @@ class ProjectController extends Controller
             'progress' => 'nullable|numeric|min:0|max:100',
             'status' => 'nullable|in:Not Started,In Progress,Completed',
             'comment' => 'nullable|string|max:2000',
+            'docking_request_id' => 'nullable|uuid',
             'owner_surveyors' => 'nullable|array',
             'owner_surveyors.*.name' => 'nullable|string|max:150',
             'owner_surveyors.*.company' => 'nullable|string|max:150',

@@ -29,6 +29,18 @@
 @section('content')
     @include('partials.flash')
 
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="subheader">Buku Kamus Harga Proyek</div>
+            @if ($project->price_book)
+                <a class="fw-semibold" href="{{ route('price-book.show', $project->price_book) }}">{{ $project->price_book->code }} - {{ $project->price_book->name }}</a>
+            @else
+                <span class="text-secondary">Belum dipilih</span>
+            @endif
+            <div class="text-secondary small mt-1">Pilihan buku ditetapkan per proyek, bukan berdasarkan pelanggan. Harga BoQ yang sudah tersimpan tidak berubah saat buku diperbarui atau pilihan buku diganti.</div>
+        </div>
+    </div>
+
     @php
         $ship = $project->ship;
         $progress = max(0, min(100, (float) ($project->progress ?? 0)));
@@ -37,11 +49,16 @@
         $status_color = ['Not Started' => 'secondary', 'In Progress' => 'primary', 'Completed' => 'success'][$status] ?? 'secondary';
         $hue = crc32((string) ($ship?->name ?? $project->project_code)) % 360;
         $overdue = $project->end_date_estimation && $status !== 'Completed' && $project->end_date_estimation->isPast();
-        $fmt = fn ($d) => $d?->translatedFormat('d M Y') ?? '-';
+        $fmt = fn ($d) => $d?->tanggal_indonesia() ?? '-';
         $doc_labels = [
             'repair_list' => 'Daftar Perbaikan', 'initial_boq' => 'BOQ Awal', 'satisfaction_notes' => 'Catatan Kepuasan',
             'final_boq' => 'BOQ Akhir', 'docking_report' => 'Laporan Docking',
         ];
+        $days_left = $project->end_date_estimation && $status !== 'Completed' ? (int) now()->startOfDay()->diffInDays($project->end_date_estimation, false) : null;
+        $current_occupancy = $occupancies->firstWhere('occupancy_status', 'occupied') ?? $occupancies->firstWhere('occupancy_status', 'scheduled');
+        $occupancy_labels = ['scheduled' => 'Terjadwal', 'occupied' => 'Di dock', 'undocked' => 'Keluar dock'];
+        $request_labels = ['draft' => 'Draf', 'submitted' => 'Diajukan', 'engineering_approved' => 'Disetujui Engineering', 'approved' => 'Disetujui', 'rejected' => 'Ditolak', 'cancelled' => 'Dibatalkan'];
+        $docs_final = $project->job_documents->whereIn('status', ['approved', 'locked', 'final'])->count();
         $spec = fn ($v, $unit = '') => filled($v) ? $v.($unit ? ' '.$unit : '') : '-';
     @endphp
 
@@ -86,9 +103,58 @@
                 </div>
             </div>
         </div>
+        <div class="card-body border-top">
+            <div class="row g-3">
+                <div class="col-6 col-lg-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="avatar bg-{{ $overdue ? 'danger' : 'blue' }}-lt"><i class="ti ti-hourglass"></i></span>
+                        <div>
+                            <div class="text-secondary small">Sisa waktu</div>
+                            <div class="fw-bold {{ $overdue ? 'text-danger' : '' }}">
+                                @if ($status === 'Completed') Selesai
+                                @elseif ($days_left === null) Jadwal belum diatur
+                                @elseif ($days_left < 0) Terlambat {{ abs($days_left) }} hari
+                                @else {{ $days_left }} hari lagi @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="avatar bg-azure-lt"><i class="ti ti-anchor"></i></span>
+                        <div>
+                            <div class="text-secondary small">Docking</div>
+                            <div class="fw-bold">
+                                @if ($current_occupancy) {{ $occupancy_labels[$current_occupancy->occupancy_status] ?? '-' }} &middot; {{ $current_occupancy->docking_space?->name ?? '-' }}
+                                @else Belum terjadwal @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="avatar bg-green-lt"><i class="ti ti-files"></i></span>
+                        <div>
+                            <div class="text-secondary small">Dokumen pekerjaan</div>
+                            <div class="fw-bold">{{ $project->job_documents->count() }} dokumen &middot; {{ $docs_final }} final</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="avatar bg-yellow-lt"><i class="ti ti-history"></i></span>
+                        <div>
+                            <div class="text-secondary small">Pembaruan terakhir</div>
+                            <div class="fw-bold">{{ $timeline->first()['at']?->diffForHumans() ?? '-' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="card-header border-top">
             <ul class="nav nav-tabs card-header-tabs" role="tablist">
                 <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab_ringkasan" role="tab">Ringkasan</a></li>
+                <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_docking" role="tab">Docking <span class="badge bg-secondary-lt ms-1">{{ $occupancies->count() }}</span></a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_kapal" role="tab">Data Kapal</a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_surveyor" role="tab">Surveyor <span class="badge bg-secondary-lt ms-1">{{ $project->owner_surveyors->count() }}</span></a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_dokumen" role="tab">Dokumen <span class="badge bg-secondary-lt ms-1">{{ $project->job_documents->count() }}</span></a></li>
@@ -127,6 +193,55 @@
                                 <span class="avatar bg-azure-lt text-azure me-3"><i class="ti ti-user-cog"></i></span>
                                 <div><div class="text-secondary small">PPC Proyek</div><div class="fw-semibold">{{ $project->ppc?->name ?? 'Belum ditetapkan' }}</div></div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane" id="tab_docking" role="tabpanel">
+            <div class="row row-cards">
+                <div class="col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-header"><h3 class="card-title">Jadwal &amp; Realisasi Dock</h3></div>
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead><tr><th>Docking space</th><th>Masuk</th><th>Est. keluar</th><th>Keluar</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    @forelse ($occupancies as $occupancy)
+                                        <tr>
+                                            <td>{{ $occupancy->docking_space?->name ?? '-' }}</td>
+                                            <td>{{ $occupancy->docked_at?->format('d/m/Y H:i') ?? '-' }}</td>
+                                            <td>{{ $occupancy->estimated_undock_at?->format('d/m/Y H:i') ?? '-' }}</td>
+                                            <td>{{ $occupancy->undocked_at?->format('d/m/Y H:i') ?? '-' }}</td>
+                                            <td><span class="badge bg-azure-lt">{{ $occupancy_labels[$occupancy->occupancy_status] ?? $occupancy->occupancy_status }}</span></td>
+                                        </tr>
+                                    @empty
+                                        <tr><td colspan="5" class="text-center text-secondary py-4">Belum ada jadwal docking.</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-header"><h3 class="card-title">Permohonan Docking Terkait</h3></div>
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead><tr><th>Docking space</th><th>Rencana</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    @forelse ($docking_requests as $docking_request)
+                                        <tr>
+                                            <td>{{ $docking_request->requested_docking_space?->name ?? '-' }}</td>
+                                            <td>{{ $docking_request->requested_start_at?->format('d/m/Y') }} &ndash; {{ $docking_request->requested_end_at?->format('d/m/Y') ?? '-' }}</td>
+                                            <td><span class="badge bg-secondary-lt">{{ $request_labels[$docking_request->request_status] ?? $docking_request->request_status }}</span></td>
+                                        </tr>
+                                    @empty
+                                        <tr><td colspan="3" class="text-center text-secondary py-4">Tidak ada permohonan docking terkait.</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -221,6 +336,55 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+
+    @php
+        $event_style = [
+            'created' => ['plus', 'green'], 'docking_linked' => ['anchor', 'azure'], 'status_changed' => ['flag', 'purple'],
+            'progress_changed' => ['progress', 'blue'], 'divisions_changed' => ['users-group', 'orange'],
+            'surveyors_changed' => ['user-search', 'yellow'], 'document' => ['file-description', 'teal'], 'updated' => ['pencil', 'secondary'],
+        ];
+    @endphp
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3 class="card-title"><i class="ti ti-history me-2 text-primary"></i>Linimasa Pembaruan Proyek</h3>
+            <div class="card-actions text-secondary small">{{ $timeline->count() }} aktivitas</div>
+        </div>
+        <div class="card-body">
+            @if ($timeline->isEmpty())
+                <div class="text-center text-secondary py-3">Belum ada riwayat pembaruan.</div>
+            @else
+                <ul class="timeline">
+                    @foreach ($timeline as $entry)
+                        @php [$icon, $color] = $event_style[$entry['event']] ?? ['point', 'secondary']; @endphp
+                        <li class="timeline-event">
+                            <div class="timeline-event-icon bg-{{ $color }}-lt text-{{ $color }}"><i class="ti ti-{{ $icon }}"></i></div>
+                            <div class="card timeline-event-card">
+                                <div class="card-body py-2">
+                                    <div class="d-flex flex-wrap justify-content-between gap-1">
+                                        <div class="fw-semibold">{{ $entry['description'] }}</div>
+                                        <div class="text-secondary small" title="{{ $entry['at']?->format('d/m/Y H:i:s') }}">{{ $entry['at']?->format('d/m/Y H:i') }}</div>
+                                    </div>
+                                    @if (! empty($entry['changes']))
+                                        <ul class="list-unstyled small mb-1 mt-1">
+                                            @foreach ($entry['changes'] as $change)
+                                                <li>
+                                                    <span class="text-secondary">{{ $change['field'] }}:</span>
+                                                    <span class="text-decoration-line-through text-secondary">{{ $change['old'] ?? 'kosong' }}</span>
+                                                    <i class="ti ti-arrow-right mx-1"></i>
+                                                    <strong>{{ $change['new'] ?? 'kosong' }}</strong>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
+                                    <div class="text-secondary small"><i class="ti ti-user me-1"></i>{{ $entry['actor'] ?? 'Sistem' }}</div>
+                                </div>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
         </div>
     </div>
 @endsection

@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Services\AuditLogService;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
@@ -27,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Schema::defaultStringLength(191);
+
+        $this->register_indonesian_date_macros();
 
         Event::listen(Login::class, function (Login $event): void {
             $user = $event->user instanceof User ? $event->user : null;
@@ -53,5 +57,24 @@ class AppServiceProvider extends ServiceProvider
                 'guard' => $event->guard,
             ]);
         });
+    }
+
+    /**
+     * Dates stay in the default database format; views call these macros to render Indonesian full dates.
+     * Macros are registered on both Carbon variants because each keeps its own macro registry.
+     */
+    private function register_indonesian_date_macros(): void
+    {
+        foreach ([Carbon::class, CarbonImmutable::class] as $carbon_class) {
+            $carbon_class::macro('tanggal_indonesia', function (): string {
+                /** @var Carbon|CarbonImmutable $this */
+                return $this->copy()->locale('id')->translatedFormat('j F Y');
+            });
+
+            $carbon_class::macro('tanggal_waktu_indonesia', function (bool $with_seconds = false): string {
+                /** @var Carbon|CarbonImmutable $this */
+                return $this->copy()->locale('id')->translatedFormat($with_seconds ? 'j F Y, H:i:s' : 'j F Y, H:i');
+            });
+        }
     }
 }

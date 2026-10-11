@@ -158,7 +158,7 @@
         </div>
 
         <div class="row g-3" id="ship-card-list">
-            <?php $__empty_1 = true; $__currentLoopData = $ships; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ship): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+            <?php $__empty_0 = true; $__currentLoopData = $ships; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ship): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_0 = false; ?>
                 <?php ($ship_identifier = $ship->unique_id ?? $ship->id); ?>
                 <div class="col-12 col-md-6 col-xl-4 ship-card-item"
                     data-name="<?php echo e(strtolower($ship->name)); ?>"
@@ -201,7 +201,7 @@
                         </div>
                     </div>
                 </div>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_0): ?>
                 <div class="col-12">
                     <div class="card">
                         <div class="card-body text-center text-secondary py-5">Belum ada data kapal.</div>

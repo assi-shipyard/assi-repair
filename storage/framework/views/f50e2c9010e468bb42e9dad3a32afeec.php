@@ -261,7 +261,7 @@
                         </div>
                     </div>
                     <div class="card-body dashboard-scroll">
-                        <?php $__empty_1 = true; $__currentLoopData = $company_fleet_summary; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $company): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                        <?php $__empty_0 = true; $__currentLoopData = $company_fleet_summary; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $company): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_0 = false; ?>
                             <div class="dashboard-project-item mb-3">
                                 <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                                     <div>
@@ -271,14 +271,14 @@
                                     <span class="badge bg-blue-lt text-blue"><?php echo e(number_format($company->ships_count)); ?> kapal</span>
                                 </div>
                                 <div class="dashboard-company-ships">
-                                    <?php $__empty_2 = true; $__currentLoopData = $company->ships; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ship): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_2 = false; ?>
+                                    <?php $__empty_1 = true; $__currentLoopData = $company->ships; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ship): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                                         <span class="badge bg-secondary-lt text-secondary"><?php echo e($ship->name); ?></span>
-                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_2): ?>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                                         <span class="text-secondary small">Belum ada kapal terdaftar.</span>
                                     <?php endif; ?>
                                 </div>
                             </div>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_0): ?>
                             <div class="text-center text-secondary py-5">Belum ada data perusahaan.</div>
                         <?php endif; ?>
                     </div>
@@ -297,7 +297,7 @@
                             </div>
                         </div>
                         <div class="card-body dashboard-scroll">
-                            <?php $__empty_1 = true; $__currentLoopData = $section['projects']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $project): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                            <?php $__empty_0 = true; $__currentLoopData = $section['projects']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $project): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_0 = false; ?>
                                 <div class="dashboard-project-item mb-3">
                                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                                         <div>
@@ -309,11 +309,11 @@
                                     <div class="row g-2 text-secondary small mb-3">
                                         <div class="col-6">
                                             Mulai estimasi<br>
-                                            <span class="text-body fw-semibold"><?php echo e($project->start_date_estimation?->format('d M Y') ?? '-'); ?></span>
+                                            <span class="text-body fw-semibold"><?php echo e($project->start_date_estimation?->tanggal_indonesia() ?? '-'); ?></span>
                                         </div>
                                         <div class="col-6">
                                             Selesai aktual<br>
-                                            <span class="text-body fw-semibold"><?php echo e($project->end_date_actual?->format('d M Y') ?? '-'); ?></span>
+                                            <span class="text-body fw-semibold"><?php echo e($project->end_date_actual?->tanggal_indonesia() ?? '-'); ?></span>
                                         </div>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -325,7 +325,7 @@
                                     </div>
                                     <a href="<?php echo e(route('project.show', $project->unique_id)); ?>" class="btn btn-outline-secondary btn-sm">Lihat detail</a>
                                 </div>
-                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_0): ?>
                                 <div class="text-center text-secondary py-5"><?php echo e($section['empty_state']); ?></div>
                             <?php endif; ?>
                         </div>

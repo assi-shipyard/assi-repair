@@ -34,6 +34,10 @@ class ProjectJobDocument extends Model
         'approved_at',
         'locked_at',
         'notes',
+        'revision_reason',
+        'submitted_at',
+        'submitted_by_user_id',
+        'superseded_at',
     ];
 
     protected function casts(): array
@@ -48,6 +52,8 @@ class ProjectJobDocument extends Model
             'approved_by_employee_id' => 'integer',
             'approved_at' => 'datetime',
             'locked_at' => 'datetime',
+            'submitted_at' => 'datetime',
+            'superseded_at' => 'datetime',
         ];
     }
 
@@ -81,13 +87,30 @@ class ProjectJobDocument extends Model
         return $this->hasMany(ProjectJobDocumentHistory::class, 'project_job_document_id');
     }
 
+    public function is_editable(): bool
+    {
+        return $this->status === 'draft';
+    }
+
     public static function cloneWithChildren(self $source, array $attributes = []): self
     {
         return DB::transaction(function () use ($source, $attributes): self {
+            $actor_id = $attributes['actor_id'] ?? null;
+            unset($attributes['actor_id']);
+
             $target = $source->replicate([
+                'unique_id',
                 'source_document_id',
                 'source_revision_no',
+                'approved_by_employee_id',
+                'approved_at',
+                'locked_at',
+                'submitted_at',
+                'submitted_by_user_id',
+                'superseded_at',
+                'revision_reason',
             ]);
+            $target->status = 'draft';
 
             $target->source_document_id = $source->id;
             $target->source_revision_no = $source->revision_no;
@@ -102,19 +125,19 @@ class ProjectJobDocument extends Model
             $source->loadMissing('jobs.materials', 'jobs.photos');
 
             foreach ($source->jobs as $job) {
-                $newJob = $job->replicate(['project_job_document_id', 'source_job_id']);
+                $newJob = $job->replicate(['unique_id', 'project_job_document_id', 'source_job_id']);
                 $newJob->project_job_document_id = $target->id;
                 $newJob->source_job_id = $job->id;
                 $newJob->save();
 
                 foreach ($job->materials as $material) {
-                    $newMaterial = $material->replicate(['project_document_job_id']);
+                    $newMaterial = $material->replicate(['unique_id', 'project_document_job_id']);
                     $newMaterial->project_document_job_id = $newJob->id;
                     $newMaterial->save();
                 }
 
                 foreach ($job->photos as $photo) {
-                    $newPhoto = $photo->replicate(['project_document_job_id']);
+                    $newPhoto = $photo->replicate(['unique_id', 'project_document_job_id']);
                     $newPhoto->project_document_job_id = $newJob->id;
                     $newPhoto->save();
                 }
@@ -122,7 +145,7 @@ class ProjectJobDocument extends Model
 
             $target->histories()->create([
                 'action' => 'copied',
-                'actor_id' => $attributes['actor_id'] ?? null,
+                'actor_id' => $actor_id,
                 'payload' => [
                     'source_document_id' => $source->id,
                     'source_revision_no' => $source->revision_no,

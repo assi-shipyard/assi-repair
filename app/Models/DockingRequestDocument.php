@@ -10,6 +10,8 @@ class DockingRequestDocument extends Model
 {
     use HasPublicUniqueId;
 
+    public const DISK = 'ship';
+
     public const TYPE_LABELS = [
         'ship_particular' => 'Ship Particular',
         'general_arrangement' => 'General Arrangement',

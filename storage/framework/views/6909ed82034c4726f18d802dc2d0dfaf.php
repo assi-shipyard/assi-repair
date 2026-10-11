@@ -100,7 +100,7 @@
         </div>
 
         <div class="row g-3" id="company-card-list">
-            <?php $__empty_1 = true; $__currentLoopData = $companies; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $company): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+            <?php $__empty_0 = true; $__currentLoopData = $companies; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $company): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_0 = false; ?>
                 <div class="col-12 col-md-6 col-xl-4 company-card-item"
                     data-name="<?php echo e(strtolower($company->name)); ?>"
                     data-ships="<?php echo e($company->ships_count); ?>"
@@ -145,7 +145,7 @@
                         </div>
                     </div>
                 </div>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_0): ?>
                 <div class="col-12">
                     <div class="card">
                         <div class="card-body text-center text-secondary py-5">Belum ada data perusahaan.</div>

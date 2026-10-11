@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ProjectActivityService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -23,6 +24,7 @@ class Project extends Model
 		'unique_id',
 		'project_code',
 		'ship_id',
+		'price_book_id',
 		'project_leader_employee_id',
 		'project_ppc_employee_id',
 		'project_type',
@@ -52,11 +54,24 @@ class Project extends Model
 				$project->unique_id = (string) Str::uuid();
 			}
 		});
+
+		static::created(function (Project $project): void {
+			app(ProjectActivityService::class)->record($project, 'created', 'Proyek dibuat dengan kode '.$project->project_code);
+		});
+
+		static::updated(function (Project $project): void {
+			app(ProjectActivityService::class)->record_model_update($project);
+		});
 	}
 
 	public function ship(): BelongsTo
 	{
 		return $this->belongsTo(Ship::class, 'ship_id');
+	}
+
+	public function price_book(): BelongsTo
+	{
+		return $this->belongsTo(PriceBook::class);
 	}
 
 	public function leader(): BelongsTo
@@ -88,6 +103,11 @@ class Project extends Model
 	public function job_documents(): HasMany
 	{
 		return $this->hasMany(ProjectJobDocument::class, 'project_id');
+	}
+
+	public function activities(): HasMany
+	{
+		return $this->hasMany(ProjectActivity::class, 'project_id');
 	}
 
 	public function docking_requests(): HasMany

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Docking\CompleteFloatingRepairRequest;
 use App\Http\Requests\Docking\EvaluateDockingRequest;
+use App\Http\Requests\Docking\MarketingRecommendationResponseRequest;
+use App\Http\Requests\Docking\PostponeDockingRequest;
 use App\Http\Requests\Docking\ReviewDockingStageRequest;
 use App\Http\Requests\Docking\StartDockingOccupancyRequest;
 use App\Http\Requests\Docking\StoreProjectDockingRequest;
@@ -18,6 +20,7 @@ use App\Models\ProjectDockingRequest;
 use App\Models\Ship;
 use App\Services\DockingCapacityService;
 use App\Services\DockingRequestCheckService;
+use App\Services\DockingRequestDocumentStorage;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -147,10 +150,27 @@ class DockingManagementController extends Controller
         return view('docking-space-request.index', compact('docking_requests', 'status', 'docking_spaces'));
     }
 
+    public function rejected_requests(Request $request): \Illuminate\Contracts\View\View
+    {
+        $stage = (string) $request->query('stage', '');
+
+        $rejected_requests = ProjectDockingRequest::with(['ship.company', 'requested_docking_space', 'requester', 'reviewer', 'documents'])
+            ->where('request_status', 'rejected')
+            ->when(in_array($stage, ['engineering', 'production'], true), function ($query) use ($stage): void {
+                $query->where('rejection_stage', $stage);
+            })
+            ->orderByDesc('reviewed_at')
+            ->orderByDesc('updated_at')
+            ->get();
+
+        return view('docking-space-request.rejected', compact('rejected_requests', 'stage'));
+    }
+
     public function store_request(
         StoreProjectDockingRequest $request,
         DockingCapacityService $docking_capacity_service,
-        DockingRequestCheckService $check_service
+        DockingRequestCheckService $check_service,
+        DockingRequestDocumentStorage $document_storage
     ): RedirectResponse {
         $data = $request->validated();
 
@@ -183,7 +203,7 @@ class DockingManagementController extends Controller
 
         $user_id = $request->user()?->id;
 
-        DB::transaction(function () use ($data, $project, $ship_id, $user_id, $check, $request, $docking_capacity_service): void {
+        DB::transaction(function () use ($data, $project, $ship_id, $user_id, $check, $request, $docking_capacity_service, $document_storage): void {
             $docking_request = ProjectDockingRequest::create([
                 'project_id' => $project?->id,
                 'ship_id' => $ship_id,
@@ -201,7 +221,7 @@ class DockingManagementController extends Controller
                 $docking_request->documents()->create([
                     'document_type' => $document['type'],
                     'document_name' => DockingRequestDocument::TYPE_LABELS[$document['type']],
-                    'document_path' => $file->store('docking_request_documents', 'local'),
+                    'document_path' => $document_storage->store_pending($docking_request, $file),
                     'uploaded_by' => $user_id,
                 ]);
             }
@@ -212,13 +232,18 @@ class DockingManagementController extends Controller
         return redirect()->route('docking-space-request.index')->with('success', 'Permohonan lolos pemeriksaan sistem dan menunggu persetujuan Engineering.');
     }
 
-    public function engineering_review(ReviewDockingStageRequest $request, string $docking_request): RedirectResponse
-    {
+    public function engineering_review(
+        ReviewDockingStageRequest $request,
+        string $docking_request,
+        DockingRequestDocumentStorage $document_storage,
+        DockingRequestCheckService $check_service,
+        DockingCapacityService $docking_capacity_service
+    ): RedirectResponse {
         if (! $this->can_approve($request, 'approve-docking-engineering')) {
             return back()->with('error', 'Anda tidak memiliki hak akses persetujuan Engineering.');
         }
 
-        $docking_request = $this->find_docking_request($docking_request);
+        $docking_request = $this->find_docking_request($docking_request, ['ship']);
 
         if ($docking_request->request_status !== 'submitted') {
             return back()->with('error', 'Permohonan tidak sedang menunggu persetujuan Engineering.');
@@ -228,20 +253,48 @@ class DockingManagementController extends Controller
         $user_id = $request->user()?->id;
 
         if ($data['decision'] === 'reject') {
-            $docking_request->update([
-                'request_status' => 'rejected',
-                'rejection_stage' => 'engineering',
-                'rejection_reason' => $data['notes'],
-                'engineering_notes' => $data['notes'],
-                'reviewed_by' => $user_id,
-                'reviewed_at' => now(),
-            ]);
+            DB::transaction(function () use ($docking_request, $data, $user_id, $document_storage): void {
+                $docking_request->update([
+                    'request_status' => 'rejected',
+                    'rejection_stage' => 'engineering',
+                    'rejection_reason' => $data['notes'],
+                    'engineering_notes' => $data['notes'],
+                    'reviewed_by' => $user_id,
+                    'reviewed_at' => now(),
+                ]);
+
+                $document_storage->move_to_rejected($docking_request->load('documents'));
+            });
 
             return $this->after_review($request, 'engineering')->with('success', 'Permohonan ditolak oleh Engineering.');
         }
 
+        $recommended_space = DockingSpace::where('unique_id', $data['recommended_docking_space'])->where('status', 'active')->first();
+
+        if (! $recommended_space) {
+            return back()->withErrors(['recommended_docking_space' => 'Docking space rekomendasi tidak aktif atau tidak ditemukan.'])->withInput();
+        }
+
+        $evaluation = $docking_capacity_service->evaluate_ship_for_space($docking_request->ship, $recommended_space, 0);
+
+        if (! $evaluation['is_compatible']) {
+            return back()->withErrors(['recommended_docking_space' => 'Docking space tidak sesuai untuk kapal ini: ' . implode(' ', $evaluation['violations'])])->withInput();
+        }
+
+        $has_conflict = $check_service->has_schedule_conflict(
+            $recommended_space->id,
+            (string) $docking_request->requested_start_at,
+            $docking_request->requested_end_at?->toDateTimeString(),
+            $docking_request->id
+        );
+
+        if ($has_conflict) {
+            return back()->withErrors(['recommended_docking_space' => 'Docking space tersebut sudah terpakai pada rentang tanggal permohonan.'])->withInput();
+        }
+
         $docking_request->update([
             'request_status' => 'engineering_approved',
+            'recommended_docking_space_id' => $recommended_space->id,
             'engineering_approved_by' => $user_id,
             'engineering_approved_at' => now(),
             'engineering_notes' => $data['notes'] ?? null,
@@ -256,13 +309,14 @@ class DockingManagementController extends Controller
         ReviewDockingStageRequest $request,
         string $docking_request,
         DockingRequestCheckService $check_service,
-        DockingCapacityService $docking_capacity_service
+        DockingCapacityService $docking_capacity_service,
+        DockingRequestDocumentStorage $document_storage
     ): RedirectResponse {
         if (! $this->can_approve($request, 'approve-docking-production')) {
             return back()->with('error', 'Anda tidak memiliki hak akses persetujuan Produksi.');
         }
 
-        $docking_request = $this->find_docking_request($docking_request, ['ship', 'requested_docking_space']);
+        $docking_request = $this->find_docking_request($docking_request, ['ship', 'requested_docking_space', 'recommended_docking_space']);
 
         if ($docking_request->request_status !== 'engineering_approved') {
             return back()->with('error', 'Permohonan belum disetujui Engineering atau sudah diproses.');
@@ -272,19 +326,27 @@ class DockingManagementController extends Controller
         $user_id = $request->user()?->id;
 
         if ($data['decision'] === 'reject') {
-            $docking_request->update([
-                'request_status' => 'rejected',
-                'rejection_stage' => 'production',
-                'rejection_reason' => $data['notes'],
-                'production_notes' => $data['notes'],
-                'reviewed_by' => $user_id,
-                'reviewed_at' => now(),
-            ]);
+            DB::transaction(function () use ($docking_request, $data, $user_id, $document_storage): void {
+                $docking_request->update([
+                    'request_status' => 'rejected',
+                    'rejection_stage' => 'production',
+                    'rejection_reason' => $data['notes'],
+                    'production_notes' => $data['notes'],
+                    'reviewed_by' => $user_id,
+                    'reviewed_at' => now(),
+                ]);
+
+                $document_storage->move_to_rejected($docking_request->load('documents'));
+            });
 
             return $this->after_review($request, 'production')->with('success', 'Permohonan ditolak oleh Produksi.');
         }
 
-        $docking_space = $docking_request->requested_docking_space;
+        $docking_space = $docking_request->recommended_docking_space ?? $docking_request->requested_docking_space;
+
+        if (in_array($data['decision'], ['postpone', 'cancel'], true)) {
+            return $this->recommend_production_action($request, $docking_request, $docking_space, $data, $check_service);
+        }
 
         if (! $docking_space) {
             return back()->with('error', 'Docking space permohonan belum ditentukan.');
@@ -308,7 +370,7 @@ class DockingManagementController extends Controller
             return back()->with('error', 'Docking space tidak lagi sesuai untuk kapal ini: ' . implode(' ', $evaluation['violations']));
         }
 
-        DB::transaction(function () use ($docking_request, $data, $user_id): void {
+        DB::transaction(function () use ($docking_request, $data, $user_id, $docking_space): void {
             $docking_request->update([
                 'request_status' => 'approved',
                 'production_approved_by' => $user_id,
@@ -328,7 +390,7 @@ class DockingManagementController extends Controller
                 [
                     'project_id' => $docking_request->project_id,
                     'ship_id' => $docking_request->ship_id,
-                    'docking_space_id' => $docking_request->requested_docking_space_id,
+                    'docking_space_id' => $docking_space->id,
                     'docked_at' => $docking_request->requested_start_at,
                     'estimated_undock_at' => $docking_request->requested_end_at,
                     'remarks' => 'Jadwal otomatis dari persetujuan permohonan docking.',
@@ -338,6 +400,205 @@ class DockingManagementController extends Controller
         });
 
         return $this->after_review($request, 'production')->with('success', 'Permohonan disetujui. Kapal menunggu kedatangan.');
+    }
+
+    public function respond_to_recommendation(
+        MarketingRecommendationResponseRequest $request,
+        string $docking_request,
+        DockingRequestCheckService $check_service,
+        DockingRequestDocumentStorage $document_storage
+    ): RedirectResponse {
+        $docking_request = $this->find_docking_request($docking_request, ['documents']);
+        $user = $request->user();
+
+        $is_owner = (int) $docking_request->requested_by === (int) $user?->id;
+
+        if (! $is_owner && ! $user?->hasRole('admin')) {
+            return back()->with('error', 'Hanya pemohon (Marketing) yang dapat menanggapi rekomendasi Produksi.');
+        }
+
+        if ($docking_request->request_status !== 'awaiting_marketing') {
+            return back()->with('error', 'Permohonan ini tidak sedang menunggu konfirmasi Marketing.');
+        }
+
+        $data = $request->validated();
+        $is_postpone = $docking_request->production_recommendation === 'postpone';
+
+        $response_fields = [
+            'marketing_responded_by' => $user->id,
+            'marketing_responded_at' => now(),
+            'marketing_response' => $data['response'],
+            'marketing_notes' => $data['notes'] ?? null,
+        ];
+
+        // Customer objects: the request goes back to Production with the customer's reason attached.
+        if ($data['response'] === 'decline') {
+            $docking_request->update($response_fields + ['request_status' => 'engineering_approved']);
+
+            return back()->with('success', 'Keberatan customer dicatat. Permohonan dikembalikan ke Produksi.');
+        }
+
+        if (! $is_postpone) {
+            DB::transaction(function () use ($docking_request, $response_fields, $document_storage): void {
+                $docking_request->update($response_fields + [
+                    'request_status' => 'rejected',
+                    'rejection_stage' => 'production',
+                    'rejection_reason' => $docking_request->production_notes,
+                ]);
+
+                $document_storage->move_to_rejected($docking_request);
+            });
+
+            return back()->with('success', 'Pembatalan dikonfirmasi. Permohonan dipindahkan ke daftar ditolak.');
+        }
+
+        $space_id = $docking_request->effective_docking_space_id();
+
+        if ($space_id !== null && $check_service->has_schedule_conflict(
+            $space_id,
+            $docking_request->recommended_start_at->toDateTimeString(),
+            $docking_request->recommended_end_at?->toDateTimeString(),
+            $docking_request->id
+        )) {
+            return back()->with('error', 'Jadwal usulan Produksi kini bentrok dengan jadwal lain. Hubungi Produksi untuk jadwal baru.');
+        }
+
+        $docking_request->update($response_fields + [
+            'request_status' => 'engineering_approved',
+            'requested_start_at' => $docking_request->recommended_start_at,
+            'requested_end_at' => $docking_request->recommended_end_at,
+        ]);
+
+        return back()->with('success', 'Penundaan dikonfirmasi. Jadwal diperbarui dan permohonan menunggu persetujuan Produksi.');
+    }
+
+    private function recommend_production_action(
+        ReviewDockingStageRequest $request,
+        ProjectDockingRequest $docking_request,
+        ?DockingSpace $docking_space,
+        array $data,
+        DockingRequestCheckService $check_service
+    ): RedirectResponse {
+        $is_postpone = $data['decision'] === 'postpone';
+
+        if ($is_postpone && $docking_space && $check_service->has_schedule_conflict(
+            $docking_space->id,
+            (string) $data['recommended_start_at'],
+            $data['recommended_end_at'],
+            $docking_request->id
+        )) {
+            return back()->withErrors(['recommended_start_at' => 'Jadwal usulan bentrok dengan jadwal docking lain pada docking space ini.'])->withInput();
+        }
+
+        $docking_request->update([
+            'request_status' => 'awaiting_marketing',
+            'production_recommendation' => $data['decision'],
+            'recommended_start_at' => $is_postpone ? $data['recommended_start_at'] : null,
+            'recommended_end_at' => $is_postpone ? $data['recommended_end_at'] : null,
+            'production_notes' => $data['notes'],
+            'reviewed_by' => $request->user()?->id,
+            'reviewed_at' => now(),
+            'marketing_response' => null,
+            'marketing_notes' => null,
+            'marketing_responded_at' => null,
+            'marketing_responded_by' => null,
+        ]);
+
+        return $this->after_review($request, 'production')->with('success', 'Rekomendasi Produksi dicatat. Marketing akan diminta konfirmasi kepada customer.');
+    }
+
+    public function postpone_form(Request $request, string $docking_request, DockingRequestCheckService $check_service): \Illuminate\Contracts\View\View|RedirectResponse
+    {
+        $docking_request = $this->find_docking_request($docking_request, ['ship', 'requested_docking_space', 'recommended_docking_space', 'postponements.postponer']);
+
+        if ($response = $this->guard_postponement($request, $docking_request)) {
+            return $response;
+        }
+
+        $space = $docking_request->recommended_docking_space ?? $docking_request->requested_docking_space;
+        $duration_minutes = $this->request_duration_minutes($docking_request);
+
+        $earliest = $request->query('from');
+        $earliest = is_string($earliest) && strtotime($earliest) !== false
+            ? $earliest
+            : now()->max($docking_request->requested_start_at)->toDateTimeString();
+
+        $suggestions = $space
+            ? $check_service->suggest_slots($space->id, $earliest, $duration_minutes, $docking_request->id)
+            : [];
+
+        return view('docking-space-request.postpone', compact('docking_request', 'space', 'suggestions', 'duration_minutes', 'earliest'));
+    }
+
+    public function postpone_docking(PostponeDockingRequest $request, string $docking_request, DockingRequestCheckService $check_service): RedirectResponse
+    {
+        $docking_request = $this->find_docking_request($docking_request, ['ship', 'requested_docking_space', 'recommended_docking_space']);
+
+        if ($response = $this->guard_postponement($request, $docking_request)) {
+            return $response;
+        }
+
+        $data = $request->validated();
+        $space = $docking_request->recommended_docking_space ?? $docking_request->requested_docking_space;
+        $new_start = \Carbon\CarbonImmutable::parse($data['new_start_at']);
+        $new_end = \Carbon\CarbonImmutable::parse($data['new_end_at']);
+
+        if ($new_start <= $docking_request->requested_start_at) {
+            return back()->withErrors(['new_start_at' => 'Tanggal docking baru harus setelah tanggal docking saat ini.'])->withInput();
+        }
+
+        if ($space && $check_service->has_schedule_conflict($space->id, $new_start->toDateTimeString(), $new_end->toDateTimeString(), $docking_request->id)) {
+            return back()
+                ->withErrors(['new_start_at' => 'Jadwal baru bentrok dengan jadwal docking lain pada ' . $space->name . '. Gunakan salah satu saran jadwal di bawah.'])
+                ->withInput();
+        }
+
+        DB::transaction(function () use ($docking_request, $data, $new_start, $new_end, $space, $request): void {
+            $docking_request->postponements()->create([
+                'docking_space_id' => $space?->id,
+                'previous_start_at' => $docking_request->requested_start_at,
+                'previous_end_at' => $docking_request->requested_end_at,
+                'new_start_at' => $new_start,
+                'new_end_at' => $new_end,
+                'reason' => $data['reason'],
+                'postponed_by' => $request->user()?->id,
+            ]);
+
+            $docking_request->update(['requested_start_at' => $new_start, 'requested_end_at' => $new_end]);
+
+            $docking_request->docking_occupancies()
+                ->where('occupancy_status', 'scheduled')
+                ->update(['docked_at' => $new_start, 'estimated_undock_at' => $new_end]);
+        });
+
+        return redirect()->route('docking-space-request.index')->with('success', 'Jadwal docking berhasil ditunda ke ' . $new_start->tanggal_waktu_indonesia() . '.');
+    }
+
+    private function guard_postponement(Request $request, ProjectDockingRequest $docking_request): ?RedirectResponse
+    {
+        $user = $request->user();
+        $is_owner = (int) $docking_request->requested_by === (int) $user?->id;
+
+        if (! $is_owner && ! $user?->hasRole('admin')) {
+            return redirect()->route('docking-space-request.index')->with('error', 'Hanya pemohon (Marketing) yang dapat menunda jadwal docking.');
+        }
+
+        $has_scheduled = $docking_request->docking_occupancies()->where('occupancy_status', 'scheduled')->exists();
+
+        if ($docking_request->request_status !== 'approved' || ! $has_scheduled) {
+            return redirect()->route('docking-space-request.index')->with('error', 'Hanya permohonan disetujui yang kapalnya belum masuk dock yang dapat ditunda.');
+        }
+
+        return null;
+    }
+
+    private function request_duration_minutes(ProjectDockingRequest $docking_request): int
+    {
+        if (! $docking_request->requested_end_at) {
+            return 30 * 24 * 60;
+        }
+
+        return max(60, (int) $docking_request->requested_start_at->diffInMinutes($docking_request->requested_end_at));
     }
 
     public function cancel_request(Request $request, string $docking_request): RedirectResponse
@@ -360,18 +621,33 @@ class DockingManagementController extends Controller
         return back()->with('success', 'Permohonan docking dibatalkan.');
     }
 
-    public function download_request_document(string $docking_request, string $document): StreamedResponse|RedirectResponse
+    public function download_request_document(Request $request, string $docking_request, string $document): StreamedResponse|RedirectResponse
     {
         $docking_request = $this->find_docking_request($docking_request);
+        $user = $request->user();
+
+        // Rejected and cancelled requests keep their files for history, so access stays limited to involved roles.
+        $can_download = $user !== null && (
+            $user->hasRole('admin')
+            || (int) $docking_request->requested_by === (int) $user->id
+            || $user->can('approve-docking-engineering')
+            || $user->can('approve-docking-production')
+            || $user->can('docking.manage')
+            || $user->can('project.manage')
+            || $user->can('project.update')
+        );
+
+        abort_unless($can_download, 403);
+
         $document_model = $docking_request->documents()->where('unique_id', $document)->first();
 
-        if (! $document_model || ! Storage::disk('local')->exists($document_model->document_path)) {
+        if (! $document_model || ! Storage::disk(DockingRequestDocument::DISK)->exists($document_model->document_path)) {
             return back()->with('error', 'Dokumen tidak ditemukan.');
         }
 
         $extension = pathinfo($document_model->document_path, PATHINFO_EXTENSION);
 
-        return Storage::disk('local')->download(
+        return Storage::disk(DockingRequestDocument::DISK)->download(
             $document_model->document_path,
             Str::slug($document_model->document_name) . ($extension !== '' ? '.' . $extension : '')
         );
@@ -415,7 +691,7 @@ class DockingManagementController extends Controller
         $data = $request->validated();
         $docking_space_id = isset($data['docking_space_id'])
             ? (int) $data['docking_space_id']
-            : (int) ($docking_request->requested_docking_space_id ?? 0);
+            : (int) ($docking_request->effective_docking_space_id() ?? 0);
 
         if ($docking_space_id <= 0) {
             return back()->with('error', 'Docking space untuk pelaksanaan docking belum ditentukan.');

@@ -172,6 +172,7 @@
 
                                             <h6 class="dropdown-header">Lainnya</h6>
                                             <a href="<?php echo e(route('price-dictionary.index')); ?>" class="dropdown-item">Data Jenis Reparasi</a>
+                                            <a href="<?php echo e(route('price-book.index')); ?>" class="dropdown-item <?php echo e(request()->routeIs('price-book.*') ? 'active' : ''); ?>">Kamus Harga</a>
 
                                     </div>
                                 </div>
@@ -195,9 +196,14 @@
                             <div class="dropdown-menu">
                                 <div class="dropdown-menu-columns">
                                     <div class="dropdown-menu-column">
+                                            <a href="<?php echo e(route('docking-dashboard')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-dashboard') ? 'active' : ''); ?>">Dashboard Docking</a>
+
+                                            <div class="dropdown-divider"></div>
+
                                             <h6 class="dropdown-header">Docking Request</h6>
                                             <a href="<?php echo e(route('docking-space-request.create')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space-request.create') ? 'active' : ''); ?>">Buat Docking Request</a>
                                             <a href="<?php echo e(route('docking-space-request.index')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space-request.index') ? 'active' : ''); ?>">Daftar Docking Request</a>
+                                            <a href="<?php echo e(route('docking-space-request.rejected')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space-request.rejected') ? 'active' : ''); ?>">Request Ditolak</a>
 
                                             <?php if(auth()->user()?->hasRole('admin') || auth()->user()?->can('approve-docking-engineering') || auth()->user()?->can('approve-docking-production')): ?>
                                                 <div class="dropdown-divider"></div>

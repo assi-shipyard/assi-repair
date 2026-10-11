@@ -39,13 +39,13 @@
                             <td class="fw-medium">{{ $item->ship?->name ?? '-' }}</td>
                             <td>{{ $item->ship?->company?->name ?? '-' }}</td>
                             <td>
-                                <div>{{ $item->requested_start_at?->format('d/m/Y H:i') }}</div>
-                                <div class="text-secondary small">s/d {{ $item->requested_end_at?->format('d/m/Y H:i') ?? '-' }}</div>
+                                <div>{{ $item->requested_start_at?->tanggal_waktu_indonesia() }}</div>
+                                <div class="text-secondary small">s/d {{ $item->requested_end_at?->tanggal_waktu_indonesia() ?? '-' }}</div>
                             </td>
                             <td>{{ $item->requested_docking_space?->name ?? '-' }}</td>
                             <td>{{ $item->documents_count }} berkas</td>
                             <td>
-                                <div>{{ $item->created_at?->format('d/m/Y H:i') }}</div>
+                                <div>{{ $item->created_at?->tanggal_waktu_indonesia() }}</div>
                                 <div class="text-secondary small">{{ $item->requester?->employee_id ?? '-' }}</div>
                             </td>
                             <td><a href="{{ route('docking-approval.show', [$stage, $item->unique_id]) }}" class="btn btn-sm btn-primary">Tinjau</a></td>
@@ -82,17 +82,20 @@
                         @endphp
                         <tr>
                             <td class="fw-medium">{{ $item->ship?->name ?? '-' }}</td>
-                            <td>{{ $item->requested_start_at?->format('d/m/Y') }} - {{ $item->requested_end_at?->format('d/m/Y') ?? '-' }}</td>
+                            <td>{{ $item->requested_start_at?->tanggal_indonesia() }} - {{ $item->requested_end_at?->tanggal_indonesia() ?? '-' }}</td>
                             <td>
                                 @if ($rejected_here)
                                     <span class="badge bg-red-lt text-red">Ditolak</span>
                                     <div class="text-secondary small">{{ $item->rejection_reason }}</div>
+                                @elseif ($stage === 'production' && $item->production_recommendation)
+                                    <span class="badge bg-orange-lt text-orange">Disarankan {{ $item->production_recommendation === 'postpone' ? 'ditunda' : 'dibatalkan' }}</span>
+                                    <div class="text-secondary small">{{ $item->production_notes }}</div>
                                 @elseif ($approved_at)
                                     <span class="badge bg-success-lt text-success">Disetujui</span>
-                                    <div class="text-secondary small">{{ $approver?->employee_id ?? '-' }}, {{ $approved_at->format('d/m/Y H:i') }}</div>
+                                    <div class="text-secondary small">{{ $approver?->employee_id ?? '-' }}, {{ $approved_at->tanggal_waktu_indonesia() }}</div>
                                 @endif
                             </td>
-                            <td>{{ ['submitted' => 'Menunggu Engineering', 'engineering_approved' => 'Menunggu Produksi', 'approved' => 'Disetujui / menunggu kedatangan', 'rejected' => 'Ditolak', 'cancelled' => 'Dibatalkan'][$item->request_status] ?? $item->request_status }}</td>
+                            <td>{{ ['submitted' => 'Menunggu Engineering', 'engineering_approved' => 'Menunggu Produksi', 'awaiting_marketing' => 'Menunggu Konfirmasi Marketing', 'approved' => 'Disetujui / menunggu kedatangan', 'rejected' => 'Ditolak', 'cancelled' => 'Dibatalkan'][$item->request_status] ?? $item->request_status }}</td>
                             <td><a href="{{ route('docking-approval.show', [$stage, $item->unique_id]) }}" class="btn btn-sm btn-outline-secondary">Detail</a></td>
                         </tr>
                     @empty

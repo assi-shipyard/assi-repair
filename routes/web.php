@@ -11,8 +11,11 @@ use App\Http\Controllers\PositionController;
 use App\Http\Controllers\NotificationSettingController;
 use App\Http\Controllers\DockingApprovalController;
 use App\Http\Controllers\DockingManagementController;
+use App\Http\Controllers\DockingDashboardController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectJobDocumentPageController;
+use App\Http\Controllers\RepairTypeController;
+use App\Http\Controllers\PriceBookController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ShipController;
 use App\Http\Controllers\ShipDocumentController;
@@ -32,6 +35,7 @@ Route::get('/logout', [LoginController::class, 'logout'])->middleware('auth')->n
 
 Route::middleware(['auth', 'audit_log'])->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/docking-dashboard', [DockingDashboardController::class, 'index'])->name('docking-dashboard');
 
     Route::middleware('role:admin')->prefix('audit-log')->name('audit-log.')->group(function (): void {
         Route::get('/', [AuditLogController::class, 'index'])->name('index');
@@ -149,31 +153,27 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::get('/', 'index')->name('index');
         Route::get('/create', 'create')->name('create');
         Route::post('/', 'store')->name('store');
+        Route::get('/history', 'history')->name('history');
         Route::get('/code-preview', 'generate_code_preview')->name('generate-code-preview');
         Route::get('/{id}', 'show')->name('show');
         Route::get('/{id}/edit', 'edit')->name('edit');
         Route::put('/{id}', 'update')->name('update');
         Route::delete('/{id}', 'destroy')->name('destroy');
-        Route::get('/history', fn () => view('examples.placeholder', [
-            'page_title' => 'Riwayat Proyek',
-            'body_title' => 'Riwayat Proyek',
-            'message' => 'Halaman riwayat proyek belum diaktifkan.',
-        ]))->name('history');
     });
 
     Route::controller(ProjectJobDocumentPageController::class)->prefix('project/{projectId}/job-document')->name('project.job-document.workflow.')->group(function (): void {
         Route::get('/', 'index')->name('index');
         Route::post('/', 'store')->name('store');
         Route::get('/{document}', 'show')->name('show');
-        Route::put('/{document}', 'update')->name('update');
-        Route::delete('/{document}', 'destroy')->name('destroy');
-        Route::post('/{document}/copy', 'copy')->name('copy');
+        Route::get('/{document}/compare', 'compare')->name('compare');
+        Route::post('/{document}/submit', 'submit')->name('submit');
+        Route::post('/{document}/approve', 'approve')->name('approve');
+        Route::post('/{document}/return-to-draft', 'return_to_draft')->name('return-to-draft');
         Route::post('/{document}/finalize-satisfaction-notes', 'finalizeSatisfactionNotes')->name('finalize-satisfaction-notes');
         Route::post('/{document}/jobs', 'storeJob')->name('job.store');
         Route::put('/{document}/jobs/{job}', 'updateJob')->name('job.update');
         Route::delete('/{document}/jobs/{job}', 'destroyJob')->name('job.destroy');
         Route::post('/{document}/jobs/{job}/materials', 'storeMaterial')->name('material.store');
-        Route::put('/{document}/jobs/{job}/materials/{material}', 'updateMaterial')->name('material.update');
         Route::delete('/{document}/jobs/{job}/materials/{material}', 'destroyMaterial')->name('material.destroy');
         Route::get('/{document}/jobs/{job}/photos', 'photos')->name('job.photos');
         Route::post('/{document}/jobs/{job}/photos', 'storePhoto')->name('job.photo.store');
@@ -198,11 +198,29 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::delete('/{id}', 'class_destroy')->name('destroy');
     });
 
-    Route::view('/price-dictionary', 'examples.placeholder', [
-        'page_title' => 'Data Jenis Reparasi',
-        'body_title' => 'Data Jenis Reparasi',
-        'message' => 'Halaman data jenis reparasi belum diaktifkan.',
-    ])->name('price-dictionary.index');
+    Route::controller(RepairTypeController::class)->prefix('price-dictionary')->name('price-dictionary.')->group(function (): void {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{repair_type}', 'update')->name('update');
+        Route::delete('/{repair_type}', 'destroy')->name('destroy');
+    });
+
+    Route::controller(PriceBookController::class)->prefix('price-book')->name('price-book.')->scopeBindings()->group(function (): void {
+        Route::get('/', 'index')->name('index');
+        Route::middleware('role:admin')->group(function (): void {
+            Route::get('/create', 'create')->name('create');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{price_book}/edit', 'edit')->name('edit');
+            Route::put('/{price_book}', 'update')->name('update');
+            Route::delete('/{price_book}', 'destroy')->name('destroy');
+            Route::get('/{price_book}/items/create', 'create_item')->name('items.create');
+            Route::post('/{price_book}/items', 'store_item')->name('items.store');
+            Route::get('/{price_book}/items/{item}/edit', 'edit_item')->name('items.edit');
+            Route::put('/{price_book}/items/{item}', 'update_item')->name('items.update');
+            Route::delete('/{price_book}/items/{item}', 'destroy_item')->name('items.destroy');
+        });
+        Route::get('/{price_book}', 'show')->name('show');
+    });
 
     Route::controller(DockingApprovalController::class)->prefix('docking-approval')->name('docking-approval.')->group(function (): void {
         Route::get('/{stage}', 'index')->whereIn('stage', ['engineering', 'production'])->name('index');
@@ -213,9 +231,13 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::get('/docking-space-request/create', 'create_request')->name('docking-space-request.create');
         Route::post('/docking-space-request', 'store_request')->name('docking-space-request.store');
         Route::get('/docking-space-request', 'index_request')->name('docking-space-request.index');
+        Route::get('/docking-space-request/rejected', 'rejected_requests')->name('docking-space-request.rejected');
         Route::post('/docking-space-request/{docking_request}/evaluate', 'evaluate_request')->name('docking-space-request.evaluate');
         Route::post('/docking-space-request/{docking_request}/engineering-review', 'engineering_review')->name('docking-space-request.engineering-review');
         Route::post('/docking-space-request/{docking_request}/production-review', 'production_review')->name('docking-space-request.production-review');
+        Route::post('/docking-space-request/{docking_request}/marketing-response', 'respond_to_recommendation')->name('docking-space-request.marketing-response');
+        Route::get('/docking-space-request/{docking_request}/postpone', 'postpone_form')->name('docking-space-request.postpone');
+        Route::post('/docking-space-request/{docking_request}/postpone', 'postpone_docking')->name('docking-space-request.postpone.store');
         Route::post('/docking-space-request/{docking_request}/cancel', 'cancel_request')->name('docking-space-request.cancel');
         Route::get('/docking-space-request/{docking_request}/documents/{document}', 'download_request_document')->name('docking-space-request.documents.download');
         Route::post('/docking-space-request/{docking_request}/start-docking', 'start_docking')->name('docking-space-request.start-docking');

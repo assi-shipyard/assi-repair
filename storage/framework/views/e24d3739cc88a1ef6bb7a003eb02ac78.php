@@ -32,23 +32,23 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php $__empty_1 = true; $__currentLoopData = $pending_requests; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php $__empty_0 = true; $__currentLoopData = $pending_requests; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_0 = false; ?>
                         <tr>
                             <td class="fw-medium"><?php echo e($item->ship?->name ?? '-'); ?></td>
                             <td><?php echo e($item->ship?->company?->name ?? '-'); ?></td>
                             <td>
-                                <div><?php echo e($item->requested_start_at?->format('d/m/Y H:i')); ?></div>
-                                <div class="text-secondary small">s/d <?php echo e($item->requested_end_at?->format('d/m/Y H:i') ?? '-'); ?></div>
+                                <div><?php echo e($item->requested_start_at?->tanggal_waktu_indonesia()); ?></div>
+                                <div class="text-secondary small">s/d <?php echo e($item->requested_end_at?->tanggal_waktu_indonesia() ?? '-'); ?></div>
                             </td>
                             <td><?php echo e($item->requested_docking_space?->name ?? '-'); ?></td>
                             <td><?php echo e($item->documents_count); ?> berkas</td>
                             <td>
-                                <div><?php echo e($item->created_at?->format('d/m/Y H:i')); ?></div>
+                                <div><?php echo e($item->created_at?->tanggal_waktu_indonesia()); ?></div>
                                 <div class="text-secondary small"><?php echo e($item->requester?->employee_id ?? '-'); ?></div>
                             </td>
                             <td><a href="<?php echo e(route('docking-approval.show', [$stage, $item->unique_id])); ?>" class="btn btn-sm btn-primary">Tinjau</a></td>
                         </tr>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_0): ?>
                         <tr><td colspan="7" class="text-center text-secondary py-4">Tidak ada permohonan yang menunggu persetujuan.</td></tr>
                     <?php endif; ?>
                 </tbody>
@@ -72,7 +72,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php $__empty_1 = true; $__currentLoopData = $decided_requests; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php $__empty_0 = true; $__currentLoopData = $decided_requests; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_0 = false; ?>
                         <?php
                             $approved_at = $stage === 'engineering' ? $item->engineering_approved_at : $item->production_approved_at;
                             $approver = $stage === 'engineering' ? $item->engineering_approver : $item->production_approver;
@@ -80,20 +80,23 @@
                         ?>
                         <tr>
                             <td class="fw-medium"><?php echo e($item->ship?->name ?? '-'); ?></td>
-                            <td><?php echo e($item->requested_start_at?->format('d/m/Y')); ?> - <?php echo e($item->requested_end_at?->format('d/m/Y') ?? '-'); ?></td>
+                            <td><?php echo e($item->requested_start_at?->tanggal_indonesia()); ?> - <?php echo e($item->requested_end_at?->tanggal_indonesia() ?? '-'); ?></td>
                             <td>
                                 <?php if($rejected_here): ?>
                                     <span class="badge bg-red-lt text-red">Ditolak</span>
                                     <div class="text-secondary small"><?php echo e($item->rejection_reason); ?></div>
+                                <?php elseif($stage === 'production' && $item->production_recommendation): ?>
+                                    <span class="badge bg-orange-lt text-orange">Disarankan <?php echo e($item->production_recommendation === 'postpone' ? 'ditunda' : 'dibatalkan'); ?></span>
+                                    <div class="text-secondary small"><?php echo e($item->production_notes); ?></div>
                                 <?php elseif($approved_at): ?>
                                     <span class="badge bg-success-lt text-success">Disetujui</span>
-                                    <div class="text-secondary small"><?php echo e($approver?->employee_id ?? '-'); ?>, <?php echo e($approved_at->format('d/m/Y H:i')); ?></div>
+                                    <div class="text-secondary small"><?php echo e($approver?->employee_id ?? '-'); ?>, <?php echo e($approved_at->tanggal_waktu_indonesia()); ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td><?php echo e(['submitted' => 'Menunggu Engineering', 'engineering_approved' => 'Menunggu Produksi', 'approved' => 'Disetujui / menunggu kedatangan', 'rejected' => 'Ditolak', 'cancelled' => 'Dibatalkan'][$item->request_status] ?? $item->request_status); ?></td>
+                            <td><?php echo e(['submitted' => 'Menunggu Engineering', 'engineering_approved' => 'Menunggu Produksi', 'awaiting_marketing' => 'Menunggu Konfirmasi Marketing', 'approved' => 'Disetujui / menunggu kedatangan', 'rejected' => 'Ditolak', 'cancelled' => 'Dibatalkan'][$item->request_status] ?? $item->request_status); ?></td>
                             <td><a href="<?php echo e(route('docking-approval.show', [$stage, $item->unique_id])); ?>" class="btn btn-sm btn-outline-secondary">Detail</a></td>
                         </tr>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_0): ?>
                         <tr><td colspan="5" class="text-center text-secondary py-4">Belum ada riwayat keputusan.</td></tr>
                     <?php endif; ?>
                 </tbody>

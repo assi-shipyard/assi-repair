@@ -309,7 +309,7 @@
                                                 <td class="fw-semibold">{{ $project->project_code }}</td>
                                                 <td>{{ $project->project_type }}</td>
                                                 <td class="text-nowrap">
-                                                    {{ $period_start?->format('d/m/Y') ?? '-' }} - {{ $period_end?->format('d/m/Y') ?? '-' }}
+                                                    {{ $period_start?->tanggal_indonesia() ?? '-' }} - {{ $period_end?->tanggal_indonesia() ?? '-' }}
                                                     @unless ($project->start_date_actual)
                                                         <span class="text-secondary small">(estimasi)</span>
                                                     @endunless
@@ -369,7 +369,7 @@
                                             <tr>
                                                 <td class="fw-semibold">{{ $document->document_name }}</td>
                                                 <td><span class="badge bg-blue-lt text-blue">{{ $document->document_type }}</span></td>
-                                                <td class="text-nowrap text-secondary">{{ $document->created_at?->format('d/m/Y H:i') }}</td>
+                                                <td class="text-nowrap text-secondary">{{ $document->created_at?->tanggal_waktu_indonesia() }}</td>
                                                 <td>
                                                     <div class="btn-list flex-nowrap">
                                                         <a href="{{ route('ship.documents.download', [$ship_identifier, $document->unique_id]) }}" class="btn btn-sm btn-outline-primary" title="Unduh dokumen">

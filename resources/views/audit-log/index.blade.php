@@ -65,7 +65,7 @@
                     <tbody>
                         @forelse ($audit_logs as $audit_log)
                             <tr>
-                                <td class="text-muted">{{ $audit_log->created_at?->format('d/m/Y H:i:s') }}</td>
+                                <td class="text-muted">{{ $audit_log->created_at?->tanggal_waktu_indonesia(true) }}</td>
                                 <td><code>{{ $audit_log->event_name }}</code></td>
                                 <td>
                                     <div>{{ $audit_log->employee_id ?? '-' }}</div>

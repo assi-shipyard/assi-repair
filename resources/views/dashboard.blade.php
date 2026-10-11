@@ -311,11 +311,11 @@
                                     <div class="row g-2 text-secondary small mb-3">
                                         <div class="col-6">
                                             Mulai estimasi<br>
-                                            <span class="text-body fw-semibold">{{ $project->start_date_estimation?->format('d M Y') ?? '-' }}</span>
+                                            <span class="text-body fw-semibold">{{ $project->start_date_estimation?->tanggal_indonesia() ?? '-' }}</span>
                                         </div>
                                         <div class="col-6">
                                             Selesai aktual<br>
-                                            <span class="text-body fw-semibold">{{ $project->end_date_actual?->format('d M Y') ?? '-' }}</span>
+                                            <span class="text-body fw-semibold">{{ $project->end_date_actual?->tanggal_indonesia() ?? '-' }}</span>
                                         </div>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-2">

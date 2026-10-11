@@ -41,7 +41,7 @@
                         <tr>
                             <td>{{ $photo->photo_category ?? '-' }}</td>
                             <td>{{ $photo->caption ?? '-' }}</td>
-                            <td>{{ optional($photo->taken_at)->format('d/m/Y H:i') ?? '-' }}</td>
+                            <td>{{ optional($photo->taken_at)->tanggal_waktu_indonesia() ?? '-' }}</td>
                             <td>
                                 <form action="{{ route('project.job-document.workflow.job.photo.destroy', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id, $photo->unique_id ?? $photo->id]) }}" method="POST" onsubmit="return confirm('Hapus foto ini?')">
                                     @csrf

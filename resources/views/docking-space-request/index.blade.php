@@ -22,6 +22,7 @@
         $status_labels = [
             'submitted' => 'Menunggu Engineering',
             'engineering_approved' => 'Menunggu Produksi',
+            'awaiting_marketing' => 'Menunggu Konfirmasi Marketing',
             'approved' => 'Disetujui / menunggu kedatangan',
             'rejected' => 'Ditolak',
             'cancelled' => 'Dibatalkan',
@@ -30,6 +31,7 @@
         $status_badges = [
             'submitted' => 'bg-blue-lt text-blue',
             'engineering_approved' => 'bg-amber-lt text-amber',
+            'awaiting_marketing' => 'bg-orange-lt text-orange',
             'approved' => 'bg-success-lt text-success',
             'rejected' => 'bg-red-lt text-red',
             'cancelled' => 'bg-secondary-lt text-secondary',
@@ -156,8 +158,8 @@
                                 <div class="text-secondary small mt-1">{{ $docking_request->ship?->name ?? '-' }}</div>
                             </td>
                             <td>
-                                <div>{{ optional($docking_request->requested_start_at)->format('d/m/Y H:i') ?? '-' }}</div>
-                                <div class="text-secondary small">s/d {{ optional($docking_request->requested_end_at)->format('d/m/Y H:i') ?? '-' }}</div>
+                                <div>{{ optional($docking_request->requested_start_at)->tanggal_waktu_indonesia() ?? '-' }}</div>
+                                <div class="text-secondary small">s/d {{ optional($docking_request->requested_end_at)->tanggal_waktu_indonesia() ?? '-' }}</div>
                             </td>
                             <td>
                                 <div class="fw-medium">{{ $docking_request->requested_docking_space?->name ?? '-' }}</div>
@@ -166,10 +168,22 @@
                             <td>
                                 <span class="badge {{ $status_badge }}">{{ $status_label }}</span>
                                 @if ($docking_request->engineering_approved_at)
-                                    <div class="text-secondary small mt-1">Engineering: {{ $docking_request->engineering_approver?->employee_id ?? '-' }}, {{ $docking_request->engineering_approved_at->format('d/m/Y H:i') }}</div>
+                                    <div class="text-secondary small mt-1">Engineering: {{ $docking_request->engineering_approver?->employee_id ?? '-' }}, {{ $docking_request->engineering_approved_at->tanggal_waktu_indonesia() }}</div>
                                 @endif
                                 @if ($docking_request->production_approved_at)
-                                    <div class="text-secondary small">Produksi: {{ $docking_request->production_approver?->employee_id ?? '-' }}, {{ $docking_request->production_approved_at->format('d/m/Y H:i') }}</div>
+                                    <div class="text-secondary small">Produksi: {{ $docking_request->production_approver?->employee_id ?? '-' }}, {{ $docking_request->production_approved_at->tanggal_waktu_indonesia() }}</div>
+                                @endif
+                                @if ($docking_request->request_status === 'awaiting_marketing')
+                                    <div class="small mt-1 text-orange">
+                                        Produksi menyarankan {{ $docking_request->production_recommendation === 'postpone' ? 'penundaan' : 'pembatalan' }}
+                                        @if ($docking_request->production_recommendation === 'postpone')
+                                            ke {{ $docking_request->recommended_start_at?->tanggal_waktu_indonesia() }} s/d {{ $docking_request->recommended_end_at?->tanggal_waktu_indonesia() }}
+                                        @endif
+                                    </div>
+                                    <div class="text-secondary small">Alasan: {{ $docking_request->production_notes }}</div>
+                                @endif
+                                @if ($docking_request->marketing_response === 'decline' && $docking_request->request_status === 'engineering_approved')
+                                    <div class="text-secondary small mt-1">Keberatan customer: {{ $docking_request->marketing_notes }}</div>
                                 @endif
                                 @if ($docking_request->request_status === 'rejected')
                                     <div class="text-danger small mt-1">Ditolak {{ $docking_request->rejection_stage === 'production' ? 'Produksi' : 'Engineering' }}: {{ $docking_request->rejection_reason }}</div>
@@ -190,15 +204,24 @@
                                         <a class="btn btn-sm btn-outline-primary w-100" href="{{ route('docking-approval.show', [$docking_request->request_status === 'submitted' ? 'engineering' : 'production', $docking_request->unique_id]) }}">Tinjau detail</a>
                                     @endif
 
-                                    @if ($docking_request->request_status === 'submitted' && $can_approve_engineering)
-                                        @include('docking-space-request.partials.review-form', ['docking_request' => $docking_request, 'route_name' => 'docking-space-request.engineering-review', 'approve_label' => 'Setujui (Engineering)'])
-                                    @endif
-
                                     @if ($docking_request->request_status === 'engineering_approved' && $can_approve_production)
                                         @include('docking-space-request.partials.review-form', ['docking_request' => $docking_request, 'route_name' => 'docking-space-request.production-review', 'approve_label' => 'Setujui (Produksi)'])
                                     @endif
 
-                                    @if (in_array($docking_request->request_status, ['submitted', 'engineering_approved'], true) && ((int) $docking_request->requested_by === (int) $current_user?->id || $current_user?->hasRole('admin')))
+                                    @if ($docking_request->request_status === 'approved' && ((int) $docking_request->requested_by === (int) $current_user?->id || $current_user?->hasRole('admin')))
+                                        <a class="btn btn-sm btn-outline-warning w-100" href="{{ route('docking-space-request.postpone', $docking_request->unique_id) }}">Tunda docking</a>
+                                    @endif
+
+                                    @if ($docking_request->request_status === 'awaiting_marketing' && ((int) $docking_request->requested_by === (int) $current_user?->id || $current_user?->hasRole('admin')))
+                                        <form method="POST" action="{{ route('docking-space-request.marketing-response', $docking_request->unique_id) }}" class="d-flex flex-column gap-2 js-marketing-form">
+                                            @csrf
+                                            <textarea class="form-control form-control-sm" name="notes" rows="2" maxlength="2000" placeholder="Alasan keberatan customer (wajib bila keberatan)"></textarea>
+                                            <button class="btn btn-sm btn-success w-100" type="submit" name="response" value="accept">Customer setuju</button>
+                                            <button class="btn btn-sm btn-outline-danger w-100" type="submit" name="response" value="decline">Customer keberatan</button>
+                                        </form>
+                                    @endif
+
+                                    @if (in_array($docking_request->request_status, ['submitted', 'engineering_approved', 'awaiting_marketing'], true) && ((int) $docking_request->requested_by === (int) $current_user?->id || $current_user?->hasRole('admin')))
                                         <form method="POST" action="{{ route('docking-space-request.cancel', $docking_request->unique_id) }}">
                                             @csrf
                                             <button class="btn btn-sm btn-outline-secondary w-100" type="submit">Batalkan</button>
@@ -275,6 +298,32 @@
             });
 
             $('.js-review-form button[value="approve"]').on('click', function () {
+                $(this).closest('form').find('[name="notes"]').rules('remove', 'required');
+            });
+
+            $('.js-marketing-form').each(function () {
+                $(this).validate({
+                    errorClass: 'is-invalid',
+                    errorElement: 'div',
+                    errorPlacement: function (error, element) {
+                        error.addClass('invalid-feedback');
+                        element.closest('form').find('textarea').after(error);
+                    },
+                    rules: { notes: { maxlength: 2000 } },
+                    messages: { notes: { maxlength: 'Catatan maksimal 2000 karakter.' } },
+                });
+            });
+
+            $('.js-marketing-form button[value="decline"]').on('click', function (event) {
+                const form = $(this).closest('form');
+                form.find('[name="notes"]').rules('add', { required: true, messages: { required: 'Alasan keberatan customer wajib diisi.' } });
+
+                if (!form.valid()) {
+                    event.preventDefault();
+                }
+            });
+
+            $('.js-marketing-form button[value="accept"]').on('click', function () {
                 $(this).closest('form').find('[name="notes"]').rules('remove', 'required');
             });
 

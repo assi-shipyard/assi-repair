@@ -44,7 +44,7 @@
                         <div class="text-truncate"><i class="ti ti-user me-1"></i>Pimpinan: {{ $project->leader?->name ?? '-' }}</div>
                         <div class="{{ $overdue ? 'text-danger' : '' }}">
                             <i class="ti ti-calendar me-1"></i>
-                            {{ $project->start_date_estimation?->format('d/m/Y') ?? '-' }} s/d {{ $project->end_date_estimation?->format('d/m/Y') ?? '-' }}
+                            {{ $project->start_date_estimation?->tanggal_indonesia() ?? '-' }} s/d {{ $project->end_date_estimation?->tanggal_indonesia() ?? '-' }}
                             @if ($overdue) <span class="badge bg-danger-lt text-danger ms-1">Terlambat</span> @endif
                         </div>
                         @if ($project->divisions->isNotEmpty())

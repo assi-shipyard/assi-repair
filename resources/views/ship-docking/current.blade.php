@@ -33,8 +33,8 @@
                             <td>{{ $occupancy->project?->project_code ?? '-' }}</td>
                             <td>{{ $occupancy->ship?->name ?? '-' }}</td>
                             <td>{{ $occupancy->docking_space?->name ?? '-' }}</td>
-                            <td>{{ optional($occupancy->docked_at)->format('d/m/Y H:i') ?? '-' }}</td>
-                            <td>{{ optional($occupancy->estimated_undock_at)->format('d/m/Y H:i') ?? '-' }}</td>
+                            <td>{{ optional($occupancy->docked_at)->tanggal_waktu_indonesia() ?? '-' }}</td>
+                            <td>{{ optional($occupancy->estimated_undock_at)->tanggal_waktu_indonesia() ?? '-' }}</td>
                             <td><span class="badge bg-azure-lt">{{ strtoupper($occupancy->occupancy_status) }}</span></td>
                             <td>
                                 @if ($can_manage_docking)

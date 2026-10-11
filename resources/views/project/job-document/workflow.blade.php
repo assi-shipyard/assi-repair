@@ -14,10 +14,13 @@
 
     @php
         $stage_types = array_keys($documentTypeLabels);
+        $status_labels = ['draft' => 'Draft', 'submitted' => 'Diajukan', 'approved' => 'Disetujui', 'locked' => 'Final', 'superseded' => 'Digantikan'];
         $document_status_classes = [
             'approved' => 'bg-success-lt text-success',
             'locked' => 'bg-success-lt text-success',
             'draft' => 'bg-secondary-lt text-secondary',
+            'submitted' => 'bg-warning-lt text-warning',
+            'superseded' => 'bg-secondary-lt text-secondary',
         ];
     @endphp
 
@@ -66,12 +69,12 @@
 
                         @if ($latest_document)
                             <div class="stage-document-meta mb-3">
-                                <div class="d-flex justify-content-between gap-2"><span class="badge {{ $status_class }}">{{ ucfirst($latest_document->status) }}</span><span class="text-secondary small">{{ $stage_documents->count() }} revisi</span></div>
+                                <div class="d-flex justify-content-between gap-2"><span class="badge {{ $status_class }}">{{ ($status_labels[$latest_document->status] ?? ucfirst($latest_document->status)) }}</span><span class="text-secondary small">{{ $stage_documents->count() }} revisi</span></div>
                                 <div class="fw-semibold mt-2">Revisi {{ $latest_document->revision_no }}</div>
                                 <div class="small text-secondary text-truncate">{{ $latest_document->document_number ?: 'Nomor dokumen belum diisi' }}</div>
                             </div>
                             <a href="{{ route('project.job-document.workflow.show', [$project->unique_id, $latest_document->unique_id ?? $latest_document->id]) }}" class="btn btn-outline-primary w-100 mb-2">Buka Revisi Terakhir<i class="ti ti-arrow-right ms-1"></i></a>
-                            <button type="button" class="btn btn-primary w-100 document-action" data-bs-toggle="modal" data-bs-target="#document-modal" data-document-type="{{ $document_type }}" data-document-label="{{ $documentTypeLabels[$document_type] }}" data-source-id="{{ $latest_document->id }}" data-source-revision="{{ $latest_document->revision_no }}"><i class="ti ti-copy-plus me-1"></i>Buat Revisi</button>
+                            <button type="button" class="btn btn-primary w-100 document-action" data-bs-toggle="modal" data-bs-target="#document-modal" data-document-type="{{ $document_type }}" data-document-label="{{ $documentTypeLabels[$document_type] }}" data-source-id="{{ $latest_document->unique_id }}" data-source-revision="{{ $latest_document->revision_no }}"><i class="ti ti-copy-plus me-1"></i>Buat Revisi</button>
                         @elseif ($stage_is_ready)
                             <div class="stage-empty text-secondary small mb-3">Belum ada dokumen untuk tahap ini.</div>
                             <button type="button" class="btn btn-primary w-100 mt-auto document-action" data-bs-toggle="modal" data-bs-target="#document-modal" data-document-type="{{ $document_type }}" data-document-label="{{ $documentTypeLabels[$document_type] }}"><i class="ti ti-file-plus me-1"></i>Buat Dokumen</button>
@@ -102,7 +105,7 @@
                                             <div class="col-auto"><span class="avatar avatar-sm bg-primary-lt text-primary">R{{ $workflow_document->revision_no }}</span></div>
                                             <div class="col"><div class="fw-semibold">Revisi {{ $workflow_document->revision_no }}</div><div class="small text-secondary">{{ $workflow_document->document_number ?: 'Nomor dokumen belum diisi' }}</div></div>
                                             <div class="col-auto text-secondary small d-none d-md-block">{{ $workflow_document->jobs_count }} pekerjaan</div>
-                                            <div class="col-auto"><span class="badge {{ $status_class }}">{{ ucfirst($workflow_document->status) }}</span></div>
+                                            <div class="col-auto"><span class="badge {{ $status_class }}">{{ ($status_labels[$workflow_document->status] ?? ucfirst($workflow_document->status)) }}</span></div>
                                             <div class="col-auto"><i class="ti ti-chevron-right text-secondary"></i></div>
                                         </div>
                                     </a>
@@ -126,6 +129,7 @@
                 <div class="modal-header"><div><h3 class="modal-title" id="document-modal-title">Buat Dokumen</h3><div class="text-secondary small" id="document-modal-description"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
                 <div class="modal-body">
                     <div class="mb-3"><label class="form-label" for="document-number-input">Nomor Dokumen</label><input id="document-number-input" class="form-control" name="document_number" maxlength="100" value="{{ old('document_number') }}" placeholder="Contoh: RL/001/VIII/2026"></div>
+                    <div class="mb-3 d-none" id="revision-reason-group"><label class="form-label required" for="revision-reason-input">Alasan Revisi</label><textarea id="revision-reason-input" class="form-control" name="revision_reason" rows="2" maxlength="1000" placeholder="Contoh: Hasil negosiasi harga dengan pemilik kapal">{{ old('revision_reason') }}</textarea><div class="form-hint">Alasan ini tampil pada riwayat dan perbandingan revisi.</div></div>
                     <div><label class="form-label" for="document-notes-input">Catatan</label><textarea id="document-notes-input" class="form-control" name="notes" rows="3" placeholder="Catatan untuk revisi atau dokumen ini">{{ old('notes') }}</textarea></div>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary" id="document-submit-button">Buat Dokumen</button></div>
@@ -140,7 +144,12 @@
         .workflow-stage { min-height: 280px; }
         .workflow-stage-locked { background-color: var(--tblr-bg-surface-secondary); }
         .stage-document-meta, .stage-empty { min-height: 76px; }
-        .revision-row { border-left: 0; border-right: 0; }
+        .revision-row { border-left: 0; border-right: 0; padding: .75rem 1.25rem; }
+        #revision-history .accordion-button { font-size: 1rem; padding: .875rem 1.25rem; }
+        #revision-history .accordion-button .badge { font-size: .75rem; font-weight: 500; }
+        #revision-history .accordion-body .revision-row:first-child { border-top: 0; }
+        #revision-history .accordion-body .revision-row:last-child { border-bottom: 0; }
+        #revision-history .accordion-body > .text-secondary { padding: .875rem 1.25rem !important; }
     </style>
 @endpush
 
@@ -154,12 +163,14 @@
                 document.getElementById('source-document-input').value = source_id;
                 document.getElementById('document-modal-title').textContent = (is_revision ? 'Buat Revisi' : 'Buat Dokumen') + ' - ' + this.dataset.documentLabel;
                 document.getElementById('document-modal-description').textContent = is_revision ? 'Revisi baru akan menyalin data dari Revisi ' + this.dataset.sourceRevision + '.' : 'Dokumen baru akan dibuat untuk tahap ini.';
+                document.getElementById('revision-reason-group').classList.toggle('d-none', !is_revision);
+                document.getElementById('revision-reason-input').required = is_revision;
                 document.getElementById('document-submit-button').textContent = is_revision ? 'Buat Revisi' : 'Buat Dokumen';
             });
         });
 
         if (window.jQuery && jQuery.fn.validate) {
-            jQuery('#document-form').validate({ rules: { document_number: { maxlength: 100 }, notes: { maxlength: 65535 } } });
+            jQuery('#document-form').validate({ rules: { document_number: { maxlength: 100 }, revision_reason: { maxlength: 1000 }, notes: { maxlength: 2000 } }, messages: { revision_reason: { required: 'Alasan revisi wajib diisi.' } } });
         }
     </script>
 @endpush

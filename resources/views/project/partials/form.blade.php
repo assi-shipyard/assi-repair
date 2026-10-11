@@ -27,6 +27,62 @@
 
     <div class="row row-cards">
         <div class="col-12 col-xl-8">
+            @if (! $is_edit)
+                @php
+                    $selected_request = old('docking_request_id', $selected_docking_request ?? '');
+                    $start_mode = $selected_request !== '' ? 'docking' : 'new';
+                @endphp
+                <div class="card mb-3">
+                    <div class="card-header"><h3 class="card-title"><i class="ti ti-route me-2 text-primary"></i>Sumber Proyek</h3></div>
+                    <div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-selectgroup-item flex-fill w-100">
+                                    <input type="radio" name="start_mode" value="new" class="form-selectgroup-input" @checked($start_mode === 'new')>
+                                    <div class="form-selectgroup-label d-flex align-items-center p-3">
+                                        <span class="avatar bg-blue-lt text-blue me-3"><i class="ti ti-ship"></i></span>
+                                        <div><div class="fw-semibold">Proyek baru</div><div class="small text-secondary">Pilih dari kapal terdaftar</div></div>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-selectgroup-item flex-fill w-100">
+                                    <input type="radio" name="start_mode" value="docking" class="form-selectgroup-input" @checked($start_mode === 'docking')>
+                                    <div class="form-selectgroup-label d-flex align-items-center p-3">
+                                        <span class="avatar bg-green-lt text-green me-3"><i class="ti ti-anchor"></i></span>
+                                        <div>
+                                            <div class="fw-semibold">Dari permohonan docking</div>
+                                            <div class="small text-secondary">{{ count($approved_docking_requests ?? []) }} permohonan disetujui menunggu proyek</div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="docking_source" class="{{ $start_mode === 'docking' ? '' : 'd-none' }}">
+                            <label class="form-label required" for="docking_request_id">Permohonan Docking Disetujui</label>
+                            <select class="form-select" id="docking_request_id" name="docking_request_id">
+                                <option value="">Pilih permohonan docking</option>
+                                @foreach ($approved_docking_requests ?? [] as $approved_request)
+                                    <option value="{{ $approved_request->unique_id }}"
+                                        data-ship="{{ $approved_request->ship_id }}"
+                                        data-start="{{ $approved_request->requested_start_at?->format('Y-m-d') }}"
+                                        data-end="{{ $approved_request->requested_end_at?->format('Y-m-d') }}"
+                                        @selected($selected_request === $approved_request->unique_id)>
+                                        {{ $approved_request->ship?->name }} &middot; {{ $approved_request->requested_docking_space?->name ?? '-' }} &middot; {{ $approved_request->requested_start_at?->tanggal_indonesia() }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @if (empty($approved_docking_requests) || count($approved_docking_requests) === 0)
+                                <div class="text-secondary small mt-1">Belum ada permohonan docking yang disetujui dan belum terhubung ke proyek.</div>
+                            @else
+                                <div class="form-hint mt-1">Kapal dan jadwal estimasi terisi otomatis. Dokumen permohonan dipindahkan ke proyek dan jadwal dock dihubungkan.</div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="card mb-3">
                 <div class="card-header"><h3 class="card-title"><i class="ti ti-ship me-2 text-primary"></i>Data Proyek</h3></div>
                 <div class="card-body">
@@ -51,6 +107,18 @@
                                     <option value="{{ $option }}" @selected($val('project_type') === $option)>{{ $option }}</option>
                                 @endforeach
                             </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="price_book_uuid">Buku Kamus Harga</label>
+                            <select class="form-select dropdown-list" id="price_book_uuid" name="price_book_uuid">
+                                <option value="">Belum dipilih</option>
+                                @foreach ($price_books as $price_book)
+                                    <option value="{{ $price_book->unique_id }}" @selected(old('price_book_uuid', $is_edit ? $project->price_book?->unique_id : null) === $price_book->unique_id)>
+                                        {{ $price_book->code }} - {{ $price_book->name }}{{ $price_book->reference_slot ? ' (Buku Utama)' : ($price_book->company ? ' - '.$price_book->company->name : '') }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-hint">Pilih buku untuk proyek ini, tanpa dibatasi pelanggan kapal. Tidak dipilih otomatis. Perubahan pilihan tidak mengubah harga yang sudah tersimpan pada BoQ.</div>
                         </div>
                         <div class="col-12">
                             <label class="form-label" for="comment">Catatan</label>
@@ -228,7 +296,9 @@
                 ignore: [],
                 rules: {
                     ship_id: { required: true },
+                    price_book_uuid: { maxlength: 36 },
                     project_type: { required: true },
+                    docking_request_id: { required: function () { return $('input[name=start_mode]:checked').val() === 'docking'; } },
                     'division_ids[]': { required: true },
                     end_date_estimation: { on_or_after: '#start_date_estimation' },
                     end_date_actual: { on_or_after: '#start_date_actual' },
@@ -236,7 +306,9 @@
                 },
                 messages: {
                     ship_id: { required: 'Pilih kapal.' },
+                    price_book_uuid: { maxlength: 'Buku Kamus Harga tidak valid.' },
                     project_type: { required: 'Pilih tipe proyek.' },
+                    docking_request_id: { required: 'Pilih permohonan docking yang disetujui.' },
                     'division_ids[]': { required: 'Pilih divisi pelaksana.' },
                     end_date_estimation: { on_or_after: 'Tanggal selesai harus sama atau setelah tanggal mulai.' },
                     end_date_actual: { on_or_after: 'Tanggal selesai harus sama atau setelah tanggal mulai.' },
@@ -316,9 +388,39 @@
                 });
             };
 
+            // Disabled selects are not submitted, so a hidden mirror keeps ship_id in the request while locked.
+            const set_start_mode = function (mode, from_user) {
+                const is_docking = mode === 'docking';
+                $('#docking_source').toggleClass('d-none', !is_docking);
+                if (!is_docking) {
+                    $('#docking_request_id').val('');
+                    $('#ship_id_mirror').remove();
+                    $('#ship_id').prop('disabled', false);
+                    return;
+                }
+                if (from_user) { $('#docking_request_id').val(''); }
+                apply_docking_request();
+            };
+
+            const apply_docking_request = function () {
+                const $opt = $('#docking_request_id option:selected');
+                $('#ship_id_mirror').remove();
+                if (!$opt.val()) { $('#ship_id').prop('disabled', false); return; }
+                $('#ship_id').val(String($opt.data('ship'))).trigger('change.select2').prop('disabled', true);
+                $('<input type="hidden" id="ship_id_mirror" name="ship_id">').val($opt.data('ship')).insertAfter('#ship_id');
+                if ($opt.data('start')) { $('#start_date_estimation').val($opt.data('start')); }
+                if ($opt.data('end')) { $('#end_date_estimation').val($opt.data('end')); }
+                refresh_ship_preview();
+                refresh_code_preview();
+            };
+
+            $('input[name="start_mode"]').on('change', function () { set_start_mode(this.value, true); });
+            $('#docking_request_id').on('change', apply_docking_request);
+
             $('#ship_id').on('change', refresh_ship_preview);
             $('#ship_id, #project_type, #start_date_estimation').on('change', refresh_code_preview);
             refresh_ship_preview();
+            if ($('#docking_request_id').length && $('#docking_request_id').val()) { apply_docking_request(); }
 
             $('.dropdown-list, #start_date_estimation, #start_date_actual').on('change', function () {
                 if ($(this).closest('form').data('validator')) { $(this).valid(); }

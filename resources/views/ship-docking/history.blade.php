@@ -36,15 +36,15 @@
                             <td>{{ $history->project?->project_code ?? '-' }}</td>
                             <td>{{ $history->ship?->name ?? '-' }}</td>
                             <td>{{ $history->docking_space?->name ?? '-' }}</td>
-                            <td>{{ optional($history->docked_at)->format('d/m/Y H:i') ?? '-' }}</td>
-                            <td>{{ optional($history->undocked_at)->format('d/m/Y H:i') ?? '-' }}</td>
+                            <td>{{ optional($history->docked_at)->tanggal_waktu_indonesia() ?? '-' }}</td>
+                            <td>{{ optional($history->undocked_at)->tanggal_waktu_indonesia() ?? '-' }}</td>
                             <td>
                                 @if ($floating)
                                     {{ strtoupper($floating->floating_status) }}
                                     <div class="text-secondary small">
-                                        {{ optional($floating->floating_started_at)->format('d/m/Y H:i') ?? '-' }}
+                                        {{ optional($floating->floating_started_at)->tanggal_waktu_indonesia() ?? '-' }}
                                         s/d
-                                        {{ optional($floating->floating_completed_at)->format('d/m/Y H:i') ?? '-' }}
+                                        {{ optional($floating->floating_completed_at)->tanggal_waktu_indonesia() ?? '-' }}
                                     </div>
                                 @else
                                     -

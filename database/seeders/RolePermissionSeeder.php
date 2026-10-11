@@ -73,6 +73,32 @@ class RolePermissionSeeder extends Seeder
         );
         $admin->syncPermissions($permissions);
 
+        $position_roles = [
+            'ceo' => 'CEO (Direktur Utama)',
+            'chrga' => 'CHRGA (Direktur SDM dan Umum)',
+            'cpo' => 'CPO (Direktur Produksi)',
+            'cfo' => 'CFO (Direktur Keuangan)',
+            'engineering' => 'Engineering (Biro Litbang)',
+            'legal' => 'Legal',
+            'marketing' => 'Marketing',
+            'marketing-manager' => 'Marketing Manager (Manajer Marketing)',
+            'repair-manager' => 'Repair Manager (Manajer Reparasi dan Rekayasa Umum)',
+            'repair-ppc' => 'Repair PPC (Staf PPC RRU)',
+            'repair-project-leader' => 'Repair Project Leader (PIMPRO Reparasi/Pimpinan Proyek)',
+            'newbuilding-manager' => 'Newbuilding Manager (Manajer Bangunan Baru)',
+            'newbuilding-ppc' => 'Newbuilding PPC (Staf PPC BB)',
+            'newbuilding-project-leader' => 'Newbuilding Project Leader (PIMPRO Bangunan Baru)',
+            'staf-it' => 'Staf IT',
+        ];
+
+        foreach ($position_roles as $name => $label) {
+            $role = Role::updateOrCreate(
+                ['name' => $name, 'guard_name' => 'web'],
+                ['role_name' => $label]
+            );
+            $role->syncPermissions($name === 'staf-it' ? $permissions : []);
+        }
+
         // Role: director (limited permissions, only view and export)
         $directorPermissions = [
             'view-dashboard', 'view-settings', 'view-profile', 'edit-profile',
@@ -93,24 +119,6 @@ class RolePermissionSeeder extends Seeder
             ['role_name' => 'Director']
         );
         $director->syncPermissions($directorPermissions);
-
-        // Role: marketing-manager (limited permissions, only view and export)
-        $marketingManagerPermissions = [
-            'view-dashboard', 'view-settings', 'view-profile', 'edit-profile',
-            'view-company', 'view-company-data', 'export-company-data',
-            'view-ship', 'view-ship-data', 'export-ship-data',
-            'view-docking-space', 'view-docking-space-data', 'export-docking-space-data',
-            'view-ship-docking', 'view-ship-docking-data', 'export-ship-docking-data',
-            'view-project', 'view-project-data', 'export-project-data',
-            'view-project-quotation',
-            'view-project-satisfaction-note',
-            'view-project-realization',
-        ];
-        $marketingManager = Role::updateOrCreate(
-            ['name' => 'marketing-manager', 'guard_name' => 'web'],
-            ['role_name' => 'Marketing Manager']
-        );
-        $marketingManager->syncPermissions($marketingManagerPermissions);
 
         // Role: marketing-staff (limited permission, but can edit company data, ship data, ship docking, and project)
         $marketingStaffPermissions = [

@@ -7,6 +7,7 @@ use App\Models\ProjectDocumentJob;
 use App\Models\ProjectDocumentJobMaterial;
 use App\Models\ProjectDocumentJobPhoto;
 use App\Models\ProjectJobDocument;
+use Illuminate\Support\Facades\DB;
 
 class ProjectJobDocumentService
 {
@@ -57,6 +58,62 @@ class ProjectJobDocumentService
         $attributes['actor_id'] = $actorId;
 
         return ProjectJobDocument::cloneWithChildren($source, $attributes);
+    }
+
+    public function createRevision(ProjectJobDocument $source, string $reason, ?string $notes, ?int $actor_id = null): ProjectJobDocument
+    {
+        $revision = $this->copyDocument($source, [
+            'status' => 'draft',
+            'revision_reason' => $reason,
+            'notes' => $notes ?? $source->notes,
+        ], $actor_id);
+
+        $this->recordHistory($revision, 'revision_created', [
+            'from_revision_no' => $source->revision_no,
+            'reason' => $reason,
+        ], $actor_id);
+
+        return $revision;
+    }
+
+    public function submit(ProjectJobDocument $document, ?int $actor_id = null): void
+    {
+        $document->update(['status' => 'submitted', 'submitted_at' => now(), 'submitted_by_user_id' => $actor_id]);
+
+        $this->recordHistory($document, 'submitted', ['revision_no' => $document->revision_no], $actor_id);
+    }
+
+    public function return_to_draft(ProjectJobDocument $document, ?int $actor_id = null): void
+    {
+        $document->update(['status' => 'draft', 'submitted_at' => null, 'submitted_by_user_id' => null]);
+
+        $this->recordHistory($document, 'returned_to_draft', ['revision_no' => $document->revision_no], $actor_id);
+    }
+
+    // Approving a revision supersedes every earlier approved or submitted revision of the same type.
+    public function approve(ProjectJobDocument $document, ?int $employee_id, ?int $actor_id = null): void
+    {
+        DB::transaction(function () use ($document, $employee_id, $actor_id): void {
+            $superseded = ProjectJobDocument::query()
+                ->where('project_id', $document->project_id)
+                ->where('document_type', $document->document_type)
+                ->where('revision_no', '<', $document->revision_no)
+                ->whereIn('status', ['approved', 'locked', 'submitted'])
+                ->get();
+
+            foreach ($superseded as $old) {
+                $old->update(['status' => 'superseded', 'superseded_at' => now()]);
+                $this->recordHistory($old, 'superseded', ['by_revision_no' => $document->revision_no], $actor_id);
+            }
+
+            $document->update([
+                'status' => 'approved',
+                'approved_at' => now(),
+                'approved_by_employee_id' => $employee_id,
+            ]);
+
+            $this->recordHistory($document, 'approved', ['revision_no' => $document->revision_no], $actor_id);
+        });
     }
 
     public function createJob(ProjectJobDocument $document, array $data, ?int $actorId = null): ProjectDocumentJob

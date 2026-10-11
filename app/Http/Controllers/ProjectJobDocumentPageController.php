@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectDocumentJob;
 use App\Models\ProjectDocumentJobMaterial;
 use App\Models\ProjectDocumentJobPhoto;
 use App\Models\ProjectJobDocument;
+use App\Services\ProjectDocumentComparisonService;
 use App\Services\ProjectJobDocumentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +20,7 @@ use Illuminate\View\View;
 class ProjectJobDocumentPageController extends Controller
 {
     // Forward declare the service in the constructor
-    public function __construct(private ProjectJobDocumentService $service) {}
+    public function __construct(private ProjectJobDocumentService $service, private ProjectDocumentComparisonService $comparison) {}
 
     public function index(string $projectId): View|RedirectResponse
     {
@@ -67,17 +69,38 @@ class ProjectJobDocumentPageController extends Controller
 
         // If the document is not found, redirect to the workflow page with an error message
         if (! $document) {
-            return redirect()->route('project.job-document.workflow', $project->unique_id)
+            return redirect()->route('project.job-document.workflow.index', $project->unique_id)
                 ->with('error', 'Dokumen pekerjaan tidak ditemukan.');
         }
 
         // Load the related jobs, materials, photos, and histories for the document
-        $document->load(['jobs.materials', 'jobs.photos', 'histories']);
+        $document->load(['jobs.materials', 'jobs.photos', 'prepared_by', 'approved_by']);
+
+        $revisions = ProjectJobDocument::query()
+            ->withCount('jobs')
+            ->where('project_id', $project->id)
+            ->where('document_type', $document->document_type)
+            ->orderByDesc('revision_no')
+            ->get();
+
+        $previous = $revisions->where('revision_no', '<', $document->revision_no)->first();
+        $comparison = $previous ? $this->comparison->compare($previous->load('jobs.materials'), $document) : null;
+
+        $histories = $document->histories()->latest('id')->limit(100)->get();
+        $actor_names = $this->actor_names($histories->pluck('actor_id'));
 
         return view($this->documentView($document), [
             'project' => $project,
             'document' => $document,
             'documentTypeLabels' => $this->documentTypeLabels(),
+            'revisions' => $revisions,
+            'previous' => $previous,
+            'comparison' => $comparison,
+            'totals' => $this->comparison->document_totals($document),
+            'histories' => $histories,
+            'actor_names' => $actor_names,
+            'can_approve' => $this->can_approve_document($document),
+            'is_latest' => $revisions->first()?->id === $document->id,
         ]);
     }
 
@@ -268,7 +291,7 @@ class ProjectJobDocumentPageController extends Controller
 
         $document = $this->find_document_by_public_id($project->id, $documentId);
         if (! $document) {
-            return redirect()->route('project.job-document.workflow', $project->unique_id)->with('error', 'Dokumen pekerjaan tidak ditemukan.');
+            return redirect()->route('project.job-document.workflow.index', $project->unique_id)->with('error', 'Dokumen pekerjaan tidak ditemukan.');
         }
 
         $job = $this->findJob($document->id, $jobId, ['photos']);
@@ -363,11 +386,14 @@ class ProjectJobDocumentPageController extends Controller
         $validator = Validator::make($request->all(), [
             'document_type' => 'required|in:'.implode(',', array_keys($this->documentTypeLabels())),
             'document_number' => 'nullable|string|max:100',
-            'source_document_id' => 'nullable|integer',
-            'notes' => 'nullable|string',
+            'source_document_id' => 'nullable|uuid',
+            'revision_reason' => 'required_with:source_document_id|nullable|string|max:1000',
+            'notes' => 'nullable|string|max:2000',
         ], [
             'document_type.required' => 'Tipe dokumen wajib dipilih.',
             'document_type.in' => 'Tipe dokumen tidak valid.',
+            'revision_reason.required_with' => 'Alasan revisi wajib diisi agar perubahan dapat ditelusuri.',
+            'revision_reason.max' => 'Alasan revisi maksimal 1000 karakter.',
         ]);
 
         if ($validator->fails()) {
@@ -381,48 +407,167 @@ class ProjectJobDocumentPageController extends Controller
             ->get()
             ->groupBy('document_type');
 
-        $sop = $this->buildSopState($documentsByType);
-
-        if (! $this->canCreateDocumentType($data['document_type'], $sop)) {
+        if (! $this->canCreateDocumentType($data['document_type'], $this->buildSopState($documentsByType))) {
             return back()->with('error', 'Tahap SOP belum terpenuhi untuk membuat dokumen ini.')->withInput();
         }
 
-        if (! empty($data['source_document_id'])) {
-            $source = ProjectJobDocument::query()
-                ->where('id', (int) $data['source_document_id'])
-                ->where('project_id', $project->id)
-                ->first();
+        $existing = $documentsByType->get($data['document_type'], collect())->sortByDesc('revision_no');
 
-            if (! $source) {
-                return back()->with('error', 'Dokumen sumber tidak ditemukan.')->withInput();
+        if (empty($data['source_document_id'])) {
+            if ($existing->isNotEmpty()) {
+                return back()->with('error', 'Dokumen untuk tahap ini sudah ada. Buat revisi dari versi terakhir.')->withInput();
             }
 
-            $attributes = [
+            $this->service->createDocument($project, [
                 'document_type' => $data['document_type'],
                 'document_number' => $data['document_number'] ?? null,
                 'status' => 'draft',
                 'notes' => $data['notes'] ?? null,
-            ];
+                'prepared_by_employee_id' => $this->current_employee_id(),
+            ], auth()->id());
 
-            $this->service->copyDocument($source, $attributes, auth()->id());
-
-            return redirect()
-                ->route('project.job-document.workflow', $project->unique_id)
-                ->with('success', 'Dokumen berhasil disalin dari dokumen sumber.');
+            return redirect()->route('project.job-document.workflow.index', $project->unique_id)
+                ->with('success', 'Dokumen pekerjaan berhasil dibuat.');
         }
 
-        $payload = [
-            'document_type' => $data['document_type'],
-            'document_number' => $data['document_number'] ?? null,
-            'status' => 'draft',
-            'notes' => $data['notes'] ?? null,
-        ];
+        $source = $existing->firstWhere('unique_id', $data['source_document_id']);
+        $latest = $existing->first();
 
-        $this->service->createDocument($project, $payload, auth()->id());
+        if (! $source || $source->document_type !== $data['document_type']) {
+            return back()->with('error', 'Dokumen sumber tidak ditemukan.')->withInput();
+        }
 
-        return redirect()
-            ->route('project.job-document.workflow', $project->unique_id)
-            ->with('success', 'Dokumen pekerjaan berhasil dibuat.');
+        if ($latest->id !== $source->id) {
+            return back()->with('error', 'Revisi hanya dapat dibuat dari versi terakhir.')->withInput();
+        }
+
+        if ($source->is_editable()) {
+            return back()->with('error', 'Revisi terakhir masih berstatus Draft. Selesaikan atau ajukan terlebih dahulu.')->withInput();
+        }
+
+        $revision = $this->service->createRevision($source, $data['revision_reason'], $data['notes'] ?? null, auth()->id());
+        $revision->update([
+            'document_number' => $data['document_number'] ?? $source->document_number,
+            'prepared_by_employee_id' => $this->current_employee_id(),
+        ]);
+
+        return redirect()->route('project.job-document.workflow.show', [$project->unique_id, $revision->unique_id])
+            ->with('success', 'Revisi '.$revision->revision_no.' berhasil dibuat dari revisi '.$source->revision_no.'.');
+    }
+
+    public function submit(string $projectId, string $documentId): RedirectResponse
+    {
+        $document = $this->findDocumentForMutation($projectId, $documentId);
+        if ($document instanceof RedirectResponse) {
+            return $document;
+        }
+
+        $document->loadCount('jobs');
+        $route = ['project.job-document.workflow.show', [$projectId, $document->unique_id]];
+
+        if ($document->jobs_count === 0) {
+            return redirect()->route(...$route)->with('error', 'Dokumen belum memiliki pekerjaan.');
+        }
+
+        $this->service->submit($document, auth()->id());
+
+        return redirect()->route(...$route)->with('success', 'Revisi diajukan untuk negosiasi dan dikunci dari perubahan.');
+    }
+
+    public function return_to_draft(string $projectId, string $documentId): RedirectResponse
+    {
+        $project = $this->findProject($projectId);
+        $document = $project ? $this->find_document_by_public_id($project->id, $documentId) : null;
+
+        if (! $document) {
+            return redirect()->route('project.index')->with('error', 'Dokumen pekerjaan tidak ditemukan.');
+        }
+
+        $latest_no = ProjectJobDocument::query()->where('project_id', $project->id)->where('document_type', $document->document_type)->max('revision_no');
+
+        if ($document->status !== 'submitted' || (int) $latest_no !== $document->revision_no) {
+            return back()->with('error', 'Hanya revisi terakhir yang berstatus Diajukan yang dapat dikembalikan ke Draft.');
+        }
+
+        $this->service->return_to_draft($document, auth()->id());
+
+        return back()->with('success', 'Revisi dikembalikan ke Draft.');
+    }
+
+    public function approve(string $projectId, string $documentId): RedirectResponse
+    {
+        $project = $this->findProject($projectId);
+        $document = $project ? $this->find_document_by_public_id($project->id, $documentId) : null;
+
+        if (! $document) {
+            return redirect()->route('project.index')->with('error', 'Dokumen pekerjaan tidak ditemukan.');
+        }
+
+        if (! $this->can_approve_document($document)) {
+            abort(403);
+        }
+
+        $latest_no = ProjectJobDocument::query()->where('project_id', $project->id)->where('document_type', $document->document_type)->max('revision_no');
+
+        if ($document->status !== 'submitted' || (int) $latest_no !== $document->revision_no) {
+            return back()->with('error', 'Hanya revisi terakhir berstatus Diajukan yang dapat disetujui.');
+        }
+
+        $this->service->approve($document, $this->current_employee_id(), auth()->id());
+
+        return back()->with('success', 'Revisi disetujui. Revisi sebelumnya ditandai sebagai Digantikan.');
+    }
+
+    public function compare(Request $request, string $projectId, string $documentId): View|RedirectResponse
+    {
+        $project = $this->findProject($projectId);
+        $document = $project ? $this->find_document_by_public_id($project->id, $documentId) : null;
+
+        if (! $document) {
+            return redirect()->route('project.index')->with('error', 'Dokumen pekerjaan tidak ditemukan.');
+        }
+
+        $with = $request->query('with');
+        $base = null;
+
+        if (is_string($with) && preg_match('/^[0-9a-fA-F-]{36}$/', $with) === 1) {
+            $base = ProjectJobDocument::query()
+                ->where('project_id', $project->id)
+                ->where('document_type', $document->document_type)
+                ->where('unique_id', $with)
+                ->first();
+        }
+
+        $base ??= ProjectJobDocument::query()
+            ->where('project_id', $project->id)
+            ->where('document_type', $document->document_type)
+            ->where('revision_no', '<', $document->revision_no)
+            ->orderByDesc('revision_no')
+            ->first();
+
+        if (! $base || $base->id === $document->id) {
+            return redirect()->route('project.job-document.workflow.show', [$project->unique_id, $document->unique_id])
+                ->with('error', 'Tidak ada revisi pembanding untuk dokumen ini.');
+        }
+
+        // Always compare older (base) against newer (target) so the delta reads chronologically.
+        [$base, $target] = $base->revision_no < $document->revision_no ? [$base, $document] : [$document, $base];
+
+        $revisions = ProjectJobDocument::query()
+            ->where('project_id', $project->id)
+            ->where('document_type', $document->document_type)
+            ->orderByDesc('revision_no')
+            ->get();
+
+        return view('project.job-document.compare', [
+            'project' => $project,
+            'document' => $document,
+            'base' => $base,
+            'target' => $target,
+            'revisions' => $revisions,
+            'comparison' => $this->comparison->compare($base, $target),
+            'documentTypeLabels' => $this->documentTypeLabels(),
+        ]);
     }
 
     public function finalizeSatisfactionNotes(string $projectId, string $documentId): RedirectResponse
@@ -436,14 +581,14 @@ class ProjectJobDocumentPageController extends Controller
         $document = $this->find_document_by_public_id($project->id, $documentId);
 
         if (! $document || $document->document_type !== ProjectJobDocument::TYPE_SATISFACTION_NOTES) {
-            return redirect()->route('project.job-document.workflow', $project->unique_id)
+            return redirect()->route('project.job-document.workflow.index', $project->unique_id)
                 ->with('error', 'Dokumen Satisfaction Notes tidak ditemukan.');
         }
 
         $document->load('jobs');
 
         if ($document->jobs->isEmpty()) {
-            return redirect()->route('project.job-document.workflow', $project->unique_id)
+            return redirect()->route('project.job-document.workflow.index', $project->unique_id)
                 ->with('error', 'Satisfaction Notes belum memiliki pekerjaan.');
         }
 
@@ -455,7 +600,7 @@ class ProjectJobDocumentPageController extends Controller
         });
 
         if (! $allCompleted) {
-            return redirect()->route('project.job-document.workflow', $project->unique_id)
+            return redirect()->route('project.job-document.workflow.index', $project->unique_id)
                 ->with('error', 'Satisfaction Notes hanya bisa difinalisasi ketika semua pekerjaan sudah 100% atau Completed.');
         }
 
@@ -465,8 +610,31 @@ class ProjectJobDocumentPageController extends Controller
             'locked_at' => now(),
         ], auth()->id());
 
-        return redirect()->route('project.job-document.workflow', $project->unique_id)
+        return redirect()->route('project.job-document.workflow.index', $project->unique_id)
             ->with('success', 'Satisfaction Notes berhasil difinalisasi.');
+    }
+
+    private function current_employee_id(): ?int
+    {
+        return Employee::query()->where('user_id', auth()->id())->value('id');
+    }
+
+    private function actor_names(Collection $user_ids): Collection
+    {
+        return Employee::query()->whereIn('user_id', $user_ids->filter()->unique())->pluck('name', 'user_id');
+    }
+
+    private function can_approve_document(ProjectJobDocument $document): bool
+    {
+        $user = auth()->user();
+        $permission = match ($document->document_type) {
+            ProjectJobDocument::TYPE_INITIAL_BOQ => 'edit-project-quotation',
+            ProjectJobDocument::TYPE_FINAL_BOQ => 'edit-project-realization',
+            ProjectJobDocument::TYPE_SATISFACTION_NOTES => 'edit-project-satisfaction-note',
+            default => 'edit-project',
+        };
+
+        return $user !== null && ($user->hasRole('admin') || $user->can($permission));
     }
 
     private function findProject(string $projectId): ?Project
@@ -485,11 +653,11 @@ class ProjectJobDocumentPageController extends Controller
 
         $document = $this->find_document_by_public_id($project->id, $documentId);
         if (! $document) {
-            return redirect()->route('project.job-document.workflow', $project->unique_id)->with('error', 'Dokumen pekerjaan tidak ditemukan.');
+            return redirect()->route('project.job-document.workflow.index', $project->unique_id)->with('error', 'Dokumen pekerjaan tidak ditemukan.');
         }
 
-        if (in_array($document->status, ['approved', 'locked'], true)) {
-            return redirect()->route('project.job-document.workflow.show', [$project->unique_id, $document->unique_id ?? $document->id])->with('error', 'Dokumen sudah final dan tidak dapat diubah.');
+        if (! $document->is_editable()) {
+            return redirect()->route('project.job-document.workflow.show', [$project->unique_id, $document->unique_id])->with('error', 'Hanya revisi berstatus Draft yang dapat diubah. Buat revisi baru untuk melakukan perubahan.');
         }
 
         return $document;
