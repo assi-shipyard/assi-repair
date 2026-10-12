@@ -6,8 +6,6 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Tests\TestCase;
 
 class NormalizeExecutiveDirectoratesTest extends TestCase
@@ -16,13 +14,6 @@ class NormalizeExecutiveDirectoratesTest extends TestCase
 
     public function test_legacy_cpo_and_nested_directorate_are_merged_without_losing_positions_or_divisions(): void
     {
-        Schema::table('organizational_units', function (Blueprint $table): void {
-            $table->enum('type', ['ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop'])->change();
-        });
-        Schema::table('positions', function (Blueprint $table): void {
-            $table->enum('category', ['director', 'manager', 'assistant_manager', 'supervisor_staff', 'pelaksana'])->default('supervisor_staff')->change();
-        });
-
         $timestamp = now();
         $executive_directorate_id = DB::table('organizational_units')->insertGetId([
             'name' => 'CEO',

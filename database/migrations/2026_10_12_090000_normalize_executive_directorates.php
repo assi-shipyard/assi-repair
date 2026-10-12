@@ -1,9 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -177,50 +175,5 @@ return new class extends Migration
             return;
         }
 
-        if (DB::getDriverName() === 'sqlite') {
-            $this->widen_sqlite_enum('organizational_units', 'type', $unit_types);
-            $this->widen_sqlite_enum('positions', 'category', $position_categories, 'supervisor_staff');
-        }
-    }
-
-    /**
-     * @param list<string> $values
-     */
-    private function widen_sqlite_enum(string $table_name, string $column_name, array $values, ?string $default = null): void
-    {
-        $create_statement = (string) DB::table('sqlite_master')
-            ->where('type', 'table')
-            ->where('name', $table_name)
-            ->value('sql');
-
-        if (collect($values)->every(fn (string $value): bool => str_contains($create_statement, "'{$value}'"))) {
-            return;
-        }
-
-        $rows = DB::table($table_name)
-            ->get()
-            ->map(static fn (object $row): array => (array) $row)
-            ->all();
-        $parent_ids = $table_name === 'organizational_units'
-            ? DB::table($table_name)->pluck('parent_id', 'id')->all()
-            : [];
-
-        Schema::table($table_name, function (Blueprint $table) use ($column_name, $values, $default): void {
-            $column = $table->enum($column_name, $values);
-
-            if ($default !== null) {
-                $column->default($default);
-            }
-
-            $column->change();
-        });
-
-        foreach ($rows as $row) {
-            DB::table($table_name)->insertOrIgnore($row);
-        }
-
-        foreach ($parent_ids as $id => $parent_id) {
-            DB::table($table_name)->where('id', $id)->update(['parent_id' => $parent_id]);
-        }
     }
 };

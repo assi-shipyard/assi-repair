@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -16,7 +17,11 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('code')->nullable()->unique();
-            $table->enum('type', ['directorate', 'division', 'subdivision', 'workshop']);
+            if (DB::connection()->getDriverName() === 'sqlite') {
+                $table->string('type');
+            } else {
+                $table->enum('type', ['directorate', 'division', 'subdivision', 'workshop']);
+            }
             $table->foreignId('parent_id')->nullable()->constrained('organizational_units')->nullOnDelete();
             $table->timestamps();
 
@@ -28,7 +33,11 @@ return new class extends Migration
             $table->id();
             $table->string('name')->unique();
             $table->unsignedTinyInteger('level')->default(1);
-            $table->enum('category', ['director', 'manager', 'assistant_manager', 'supervisor_staff', 'pelaksana'])->default('supervisor_staff');
+            if (DB::connection()->getDriverName() === 'sqlite') {
+                $table->string('category')->default('supervisor_staff');
+            } else {
+                $table->enum('category', ['director', 'manager', 'assistant_manager', 'supervisor_staff', 'pelaksana'])->default('supervisor_staff');
+            }
             $table->boolean('is_head_position')->default(false);
             $table->string('code')->nullable()->unique();
             $table->foreignId('organizational_unit_id')->constrained('organizational_units')->cascadeOnDelete();
