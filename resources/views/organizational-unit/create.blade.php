@@ -10,10 +10,10 @@
 @section('content')
     @include('partials.flash')
 
-    <div class="card unit-form-summary mb-4"><div class="card-body p-4 d-flex align-items-center gap-3"><span class="avatar avatar-lg bg-primary-lt text-primary"><i class="ti ti-building-community fs-2"></i></span><div><div class="text-secondary small">Struktur Organisasi</div><h2 class="mb-1">Tambah Unit Organisasi</h2><div class="text-secondary">Bangun struktur C-Suite, direktorat, divisi, biro, subdivisi, dan bengkel.</div></div></div></div>
+    <div class="card unit-form-summary mb-4"><div class="card-body p-4 d-flex align-items-center gap-3"><span class="avatar avatar-lg bg-primary-lt text-primary"><i class="ti ti-building-community fs-2"></i></span><div><div class="text-secondary small">Struktur Organisasi</div><h2 class="mb-1">Tambah Unit Organisasi</h2><div class="text-secondary">Direktorat Direksi menaungi direktorat fungsional, divisi, biro, subdivisi, dan bengkel.</div></div></div></div>
     <form id="organizational-unit-form" action="{{ route('organizational-unit.store') }}" method="POST" class="card">
         @csrf
-        <div class="card-header"><div><h3 class="card-title mb-1">Identitas dan Hierarki Unit</h3><div class="text-secondary small">Divisi dan biro sejajar di bawah direktorat; subdivisi berada di bawah divisi, sedangkan bengkel mandiri di bawah CPO.</div></div></div>
+        <div class="card-header"><div><h3 class="card-title mb-1">Identitas dan Hierarki Unit</h3><div class="text-secondary small">Divisi dan biro sejajar di bawah direktorat; subdivisi di bawah divisi; bengkel dapat berada di bawah Divisi atau Direktorat Produksi.</div></div></div>
         <div class="card-body">
             <div class="row g-3">
                         <div class="col-md-6"><label class="form-label required" for="name">Nama Unit</label><input id="name" class="form-control" name="name" value="{{ old('name') }}" maxlength="255" placeholder="Contoh: Divisi Reparasi" required></div>
@@ -38,7 +38,7 @@
                         </div>
             </div>
         </div>
-        <div class="card-footer d-flex justify-content-between"><span class="text-secondary small">CEO tidak memiliki induk; jenis unit menentukan induk yang dapat dipilih.</span><button class="btn btn-primary" type="submit"><i class="ti ti-device-floppy me-1"></i>Simpan Unit</button></div>
+        <div class="card-footer d-flex justify-content-between"><span class="text-secondary small">Direktorat Direksi tidak memiliki induk; direktorat fungsional berada di bawahnya.</span><button class="btn btn-primary" type="submit"><i class="ti ti-device-floppy me-1"></i>Simpan Unit</button></div>
     </form>
 @endsection
 

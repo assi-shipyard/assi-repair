@@ -12,15 +12,13 @@ class OrganizationalStructureTest extends TestCase
 {
     public function test_organizational_units_follow_the_defined_parent_hierarchy(): void
     {
-        self::assertSame([], OrganizationalUnit::ALLOWED_PARENT_TYPES['ceo']);
-        self::assertSame(['ceo'], OrganizationalUnit::ALLOWED_PARENT_TYPES['chrgao']);
-        self::assertSame(['ceo'], OrganizationalUnit::ALLOWED_PARENT_TYPES['cfo']);
-        self::assertSame(['ceo'], OrganizationalUnit::ALLOWED_PARENT_TYPES['cpo']);
-        self::assertSame(['chrgao', 'cfo', 'cpo'], OrganizationalUnit::ALLOWED_PARENT_TYPES['directorate']);
-        self::assertSame(['directorate'], OrganizationalUnit::ALLOWED_PARENT_TYPES['division']);
-        self::assertSame(['directorate'], OrganizationalUnit::ALLOWED_PARENT_TYPES['bureau']);
+        self::assertSame([], OrganizationalUnit::ALLOWED_PARENT_TYPES['executive_directorate']);
+        self::assertSame(['executive_directorate'], OrganizationalUnit::ALLOWED_PARENT_TYPES['directorate']);
+        self::assertSame(['executive_directorate'], OrganizationalUnit::ALLOWED_PARENT_TYPES['production_directorate']);
+        self::assertSame(['directorate', 'production_directorate'], OrganizationalUnit::ALLOWED_PARENT_TYPES['division']);
+        self::assertSame(['directorate', 'production_directorate'], OrganizationalUnit::ALLOWED_PARENT_TYPES['bureau']);
         self::assertSame(['division'], OrganizationalUnit::ALLOWED_PARENT_TYPES['subdivision']);
-        self::assertSame(['division', 'cpo'], OrganizationalUnit::ALLOWED_PARENT_TYPES['workshop']);
+        self::assertSame(['division', 'production_directorate'], OrganizationalUnit::ALLOWED_PARENT_TYPES['workshop']);
     }
 
     public function test_position_categories_match_reporting_levels(): void

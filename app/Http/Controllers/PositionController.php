@@ -25,7 +25,7 @@ class PositionController extends Controller
 
     public function create(): View
     {
-        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
+        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'executive_directorate', 'directorate', 'production_directorate', 'division', 'bureau', 'subdivision', 'workshop')")
             ->orderBy('name')
             ->get();
         $category_options = Position::category_options();
@@ -57,7 +57,7 @@ class PositionController extends Controller
     {
         $position = $this->find_position($position);
 
-        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
+        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'executive_directorate', 'directorate', 'production_directorate', 'division', 'bureau', 'subdivision', 'workshop')")
             ->orderBy('name')
             ->get();
         $category_options = Position::category_options();

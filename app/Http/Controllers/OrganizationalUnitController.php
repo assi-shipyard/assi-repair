@@ -13,7 +13,7 @@ class OrganizationalUnitController extends Controller
     {
         // Fetch organizational units with their parent, children, and positions, ordered by type and name
         $organizational_units = OrganizationalUnit::with(['parent', 'children', 'positions'])
-            ->orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
+            ->orderByRaw("FIELD(type, 'executive_directorate', 'directorate', 'production_directorate', 'division', 'bureau', 'subdivision', 'workshop')")
             ->orderBy('name')
             ->get();
 
@@ -25,7 +25,7 @@ class OrganizationalUnitController extends Controller
     {
         // Fetch types and existing organizational units for the form
         $types = $this->types();
-        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
+        $organizational_units = OrganizationalUnit::orderByRaw("FIELD(type, 'executive_directorate', 'directorate', 'production_directorate', 'division', 'bureau', 'subdivision', 'workshop')")
             ->orderBy('name')
             ->get();
 
@@ -77,7 +77,7 @@ class OrganizationalUnitController extends Controller
         $organizational_unit = $this->find_organizational_unit($organizational_unit);
         $types = $this->types();
         $organizational_units = OrganizationalUnit::where('id', '!=', $organizational_unit->id)
-            ->orderByRaw("FIELD(type, 'ceo', 'chrgao', 'cfo', 'cpo', 'directorate', 'division', 'bureau', 'subdivision', 'workshop')")
+            ->orderByRaw("FIELD(type, 'executive_directorate', 'directorate', 'production_directorate', 'division', 'bureau', 'subdivision', 'workshop')")
             ->orderBy('name')
             ->get();
 
@@ -177,7 +177,17 @@ class OrganizationalUnitController extends Controller
     {
         if (OrganizationalUnit::ALLOWED_PARENT_TYPES[$type] === []) {
             if ($parent_id !== null && $parent_id !== '') {
-                return 'CEO tidak boleh memiliki unit induk.';
+                return 'Direktorat Direksi tidak boleh memiliki unit induk.';
+            }
+
+            $root_query = OrganizationalUnit::query()->where('type', $type);
+
+            if ($current_id !== null) {
+                $root_query->where('id', '!=', $current_id);
+            }
+
+            if ($root_query->exists()) {
+                return 'Direktorat Direksi hanya boleh ada satu.';
             }
 
             return null;

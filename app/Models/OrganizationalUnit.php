@@ -13,11 +13,9 @@ class OrganizationalUnit extends Model
     use HasPublicUniqueId;
 
     public const TYPE_LABELS = [
-        'ceo' => 'CEO',
-        'chrgao' => 'CHRGAO',
-        'cfo' => 'CFO',
-        'cpo' => 'CPO',
+        'executive_directorate' => 'Direktorat Direksi',
         'directorate' => 'Direktorat',
+        'production_directorate' => 'Direktorat Produksi',
         'division' => 'Divisi',
         'bureau' => 'Biro',
         'subdivision' => 'Subdivisi',
@@ -25,15 +23,13 @@ class OrganizationalUnit extends Model
     ];
 
     public const ALLOWED_PARENT_TYPES = [
-        'ceo' => [],
-        'chrgao' => ['ceo'],
-        'cfo' => ['ceo'],
-        'cpo' => ['ceo'],
-        'directorate' => ['chrgao', 'cfo', 'cpo'],
-        'division' => ['directorate'],
-        'bureau' => ['directorate'],
+        'executive_directorate' => [],
+        'directorate' => ['executive_directorate'],
+        'production_directorate' => ['executive_directorate'],
+        'division' => ['directorate', 'production_directorate'],
+        'bureau' => ['directorate', 'production_directorate'],
         'subdivision' => ['division'],
-        'workshop' => ['division', 'cpo'],
+        'workshop' => ['division', 'production_directorate'],
     ];
 
     protected $fillable = [
