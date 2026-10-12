@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * CompanyController handles all company-related operations, including
@@ -151,6 +152,10 @@ class CompanyController extends Controller
         // If company still has ships associated, prevent deletion
         if ($company->ships()->count() > 0) {
             return redirect()->route('company.index')->with('error', 'Tidak dapat menghapus perusahaan yang masih memiliki kapal terdaftar di sistem. Harap hapus kapal-kapal tersebut terlebih dahulu.');
+        }
+
+        if ($company->customer_accounts()->exists()) {
+            return redirect()->route('company.index')->with('error', 'Perusahaan tidak dapat dihapus karena masih terhubung dengan akun pelanggan.');
         }
 
         // If there's no further issue, delete the company
@@ -306,20 +311,35 @@ class CompanyController extends Controller
         }
 
         // Handle the logo file upload and update the company's logo path
-        $logoFile = $request->file('company_logo');
-        $logoFilename = time().'_'.Str::slug($company->name).'.'.$logoFile->getClientOriginalExtension();
-
-        // Delete old logo file if it exists before saving the new one
-        if ($company->logo_path) {
-            Storage::disk('public')->delete('company_logos/'.$company->logo_path);
-        }
-
-        // Store the new logo file and update the company's logo path in the database
-        $logoFile->storeAs('company_logos', $logoFilename, 'public');
-        $company->logo_path = $logoFilename;
+        $previous_logo_path = $company->logo_path;
+        $company->logo_path = $request->file('company_logo')->store('companies/'.$company->unique_id.'/logo', 'ship');
         $company->save();
 
+        if ($previous_logo_path) {
+            Storage::disk('ship')->delete($previous_logo_path);
+            Storage::disk('public')->delete(str_starts_with($previous_logo_path, 'companies/')
+                ? $previous_logo_path
+                : 'company_logos/'.$previous_logo_path);
+        }
+
         return redirect()->route('company.show', $company->unique_id)->with('success', 'Logo perusahaan berhasil diunggah.');
+    }
+
+    public function logo(string $company): StreamedResponse
+    {
+        $company_model = $this->find_company($company);
+        abort_if(! $company_model || ! $company_model->logo_path, 404);
+
+        if (Storage::disk('ship')->exists($company_model->logo_path)) {
+            return Storage::disk('ship')->response($company_model->logo_path);
+        }
+
+        $legacy_path = str_starts_with($company_model->logo_path, 'companies/')
+            ? $company_model->logo_path
+            : 'company_logos/'.$company_model->logo_path;
+        abort_unless(Storage::disk('public')->exists($legacy_path), 404);
+
+        return Storage::disk('public')->response($legacy_path);
     }
 
     // Add new document for a company
@@ -353,8 +373,7 @@ class CompanyController extends Controller
 
         // Handle the file upload
         $file = $data['document_file'];
-        $filename = time().'_'.$file->getClientOriginalName();
-        $filepath = $file->storeAs('company_documents', $filename, 'public');
+        $filepath = $file->store('companies/'.$company->unique_id.'/documents', 'ship');
 
         // Create a new company document record
         $document = new CompanyDocument;
@@ -365,6 +384,24 @@ class CompanyController extends Controller
         $document->save();
 
         return redirect()->route('company.documents', $company->unique_id)->with('success', 'Dokumen berhasil diunggah.');
+    }
+
+    public function download_document(string $company, string $document): StreamedResponse
+    {
+        $company_model = $this->find_company($company);
+        $document_model = $company_model
+            ? $this->find_company_document($company_model->id, $document)
+            : null;
+
+        abort_if(! $document_model, 404);
+
+        if (Storage::disk('ship')->exists($document_model->document_path)) {
+            return Storage::disk('ship')->download($document_model->document_path);
+        }
+
+        abort_unless(Storage::disk('public')->exists($document_model->document_path), 404);
+
+        return Storage::disk('public')->download($document_model->document_path);
     }
 
     public function show_documents($id): View
@@ -395,6 +432,7 @@ class CompanyController extends Controller
             return redirect()->route('company.show', $company->unique_id)->with('error', 'Dokumen tidak ditemukan.');
         }
 
+        Storage::disk('ship')->delete($document->document_path);
         Storage::disk('public')->delete($document->document_path);
         $document->delete();
 

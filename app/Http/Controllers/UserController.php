@@ -54,16 +54,18 @@ class UserController extends Controller
         $employee->email = $validated['email'] ?? $employee->email;
 
         if ($request->boolean('remove_photo') && $employee->profile_photo_path !== null) {
+            Storage::disk('ship')->delete($employee->profile_photo_path);
             Storage::disk('local')->delete($employee->profile_photo_path);
             $employee->profile_photo_path = null;
         }
 
         if ($request->hasFile('profile_photo')) {
             if ($employee->profile_photo_path !== null) {
+                Storage::disk('ship')->delete($employee->profile_photo_path);
                 Storage::disk('local')->delete($employee->profile_photo_path);
             }
 
-            $employee->profile_photo_path = $request->file('profile_photo')->store('employee-photos', 'local');
+            $employee->profile_photo_path = $request->file('profile_photo')->store('employees/profile-photos', 'ship');
         }
 
         $employee->save();
@@ -102,6 +104,7 @@ class UserController extends Controller
         $employee = $this->current_employee();
 
         if ($employee->profile_photo_path !== null) {
+            Storage::disk('ship')->delete($employee->profile_photo_path);
             Storage::disk('local')->delete($employee->profile_photo_path);
             $employee->profile_photo_path = null;
             $employee->save();
@@ -114,11 +117,15 @@ class UserController extends Controller
     {
         $employee = $this->current_employee();
 
-        if ($employee->profile_photo_path === null || ! Storage::disk('local')->exists($employee->profile_photo_path)) {
+        if ($employee->profile_photo_path === null) {
             abort(404);
         }
 
-        return Storage::disk('local')->response($employee->profile_photo_path);
+        $disk = Storage::disk('ship')->exists($employee->profile_photo_path) ? 'ship' : 'local';
+
+        abort_unless(Storage::disk($disk)->exists($employee->profile_photo_path), 404);
+
+        return Storage::disk($disk)->response($employee->profile_photo_path);
     }
 
     private function current_employee(bool $with_position = false): ?Employee

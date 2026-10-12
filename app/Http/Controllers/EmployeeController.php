@@ -14,6 +14,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Intervention\Image\Laravel\Facades\Image;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -137,6 +139,7 @@ class EmployeeController extends Controller
         $employee = $this->find_employee($employee);
 
         if ($employee->profile_photo_path !== null) {
+            Storage::disk('ship')->delete($employee->profile_photo_path);
             Storage::disk('local')->delete($employee->profile_photo_path);
         }
 
@@ -159,11 +162,13 @@ class EmployeeController extends Controller
             abort(404);
         }
 
-        if (! Storage::disk('local')->exists($employee->profile_photo_path)) {
+        $disk = Storage::disk('ship')->exists($employee->profile_photo_path) ? 'ship' : 'local';
+
+        if (! Storage::disk($disk)->exists($employee->profile_photo_path)) {
             abort(404);
         }
 
-        return Storage::disk('local')->response($employee->profile_photo_path);
+        return Storage::disk($disk)->response($employee->profile_photo_path);
     }
 
     private function rules(?int $employee_id = null, bool $is_update = false): array
@@ -184,6 +189,18 @@ class EmployeeController extends Controller
             'manager_id' => 'nullable|exists:employees,id',
             'profile_photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
             'remove_photo' => 'nullable|boolean',
+        ];
+
+        $existing_employee = $employee_id === null ? null : Employee::query()->find($employee_id);
+        $linked_user_id = $existing_employee?->user_id;
+        if ($linked_user_id === null && $existing_employee !== null) {
+            $linked_user_id = User::query()->where('employee_id', $existing_employee->employee_id)->value('id');
+        }
+        $rules['email'] = [...explode('|', $email_rule), 'max:64', Rule::unique('users', 'email')->ignore($linked_user_id)];
+        $rules['employee_id'] = [
+            ...explode('|', $employee_code_rule),
+            Rule::unique('users', 'employee_id')->where(fn ($query) => $query->where('account_type', '!=', User::TYPE_INTERNAL)),
+            Rule::unique('users', 'username'),
         ];
 
         if ($is_update) {
@@ -212,6 +229,7 @@ class EmployeeController extends Controller
         $messages = [
             'name.required' => 'Nama karyawan wajib diisi.',
             'email.email' => 'Email harus berupa alamat email yang valid.',
+            'email.max' => 'Email maksimal 64 karakter.',
             'email.unique' => 'Email sudah ada.',
             'employee_id.required' => 'Nomor induk karyawan wajib diisi.',
             'employee_id.digits' => 'Nomor induk karyawan harus berupa 9 digit angka.',
@@ -240,7 +258,7 @@ class EmployeeController extends Controller
         DB::transaction(function () use ($employee, $payload, $request): void {
             $linked_user = $employee->user;
 
-            if ($linked_user === null) {
+            if ($linked_user === null && $employee->employee_id !== null) {
                 $linked_user = User::query()->where('employee_id', $employee->employee_id)->first();
             }
 
@@ -252,6 +270,11 @@ class EmployeeController extends Controller
                 $linked_user = new User;
             }
 
+            if ($linked_user->exists && ($linked_user->account_type !== User::TYPE_INTERNAL || $linked_user->hasRole('admin'))) {
+                throw ValidationException::withMessages(['employee_id' => 'Identitas ini digunakan oleh akun non-karyawan.']);
+            }
+
+            $linked_user->account_type = User::TYPE_INTERNAL;
             $linked_user->employee_id = $payload['employee_id'];
             $linked_user->email = $payload['email'] ?? null;
 
@@ -266,12 +289,14 @@ class EmployeeController extends Controller
             $position = Position::query()->findOrFail($payload['position_id']);
 
             if ($request->boolean('remove_photo') && $employee->profile_photo_path !== null) {
+                Storage::disk('ship')->delete($employee->profile_photo_path);
                 Storage::disk('local')->delete($employee->profile_photo_path);
                 $employee->profile_photo_path = null;
             }
 
             if ($request->hasFile('profile_photo')) {
                 if ($employee->profile_photo_path !== null) {
+                    Storage::disk('ship')->delete($employee->profile_photo_path);
                     Storage::disk('local')->delete($employee->profile_photo_path);
                 }
 
@@ -307,12 +332,12 @@ class EmployeeController extends Controller
 
                 if ($encoded_image->size() <= self::PROFILE_PHOTO_MAX_BYTES) {
                     $filename = sprintf(
-                        'employee_photos/%s_%s.jpg',
+                        'employees/profile-photos/%s_%s.jpg',
                         now()->format('YmdHis'),
                         bin2hex(random_bytes(6))
                     );
 
-                    Storage::disk('local')->put($filename, (string) $encoded_image);
+                    Storage::disk('ship')->put($filename, (string) $encoded_image);
 
                     return $filename;
                 }

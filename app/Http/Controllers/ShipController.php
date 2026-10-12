@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\Ship;
 use App\Models\ShipClass;
+use App\Models\ShipImage;
 use App\Models\ShipType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Controller for ship CRUD flow and related ship type/class management.
@@ -80,11 +83,63 @@ class ShipController extends Controller
      */
     public function show($id)
     {
-        $ship = $this->find_ship_by_unique_id($id, ['company', 'type', 'classification']);
+        $ship = $this->find_ship_by_unique_id($id, ['company', 'type', 'classification', 'images']);
         $projects = $ship->projects()->with('leader')->orderByDesc('start_date_estimation')->get();
         $documents = $ship->documents()->latest()->get();
 
         return view('ship.show', compact('ship', 'projects', 'documents'));
+    }
+
+    public function store_photo(Request $request, string $ship): \Illuminate\Http\RedirectResponse
+    {
+        $ship_model = Ship::query()->firstWhere('unique_id', $ship);
+
+        if (! $ship_model) {
+            return redirect()->route('ship.index')->with('error', 'Kapal tidak ditemukan.');
+        }
+
+        $validation = Validator::make($request->all(), [
+            'ship_photo' => 'required|image|mimes:jpg,jpeg,png,webp|max:10240',
+        ], [
+            'ship_photo.required' => 'Foto kapal wajib diunggah.',
+            'ship_photo.image' => 'File harus berupa gambar.',
+            'ship_photo.mimes' => 'Foto kapal harus berformat JPG, JPEG, PNG, atau WEBP.',
+            'ship_photo.max' => 'Ukuran foto kapal maksimal 10 MB.',
+        ]);
+
+        if ($validation->fails()) {
+            return back()->withErrors($validation)->withInput();
+        }
+
+        $image_path = $request->file('ship_photo')->store('ships/'.$ship_model->unique_id.'/photos', 'ship');
+        $ship_model->images()->create(['image_path' => $image_path]);
+
+        return redirect()->route('ship.show', $ship_model->unique_id)->with('success', 'Foto kapal berhasil diunggah.');
+    }
+
+    public function photo(string $ship, string $photo): StreamedResponse
+    {
+        $ship_model = Ship::query()->firstWhere('unique_id', $ship);
+        $image = $ship_model?->images()->firstWhere('unique_id', $photo);
+
+        abort_if(! $image || ! Storage::disk('ship')->exists($image->image_path), 404);
+
+        return Storage::disk('ship')->response($image->image_path);
+    }
+
+    public function destroy_photo(string $ship, string $photo): \Illuminate\Http\RedirectResponse
+    {
+        $ship_model = Ship::query()->firstWhere('unique_id', $ship);
+        $image = $ship_model?->images()->firstWhere('unique_id', $photo);
+
+        if (! $image) {
+            return redirect()->route('ship.show', $ship)->with('error', 'Foto kapal tidak ditemukan.');
+        }
+
+        Storage::disk('ship')->delete($image->image_path);
+        $image->delete();
+
+        return redirect()->route('ship.show', $ship)->with('success', 'Foto kapal berhasil dihapus.');
     }
 
     /**
@@ -129,6 +184,12 @@ class ShipController extends Controller
     public function destroy($id)
     {
         $ship = $this->find_ship_by_unique_id($id, ['company']);
+
+        if ($ship->projects()->where(function ($query): void {
+            $query->has('customer_access')->orHas('customer_documents')->orHas('customer_feedback');
+        })->exists()) {
+            return redirect()->route('ship.index')->with('error', 'Kapal tidak dapat dihapus karena proyeknya memiliki akses atau riwayat pelanggan.');
+        }
 
         // To prevent accidental deletion of ships that are still referenced by projects, we can check if there are any projects associated with this ship before allowing deletion.
         // This feature will be implemented later after we have project management features in place. For now, we will allow deletion without this guard.

@@ -17,8 +17,16 @@ class ProjectDocumentJob extends Model
         'unique_id',
         'project_job_document_id',
         'source_job_id',
+        'project_job_group_id',
+        'parent_job_id',
+        'price_book_item_id',
         'job_name',
         'job_volume_estimated',
+        'unit',
+        'unit_price',
+        'minimum_quantity',
+        'calculation',
+        'notes',
         'responsible_kind',
         'responsible_name',
         'est_start_date',
@@ -44,7 +52,13 @@ class ProjectDocumentJob extends Model
             'unique_id' => 'string',
             'project_job_document_id' => 'integer',
             'source_job_id' => 'integer',
+            'project_job_group_id' => 'integer',
+            'parent_job_id' => 'integer',
+            'price_book_item_id' => 'integer',
             'job_volume_estimated' => 'decimal:4',
+            'unit_price' => 'decimal:2',
+            'minimum_quantity' => 'decimal:4',
+            'calculation' => 'array',
             'est_start_date' => 'date',
             'est_finish_date' => 'date',
             'est_duration_days' => 'integer',
@@ -70,9 +84,29 @@ class ProjectDocumentJob extends Model
         return $this->belongsTo(self::class, 'source_job_id');
     }
 
+    public function job_group(): BelongsTo
+    {
+        return $this->belongsTo(project_job_group::class, 'project_job_group_id');
+    }
+
+    public function parent_job(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_job_id');
+    }
+
+    public function child_jobs(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_job_id')->orderBy('sort_order');
+    }
+
+    public function price_book_item(): BelongsTo
+    {
+        return $this->belongsTo(PriceBookItem::class);
+    }
+
     public function materials(): HasMany
     {
-        return $this->hasMany(ProjectDocumentJobMaterial::class, 'project_document_job_id');
+        return $this->hasMany(ProjectDocumentJobMaterial::class, 'project_document_job_id')->orderBy('sort_order')->orderBy('id');
     }
 
     public function photos(): HasMany

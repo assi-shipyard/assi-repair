@@ -1,21 +1,22 @@
 
 <?php
     $current_user = auth()->user();
+    $is_customer = $current_user?->is_customer() === true;
 
     // Unread notification badge count and the 5 most recent items for the dropdown.
     // Two cheap queries instead of hydrating every unread notification.
-    $unread_notification_count = $current_user?->unreadNotifications()->count() ?? 0;
+    $unread_notification_count = $is_customer ? 0 : ($current_user?->unreadNotifications()->count() ?? 0);
     $recent_notifications = $unread_notification_count > 0
         ? $current_user->unreadNotifications()->latest()->limit(5)->get()
         : collect();
 
     // User context is stored in session at login (see LoginController).
-    $employee_name = session('employee_name') ?? '-';
+    $employee_name = $is_customer ? $current_user->name : (session('employee_name') ?? $current_user?->name ?? '-');
     $employee_position = session('employee_position');
     $employee_id = session('employee_id');
-    $employee_summary = $employee_position && $employee_id
+    $employee_summary = $is_customer ? 'Pelanggan' : ($employee_position && $employee_id
         ? $employee_position . ' - ' . $employee_id
-        : '-';
+        : '-');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -77,14 +78,14 @@
             </button>
 
             <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
-                <a href="<?php echo e(route('dashboard')); ?>">
+                <a href="<?php echo e(route($is_customer ? 'customer.index' : 'dashboard')); ?>">
                     <img src="<?php echo e(secure_asset('assets/img/assi_logo_with_name.png')); ?>" width="110" alt="SIREKA ASSI" class="navbar-brand-image">
                 </a>
             </h1>
 
             <div class="navbar-nav flex-row order-md-last">
                 
-                <?php if(auth()->guard()->check()): ?>
+                <?php if($current_user && ! $is_customer): ?>
                     <div class="d-none d-md-flex">
                         <div class="nav-item dropdown me-3">
                             <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="Tampilkan notifikasi">
@@ -129,7 +130,11 @@
                         </div>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                        <a href="<?php echo e(route('settings.index')); ?>" class="dropdown-item">Pengaturan</a>
+                        <?php if($current_user?->account_type === \App\Models\User::TYPE_ADMIN): ?>
+                            <a href="<?php echo e(route('accounts.edit', $current_user)); ?>" class="dropdown-item">Pengaturan</a>
+                        <?php else: ?>
+                            <a href="<?php echo e(route($is_customer ? 'customer.settings' : 'settings.index')); ?>" class="dropdown-item">Pengaturan</a>
+                        <?php endif; ?>
                         <a href="<?php echo e(route('logout')); ?>" class="dropdown-item">Keluar</a>
                     </div>
                 </div>
@@ -139,6 +144,12 @@
             <div class="collapse navbar-collapse" id="navbar-menu">
                 <div class="d-flex flex-column flex-md-row flex-fill align-items-stretch align-items-md-center">
                     <ul class="navbar-nav">
+                        <?php if($is_customer): ?>
+                            <li class="nav-item"><a class="nav-link" href="<?php echo e(route('customer.index')); ?>">Proyek Saya</a></li>
+                            <?php $__currentLoopData = ['Not Started' => 'Mendatang', 'In Progress' => 'Berjalan', 'Completed' => 'Riwayat']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $project_status => $project_label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <li class="nav-item"><a class="nav-link" href="<?php echo e(route('customer.index', ['status' => $project_status])); ?>"><?php echo e($project_label); ?></a></li>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        <?php else: ?>
                         
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
@@ -173,6 +184,9 @@
                                             <h6 class="dropdown-header">Lainnya</h6>
                                             <a href="<?php echo e(route('price-dictionary.index')); ?>" class="dropdown-item">Data Jenis Reparasi</a>
                                             <a href="<?php echo e(route('price-book.index')); ?>" class="dropdown-item <?php echo e(request()->routeIs('price-book.*') ? 'active' : ''); ?>">Kamus Harga</a>
+                                            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin')): ?>
+                                                <a href="<?php echo e(route('job-group.index')); ?>" class="dropdown-item <?php echo e(request()->routeIs('job-group.*') ? 'active' : ''); ?>">Kelompok Pekerjaan</a>
+                                            <?php endif; ?>
 
                                     </div>
                                 </div>
@@ -281,6 +295,8 @@
                                     <div class="dropdown-menu-columns">
                                         <div class="dropdown-menu-column">
                                             <h6 class="dropdown-header">Users</h6>
+                                            <a href="<?php echo e(route('accounts.index')); ?>" class="dropdown-item">Kelola Semua Akun</a>
+                                            <a href="<?php echo e(route('accounts.projects')); ?>" class="dropdown-item">Akses &amp; Persetujuan Pelanggan</a>
                                             <a href="<?php echo e(route('employee.create')); ?>" class="dropdown-item">Buat Akun Baru</a>
                                             <a href="<?php echo e(route('employee.index')); ?>" class="dropdown-item">Daftar User</a>
 
@@ -306,6 +322,10 @@
                                     </div>
                                 </div>
                             </li>
+                        <?php endif; ?>
+                        <?php if(! $current_user?->hasRole('admin') && $current_user?->can('manage-customer-projects')): ?>
+                            <li class="nav-item"><a href="<?php echo e(route('accounts.projects')); ?>" class="nav-link">Layanan Pelanggan</a></li>
+                        <?php endif; ?>
                         <?php endif; ?>
                     </ul>
                 </div>
@@ -406,7 +426,7 @@
         });
     </script>
 
-    <?php if(auth()->guard()->check()): ?>
+    <?php if($current_user && ! $is_customer): ?>
         
         <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>

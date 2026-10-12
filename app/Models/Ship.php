@@ -49,6 +49,11 @@ class Ship extends Model
 		return $this->hasMany(ShipDocument::class, 'ship_id');
 	}
 
+	public function images(): HasMany
+	{
+		return $this->hasMany(ShipImage::class, 'ship_id');
+	}
+
 	public function projects(): HasMany
 	{
 		return $this->hasMany(Project::class, 'ship_id');

@@ -15,8 +15,13 @@ class ProjectDocumentJobMaterial extends Model
     protected $fillable = [
         'unique_id',
         'project_document_job_id',
+        'price_book_item_id',
         'material_name',
         'volume',
+        'unit',
+        'unit_price',
+        'minimum_quantity',
+        'sort_order',
         'density',
         'dimension',
         'price',
@@ -32,13 +37,22 @@ class ProjectDocumentJobMaterial extends Model
         return [
             'unique_id' => 'string',
             'project_document_job_id' => 'integer',
+            'price_book_item_id' => 'integer',
             'volume' => 'decimal:4',
+            'unit_price' => 'decimal:2',
+            'minimum_quantity' => 'decimal:4',
+            'sort_order' => 'integer',
             'density' => 'decimal:6',
             'price' => 'decimal:2',
             'diameter' => 'decimal:4',
             'length' => 'decimal:4',
             'thickness' => 'decimal:4',
         ];
+    }
+
+    public function price_book_item(): BelongsTo
+    {
+        return $this->belongsTo(PriceBookItem::class);
     }
 
     public function job(): BelongsTo

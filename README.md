@@ -35,6 +35,81 @@ Run `php artisan migrate` to install the price-book tables.
 This menu manages the price catalog only; it does not change existing project
 document pricing or apply minimum quantities to project totals yet.
 
+## Subcontractor master data
+
+The `subcontractors` table and `App\Models\subcontractor` represent external
+company/vendors, separately from customer companies, internal employees, and
+login accounts. Each vendor has a unique code and automatically generated public
+UUID, a company name, and a contact person's name. Phone, email, address, and
+internal notes are optional. UUIDs are used for future route binding.
+
+Vendors default to active. Use the `active()` query scope for future assignment
+selectors; deactivate vendors rather than deleting historical references.
+Run `php artisan migrate` to install the table.
+
+This stage adds database/model support only, with no management screens or
+mutation endpoints. Job-level subcontractor assignments and assisting internal
+employees will be added when users fill the Satisfaction Notes report.
+Existing free-text job responsibility fields remain unchanged and are not
+automatically linked to vendors. The future management/assignment workflow must
+validate input, authorize access, and persist database audit records transactionally.
+Payments, bank details, and other finance workflows are deferred.
+
+## Accounts and customer portal
+
+Run the migrations before using the new account screens. Existing employee
+accounts remain `internal`; existing users with the Spatie `admin` role are
+backfilled with the `admin` account type and a separate username. The legacy
+admin identifier remains in `employee_id` for compatibility with existing data.
+`AdminSeeder` also populates the new fields.
+
+Administrators use **Kelola Semua Akun** to create/edit admin/customer accounts,
+reset passwords, and activate or suspend accounts. Account type cannot be changed.
+Internal employees continue to use the employee
+form and their nine-digit NIK. Customers sign in at `/customer/login` using
+email, and must change their administrator-provisioned initial password before
+accessing projects. Deliver initial credentials through an independently
+verified, secure channel; automatic email invitations are not implemented.
+
+Under **Akses & Persetujuan Pelanggan**, assign each customer explicitly to
+projects. Their company represents their employer, not necessarily the vessel
+owner. A company association alone grants no access. Viewing prices and the
+three approval categories are separate per-project permissions. RAB approval
+requires financial access; external surveyors without financial access can
+review technical details and approve **Catatan Kepuasan**.
+
+Only the latest internally approved/locked RAB Awal, Catatan Kepuasan, or RAB
+Akhir revision can be published. Publication creates an immutable allowlisted
+snapshot with one designated customer approver. Pending requests are superseded
+when a newer revision is published; completed decisions remain preserved.
+Pending approvals can be reassigned to another authorized project representative.
+Customer decisions do not change internal document approval status. Rejected
+or change-requested documents require a new internal revision and publication.
+
+RAB prices are omitted from locked HTML and JSON, including material prices.
+An authorized customer must confirm their own password to unlock one document
+for five minutes. Unlocks are tied to user, document, password fingerprint and
+access version; access changes invalidate earlier unlocks. Responses are
+`private, no-store`. Financial snapshots are encrypted using Laravel's application
+key, which must be backed up and retained when rotating keys. Customer documents
+never expose internal actual costs, internal notes, histories, or unshared files.
+Published job prices use the same `est_price`/`est_currency` fields as the existing
+BoQ screens; material prices use `price`/`currency`.
+
+Customers submit **Kepuasan Pelanggan** once per account after project completion,
+and may submit **Komplain** on any assigned project. Feedback is visible only to
+its author and authorized internal handlers. Admins can handle feedback and
+publish documents; internal handlers need `manage-customer-projects` (created by
+`RolePermissionSeeder`, then assigned through role/permission management).
+Only admins can provision accounts or change project access.
+
+Account mutations, access changes, publications, decisions, price unlock/lock
+events, password changes, feedback and responses write explicit database audit
+records. Transactional mutations fail if their audit cannot be saved. Passwords
+and financial amounts are excluded from these event payloads. Published records
+use restrictive foreign keys to preserve decision history; deactivate accounts
+and revoke access rather than deleting referenced users/projects/documents.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

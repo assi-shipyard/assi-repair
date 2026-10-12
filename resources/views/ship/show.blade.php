@@ -187,6 +187,46 @@
             </div>
         </div>
 
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><span class="ti ti-photo me-2"></span>Foto Kapal</h3>
+                <div class="card-actions">
+                    <form action="{{ route('ship.photos.store', $ship_identifier) }}" method="POST" enctype="multipart/form-data" class="d-flex flex-wrap gap-2">
+                        @csrf
+                        <input class="form-control" type="file" name="ship_photo" accept="image/jpeg,image/png,image/webp" required>
+                        <button class="btn btn-primary" type="submit"><span class="ti ti-upload me-1"></span>Unggah</button>
+                    </form>
+                </div>
+            </div>
+            <div class="card-body">
+                @error('ship_photo')
+                    <div class="alert alert-danger" role="alert">{{ $message }}</div>
+                @enderror
+                @if ($ship->images->isEmpty())
+                    <div class="text-center text-secondary py-3">Belum ada foto kapal.</div>
+                @else
+                    <div class="row g-3">
+                        @foreach ($ship->images as $image)
+                            <div class="col-6 col-md-4 col-xl-3">
+                                <div class="card card-sm h-100">
+                                    <a href="{{ route('ship.photos.show', [$ship_identifier, $image->unique_id]) }}" target="_blank" rel="noopener noreferrer">
+                                        <img src="{{ route('ship.photos.show', [$ship_identifier, $image->unique_id]) }}" alt="Foto {{ $ship->name }}" class="w-100 object-fit-cover" style="height: 10rem">
+                                    </a>
+                                    <div class="card-body p-2">
+                                        <form action="{{ route('ship.photos.destroy', [$ship_identifier, $image->unique_id]) }}" method="POST" onsubmit="return confirm('Hapus foto kapal ini?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="btn btn-outline-danger btn-sm w-100" type="submit"><span class="ti ti-trash me-1"></span>Hapus</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </div>
+
         <div class="row g-3">
             <div class="col-lg-4">
                 <div class="d-flex flex-column gap-3">

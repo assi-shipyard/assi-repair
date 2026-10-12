@@ -60,4 +60,9 @@ class Company extends Model
 	{
 		return $this->hasMany(Ship::class);
 	}
+
+	public function customer_accounts(): \Illuminate\Database\Eloquent\Relations\HasMany
+	{
+		return $this->hasMany(User::class)->where('account_type', User::TYPE_CUSTOMER);
+	}
 }

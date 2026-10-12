@@ -1,21 +1,26 @@
 <?php
 
-use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\account_management_controller;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\customer_portal_controller;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DockingApprovalController;
+use App\Http\Controllers\DockingDashboardController;
+use App\Http\Controllers\DockingManagementController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\LoginController;
+use App\Http\Controllers\NotificationFlagController;
+use App\Http\Controllers\NotificationSettingController;
 use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PositionController;
-use App\Http\Controllers\NotificationSettingController;
-use App\Http\Controllers\DockingApprovalController;
-use App\Http\Controllers\DockingManagementController;
-use App\Http\Controllers\DockingDashboardController;
+use App\Http\Controllers\PriceBookController;
+use App\Http\Controllers\project_boq_controller;
+use App\Http\Controllers\project_job_group_controller;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectJobDocumentPageController;
 use App\Http\Controllers\RepairTypeController;
-use App\Http\Controllers\PriceBookController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ShipController;
 use App\Http\Controllers\ShipDocumentController;
@@ -29,11 +34,38 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', [LoginController::class, 'login_process'])->name('login.process');
     Route::get('/admin/login', [LoginController::class, 'admin_login'])->name('admin.login');
     Route::post('/admin/login', [LoginController::class, 'admin_login_process'])->name('admin.login.process');
+    Route::get('/customer/login', [customer_portal_controller::class, 'login'])->name('customer.login');
+    Route::post('/customer/login', [customer_portal_controller::class, 'login_process'])->middleware('throttle:6,1')->name('customer.login.process');
 });
 
-Route::get('/logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
+Route::get('/logout', [LoginController::class, 'logout'])->middleware(['auth', 'account_access'])->name('logout');
 
-Route::middleware(['auth', 'audit_log'])->group(function (): void {
+Route::middleware(['auth', 'account_access'])->prefix('customer')->name('customer.')->group(function (): void {
+    Route::get('/', [customer_portal_controller::class, 'index'])->name('index');
+    Route::get('/settings', [customer_portal_controller::class, 'settings'])->name('settings');
+    Route::put('/password', [customer_portal_controller::class, 'password'])->middleware('throttle:6,1')->name('password');
+    Route::get('/project/{project_id}', [customer_portal_controller::class, 'project'])->whereUuid('project_id')->name('project');
+    Route::post('/project/{project_id}/feedback', [customer_portal_controller::class, 'feedback'])->whereUuid('project_id')->middleware('throttle:10,1')->name('feedback');
+    Route::get('/document/{document}', [customer_portal_controller::class, 'document'])->whereUuid('document')->name('document');
+    Route::get('/document/{document}/data', [customer_portal_controller::class, 'document_data'])->whereUuid('document')->name('document.data');
+    Route::post('/document/{document}/unlock', [customer_portal_controller::class, 'unlock'])->whereUuid('document')->middleware('throttle:6,1')->name('unlock');
+    Route::post('/document/{document}/lock', [customer_portal_controller::class, 'lock'])->whereUuid('document')->name('lock');
+    Route::post('/document/{document}/decision', [customer_portal_controller::class, 'decide'])->whereUuid('document')->middleware('throttle:10,1')->name('decision');
+});
+
+Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): void {
+    Route::middleware('role:admin')->group(function (): void {
+        Route::get('/accounts', [account_management_controller::class, 'index'])->name('accounts.index');
+        Route::post('/accounts', [account_management_controller::class, 'store'])->name('accounts.store');
+        Route::get('/accounts/{user}/edit', [account_management_controller::class, 'edit'])->whereUuid('user')->name('accounts.edit');
+        Route::put('/accounts/{user}', [account_management_controller::class, 'update'])->whereUuid('user')->name('accounts.update');
+        Route::put('/accounts/{user}/status', [account_management_controller::class, 'status'])->whereUuid('user')->name('accounts.status');
+        Route::post('/customer-management/access', [account_management_controller::class, 'access'])->name('accounts.access');
+    });
+    Route::get('/customer-management', [account_management_controller::class, 'projects'])->name('accounts.projects');
+    Route::post('/customer-management/publish', [account_management_controller::class, 'publish'])->name('accounts.publish');
+    Route::put('/customer-management/document/{document}/approver', [account_management_controller::class, 'reassign'])->whereUuid('document')->name('accounts.reassign');
+    Route::put('/customer-management/feedback/{feedback}', [account_management_controller::class, 'respond'])->whereUuid('feedback')->name('accounts.respond');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/docking-dashboard', [DockingDashboardController::class, 'index'])->name('docking-dashboard');
 
@@ -58,9 +90,11 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::put('/{company}', 'update')->name('update');
         Route::delete('/{company}', 'destroy')->name('destroy');
         Route::get('/{company}/documents', 'show_documents')->name('documents');
+        Route::get('/{company}/logo', 'logo')->name('logo');
         Route::post('/{company}/logo', 'upload_logo')->name('upload-logo');
         Route::post('/{company}/documents', 'upload_document')->name('upload-document');
         Route::delete('/{company}/documents/{document}', 'delete_document')->name('delete-document');
+        Route::get('/{company}/documents/{document}/download', 'download_document')->name('documents.download');
         Route::get('/{company}/data', 'get')->name('get');
     });
 
@@ -72,6 +106,9 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::get('/{ship}/edit', 'edit')->name('edit');
         Route::put('/{ship}', 'update')->name('update');
         Route::delete('/{ship}', 'destroy')->name('destroy');
+        Route::post('/{ship}/photos', 'store_photo')->name('photos.store');
+        Route::get('/{ship}/photos/{photo}', 'photo')->name('photos.show');
+        Route::delete('/{ship}/photos/{photo}', 'destroy_photo')->name('photos.destroy');
 
         Route::post('/{ship}/documents', [ShipDocumentController::class, 'store'])->name('documents.store');
         Route::get('/{ship}/documents/{document}', [ShipDocumentController::class, 'download'])->name('documents.download');
@@ -142,7 +179,7 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::put('/{id}/roles', 'update_roles')->name('update-roles');
     });
 
-    Route::resource('/notification-flag', \App\Http\Controllers\NotificationFlagController::class)->except(['show']);
+    Route::resource('/notification-flag', NotificationFlagController::class)->except(['show']);
 
     Route::controller(NotificationSettingController::class)->prefix('notification-settings')->name('notification-settings.')->group(function (): void {
         Route::get('/', 'index')->name('index');
@@ -161,6 +198,18 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::delete('/{id}', 'destroy')->name('destroy');
     });
 
+    Route::controller(project_boq_controller::class)->prefix('project/{projectId}/job-document')->name('project.job-document.workflow.')
+        ->whereUuid(['projectId', 'document', 'job', 'material'])->group(function (): void {
+            Route::get('/price-items', 'price_items')->name('price-items');
+            Route::get('/{document}/export', 'export')->name('export');
+            Route::post('/{document}/jobs', 'store_job')->name('job.store');
+            Route::put('/{document}/jobs/{job}', 'update_job')->name('job.update');
+            Route::delete('/{document}/jobs/{job}', 'destroy_job')->name('job.destroy');
+            Route::post('/{document}/jobs/{job}/materials', 'store_material')->name('material.store');
+            Route::put('/{document}/jobs/{job}/materials/{material}', 'update_material')->name('material.update');
+            Route::delete('/{document}/jobs/{job}/materials/{material}', 'destroy_material')->name('material.destroy');
+        });
+
     Route::controller(ProjectJobDocumentPageController::class)->prefix('project/{projectId}/job-document')->name('project.job-document.workflow.')->group(function (): void {
         Route::get('/', 'index')->name('index');
         Route::post('/', 'store')->name('store');
@@ -170,14 +219,17 @@ Route::middleware(['auth', 'audit_log'])->group(function (): void {
         Route::post('/{document}/approve', 'approve')->name('approve');
         Route::post('/{document}/return-to-draft', 'return_to_draft')->name('return-to-draft');
         Route::post('/{document}/finalize-satisfaction-notes', 'finalizeSatisfactionNotes')->name('finalize-satisfaction-notes');
-        Route::post('/{document}/jobs', 'storeJob')->name('job.store');
-        Route::put('/{document}/jobs/{job}', 'updateJob')->name('job.update');
-        Route::delete('/{document}/jobs/{job}', 'destroyJob')->name('job.destroy');
-        Route::post('/{document}/jobs/{job}/materials', 'storeMaterial')->name('material.store');
-        Route::delete('/{document}/jobs/{job}/materials/{material}', 'destroyMaterial')->name('material.destroy');
         Route::get('/{document}/jobs/{job}/photos', 'photos')->name('job.photos');
         Route::post('/{document}/jobs/{job}/photos', 'storePhoto')->name('job.photo.store');
+        Route::get('/{document}/jobs/{job}/photos/{photo}/file', 'photo')->name('job.photo.show');
         Route::delete('/{document}/jobs/{job}/photos/{photo}', 'destroyPhoto')->name('job.photo.destroy');
+    });
+
+    Route::controller(project_job_group_controller::class)->prefix('job-group')->name('job-group.')->middleware('role:admin')->group(function (): void {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{job_group}', 'update')->name('update');
+        Route::delete('/{job_group}', 'destroy')->name('destroy');
     });
 
     Route::get('/docking-space', [DockingManagementController::class, 'index_docking_space'])->name('docking-space.index');

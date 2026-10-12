@@ -11,6 +11,8 @@ class ProjectDocumentComparisonService
     public const JOB_FIELDS = [
         'job_name' => 'Nama pekerjaan',
         'job_volume_estimated' => 'Volume',
+        'unit' => 'Satuan',
+        'unit_price' => 'Harga satuan',
         'responsible_name' => 'Penanggung jawab',
         'est_start_date' => 'Mulai',
         'est_finish_date' => 'Selesai',
@@ -21,6 +23,8 @@ class ProjectDocumentComparisonService
 
     public const MATERIAL_FIELDS = [
         'volume' => 'Volume',
+        'unit' => 'Satuan',
+        'unit_price' => 'Harga satuan',
         'price' => 'Harga',
         'currency' => 'Mata uang',
         'dimension' => 'Dimensi',
@@ -87,6 +91,13 @@ class ProjectDocumentComparisonService
             if ($job->est_price !== null) {
                 $currency = $job->est_currency ?: 'IDR';
                 $totals[$currency] = ($totals[$currency] ?? 0) + (float) $job->est_price;
+            }
+
+            foreach ($job->materials as $material) {
+                if ($material->price !== null) {
+                    $currency = $material->currency ?: 'IDR';
+                    $totals[$currency] = ($totals[$currency] ?? 0) + (float) $material->price;
+                }
             }
         }
 

@@ -75,6 +75,7 @@
                                         </div>
                                     @endif
 
+                                    <div class="mb-3 text-center"><a href="{{ route('customer.login') }}">Masuk sebagai Pelanggan</a></div>
                                     <div class="form-group mb-3">
                                         <label class="form-label">Nomor Induk Karyawan (NIK)</label>
                                         <div class="input-icon mb-3">

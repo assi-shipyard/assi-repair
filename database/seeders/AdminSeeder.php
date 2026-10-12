@@ -30,7 +30,7 @@ class AdminSeeder extends Seeder
         $email = trim((string) config('seeding.admin.email', ''));
         $password = (string) config('seeding.admin.password', '');
         $password_was_generated = false;
-        $existing_user = User::query()->where('employee_id', $employee_id)->exists();
+        $existing_user = User::query()->where('username', $employee_id)->orWhere('employee_id', $employee_id)->exists();
 
         $this->validate_identity($employee_id, $email);
 
@@ -56,7 +56,7 @@ class AdminSeeder extends Seeder
         DB::transaction(function () use ($employee_id, $email, $password, $password_was_generated): void {
             $admin_role = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
 
-            $user = User::query()->where('employee_id', $employee_id)->first();
+            $user = User::query()->where('username', $employee_id)->orWhere('employee_id', $employee_id)->first();
 
             if ($user === null) {
                 $user = new User();
@@ -65,6 +65,8 @@ class AdminSeeder extends Seeder
             }
 
             // Existing password is intentionally left untouched to avoid silent credential resets.
+            $user->account_type = User::TYPE_ADMIN;
+            $user->username = $employee_id;
             $user->email = $email !== '' ? $email : $user->email;
             $user->save();
 

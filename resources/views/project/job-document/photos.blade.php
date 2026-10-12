@@ -35,10 +35,15 @@
     <div class="card">
         <div class="table-responsive">
             <table class="table table-vcenter card-table">
-                <thead><tr><th>Kategori</th><th>Keterangan</th><th>Tanggal</th><th class="w-1"></th></tr></thead>
+                <thead><tr><th>Foto</th><th>Kategori</th><th>Keterangan</th><th>Tanggal</th><th class="w-1"></th></tr></thead>
                 <tbody>
                     @forelse ($photos as $photo)
                         <tr>
+                            <td>
+                                <a href="{{ route('project.job-document.workflow.job.photo.show', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id, $photo->unique_id ?? $photo->id]) }}" target="_blank" rel="noopener noreferrer">
+                                    <img src="{{ route('project.job-document.workflow.job.photo.show', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id, $photo->unique_id ?? $photo->id]) }}" alt="Foto pekerjaan" loading="lazy" class="rounded object-fit-cover" style="width: 5rem; height: 4rem">
+                                </a>
+                            </td>
                             <td>{{ $photo->photo_category ?? '-' }}</td>
                             <td>{{ $photo->caption ?? '-' }}</td>
                             <td>{{ optional($photo->taken_at)->tanggal_waktu_indonesia() ?? '-' }}</td>
@@ -51,7 +56,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="text-center text-secondary py-4">Belum ada foto.</td></tr>
+                        <tr><td colspan="5" class="text-center text-secondary py-4">Belum ada foto.</td></tr>
                     @endforelse
                 </tbody>
             </table>

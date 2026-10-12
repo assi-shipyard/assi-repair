@@ -46,7 +46,7 @@ class LoginController extends Controller
         $validator = Validator::make(
             $credentials,
             [
-                'employee_id' => 'required|string|min:9|max:9',
+                'employee_id' => 'required|digits:9',
                 'password' => 'required|string',
             ],
             [
@@ -60,7 +60,7 @@ class LoginController extends Controller
             return $this->redirect_back_with_validation_error($validator);
         }
 
-        if (Auth::attempt(['employee_id' => $credentials['employee_id'], 'password' => $credentials['password']], $remember)) {
+        if (Auth::attempt(['employee_id' => $credentials['employee_id'], 'password' => $credentials['password'], 'account_type' => User::TYPE_INTERNAL, 'is_active' => true], $remember)) {
             $request->session()->regenerate();
 
             $user = Auth::user();
@@ -108,7 +108,13 @@ class LoginController extends Controller
             return $this->redirect_back_with_validation_error($validator);
         }
 
-        if (Auth::attempt(['employee_id' => $credentials['username'], 'password' => $credentials['password']], $remember)) {
+        $admin_user = User::query()
+            ->where('username', $credentials['username'])
+            ->orWhere(fn ($query) => $query->whereNull('username')->where('employee_id', $credentials['username']))
+            ->first();
+
+        if ($admin_user?->hasRole('admin') && ! $admin_user->is_customer()
+            && Auth::attempt(['id' => $admin_user->id, 'password' => $credentials['password'], 'is_active' => true], $remember)) {
             $request->session()->regenerate();
 
             $user = Auth::user();
@@ -134,11 +140,12 @@ class LoginController extends Controller
 
     public function logout(Request $request): RedirectResponse
     {
+        $was_customer = Auth::user()?->is_customer() === true;
         $was_admin = Auth::user()?->hasRole('admin') === true;
 
         $this->logout_and_invalidate($request);
 
-        return redirect()->route($was_admin ? 'admin.login' : 'login');
+        return redirect()->route($was_customer ? 'customer.login' : ($was_admin ? 'admin.login' : 'login'));
     }
 
     private function redirect_if_authenticated(): ?RedirectResponse
@@ -147,7 +154,7 @@ class LoginController extends Controller
             return null;
         }
 
-        return redirect()->route('dashboard');
+        return redirect()->route(Auth::user()?->is_customer() ? 'customer.index' : 'dashboard');
     }
 
     private function redirect_back_with_validation_error(\Illuminate\Contracts\Validation\Validator $validator): RedirectResponse
@@ -170,7 +177,7 @@ class LoginController extends Controller
 
         $request->session()->put([
             'employee_id' => $employee?->employee_id ?? $user->employee_id,
-            'employee_name' => $employee?->name ?? ($user->hasRole('admin') ? config('seeding.admin.name') : null),
+            'employee_name' => $employee?->name ?? $user->name ?? ($user->hasRole('admin') ? config('seeding.admin.name') : null),
             'employee_position' => $employee?->position?->name,
         ]);
     }

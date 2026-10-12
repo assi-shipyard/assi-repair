@@ -51,6 +51,7 @@ class RolePermissionSeeder extends Seeder
             'add-user', 'edit-user', 'delete-user', 'view-user',
             'add-role', 'edit-role', 'delete-role', 'view-role',
             'add-permission', 'edit-permission', 'delete-permission', 'view-permission',
+            'manage-customer-projects',
         ];
 
         // Create all permissions if not exist

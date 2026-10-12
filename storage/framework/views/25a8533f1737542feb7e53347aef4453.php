@@ -47,8 +47,8 @@
                     <div class="col-8"><div class="text-secondary small">Total Harga Estimasi</div>
                         <div class="fw-bold"><?php $__empty_1 = true; $__currentLoopData = $totals; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $currency => $amount): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><?php echo e($currency); ?> <?php echo e(number_format($amount, 0, ',', '.')); ?><?php if(! $loop->last): ?> &middot; <?php endif; ?> <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?> - <?php endif; ?></div></div>
                     <div class="col-4"><div class="text-secondary small">Disiapkan</div><div><?php echo e($document->prepared_by?->name ?? '-'); ?></div></div>
-                    <div class="col-4"><div class="text-secondary small">Diajukan</div><div><?php echo e($document->submitted_at?->format('d/m/Y H:i') ?? '-'); ?></div></div>
-                    <div class="col-4"><div class="text-secondary small">Disetujui</div><div><?php echo e($document->approved_at?->format('d/m/Y H:i') ?? '-'); ?></div></div>
+                    <div class="col-4"><div class="text-secondary small">Diajukan</div><div><?php echo e($document->submitted_at ? $document->submitted_at->timezone('Asia/Jakarta')->tanggal_waktu_indonesia().' WIB' : '-'); ?></div></div>
+                    <div class="col-4"><div class="text-secondary small">Disetujui</div><div><?php echo e($document->approved_at ? $document->approved_at->timezone('Asia/Jakarta')->tanggal_waktu_indonesia().' WIB' : '-'); ?></div></div>
                 </div>
             </div>
         </div>
@@ -71,82 +71,7 @@
 
 <div class="tab-content">
 <div class="tab-pane active show" id="tab_jobs" role="tabpanel">
-<?php if($document->is_editable()): ?>
-<div class="card mb-4">
-    <div class="card-header"><h3 class="card-title mb-0">Tambah Pekerjaan</h3></div>
-    <div class="card-body">
-        <form action="<?php echo e(route('project.job-document.workflow.job.store', [$project->unique_id, $document->unique_id ?? $document->id])); ?>" method="POST">
-            <?php echo csrf_field(); ?>
-            <div class="row g-3">
-                <div class="col-md-4"><input class="form-control" name="job_name" placeholder="Nama pekerjaan" required></div>
-                <div class="col-md-3"><input class="form-control" name="job_volume_estimated" placeholder="Volume"></div>
-                <div class="col-md-3"><input class="form-control" name="responsible_name" placeholder="Penanggung jawab"></div>
-                <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Tambah</button></div>
-                <div class="col-md-4"><input class="form-control" name="progress_percent" placeholder="Progress"></div>
-                <div class="col-md-4"><input class="form-control" name="est_price" placeholder="Harga estimasi"></div>
-                <div class="col-md-4"><select class="form-select" name="status"><option value="pending">Pending</option><option value="ongoing">Ongoing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<?php endif; ?>
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-vcenter card-table">
-            <thead><tr><th>Pekerjaan</th><th>Penanggung Jawab</th><th>Progress</th><th>Status</th><th class="w-1"></th></tr></thead>
-            <tbody>
-                <?php $__empty_1 = true; $__currentLoopData = $document->jobs; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $job): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                    <tr>
-                        <td>
-                            <div class="fw-semibold"><?php echo e($job->job_name); ?></div>
-                            <div class="small text-secondary"><?php echo e($job->job_volume_estimated ?? '-'); ?></div>
-                            <div class="small text-secondary">Material: <?php echo e($job->materials->count()); ?></div>
-                        </td>
-                        <td><?php echo e($job->responsible_name ?? '-'); ?></td>
-                        <td><?php echo e($job->progress_percent ?? 0); ?>%</td>
-                        <td><?php echo e($job->status ?? '-'); ?></td>
-                        <td>
-                            <a href="<?php echo e(route('project.job-document.workflow.job.photos', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id])); ?>" class="btn btn-sm btn-outline-primary">Foto</a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="5" class="bg-light">
-                            <?php if($document->is_editable()): ?>
-                            <div class="row g-2 align-items-end">
-                                <div class="col-md-4"><input class="form-control form-control-sm" form="material-form-<?php echo e($job->id); ?>" name="material_name" placeholder="Material baru"></div>
-                                <div class="col-md-2"><input class="form-control form-control-sm" form="material-form-<?php echo e($job->id); ?>" name="volume" placeholder="Volume"></div>
-                                <div class="col-md-2"><input class="form-control form-control-sm" form="material-form-<?php echo e($job->id); ?>" name="price" placeholder="Harga"></div>
-                                <div class="col-md-2"><input class="form-control form-control-sm" form="material-form-<?php echo e($job->id); ?>" name="currency" placeholder="IDR"></div>
-                                <div class="col-md-2">
-                                    <form id="material-form-<?php echo e($job->id); ?>" action="<?php echo e(route('project.job-document.workflow.material.store', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id])); ?>" method="POST">
-                                        <?php echo csrf_field(); ?>
-                                        <button class="btn btn-sm btn-outline-primary w-100" type="submit">Tambah Material</button>
-                                    </form>
-                                </div>
-                            </div>
-                            <?php endif; ?>
-                            <div class="mt-3 table-responsive">
-                                <table class="table table-sm table-vcenter mb-0">
-                                    <thead><tr><th>Material</th><th>Volume</th><th>Harga</th></tr></thead>
-                                    <tbody>
-                                        <?php $__empty_2 = true; $__currentLoopData = $job->materials; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $material): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_2 = false; ?>
-                                            <tr><td><?php echo e($material->material_name); ?></td><td><?php echo e($material->volume ?? '-'); ?></td><td><?php echo e($material->price ?? '-'); ?></td></tr>
-                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_2): ?>
-                                            <tr><td colspan="3" class="text-secondary">Belum ada material.</td></tr>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                    <tr><td colspan="5" class="text-center text-secondary py-4">Belum ada pekerjaan.</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+    <?php echo $__env->make('project.job-document.partials.boq-sheet', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 </div>
 
 <div class="tab-pane" id="tab_changes" role="tabpanel">
@@ -190,7 +115,7 @@
                 <div>
                     <div class="fw-semibold"><?php echo e($action_labels[$history->action] ?? $history->action); ?><?php if(! empty($history->payload['job_name'])): ?>: <?php echo e($history->payload['job_name']); ?><?php endif; ?></div>
                     <?php if(! empty($history->payload['reason'])): ?><div class="small">Alasan: <?php echo e($history->payload['reason']); ?></div><?php endif; ?>
-                    <div class="small text-secondary"><?php echo e($history->created_at?->format('d/m/Y H:i')); ?> &middot; <?php echo e($actor_names[$history->actor_id] ?? 'Sistem'); ?></div>
+                    <div class="small text-secondary"><?php echo e($history->created_at?->timezone('Asia/Jakarta')->tanggal_waktu_indonesia()); ?> WIB &middot; <?php echo e($actor_names[$history->actor_id] ?? 'Sistem'); ?></div>
                 </div>
             </div>
         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>

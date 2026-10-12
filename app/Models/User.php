@@ -1,17 +1,34 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Concerns\HasPublicUniqueId;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles;
+    /** @use HasFactory<UserFactory> */
+    use HasFactory, HasPublicUniqueId, HasRoles, Notifiable;
+
+    public const TYPE_ADMIN = 'admin';
+
+    public const TYPE_INTERNAL = 'internal';
+
+    public const TYPE_CUSTOMER = 'customer';
+
+    protected $attributes = [
+        'account_type' => self::TYPE_INTERNAL,
+        'is_active' => true,
+        'must_change_password' => false,
+    ];
 
     /**
      * The attributes that are mass assignable.
@@ -22,6 +39,13 @@ class User extends Authenticatable
         'employee_id',
         'email',
         'password',
+        'unique_id',
+        'account_type',
+        'username',
+        'name',
+        'is_active',
+        'company_id',
+        'must_change_password',
     ];
 
     /**
@@ -44,16 +68,31 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
         ];
     }
 
     /**
      * Override the username field for authentication.
-     *
-     * @return string
      */
-    public function username()
+    public function username(): string
     {
         return 'employee_id';
+    }
+
+    public function is_customer(): bool
+    {
+        return $this->account_type === self::TYPE_CUSTOMER;
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function employee(): HasOne
+    {
+        return $this->hasOne(Employee::class);
     }
 }

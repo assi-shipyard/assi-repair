@@ -15,9 +15,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ShipDocumentController extends Controller
 {
-    private const DISK = 'local';
-
-    private const DIRECTORY = 'ship_documents';
+    private const DISK = 'ship';
 
     public function store(Request $request, string $ship): RedirectResponse
     {
@@ -48,7 +46,7 @@ class ShipDocumentController extends Controller
 
         $data = $validation->validated();
         // Random stored name; the original client name is never used on disk.
-        $path = $data['document_file']->store(self::DIRECTORY, self::DISK);
+        $path = $data['document_file']->store('ships/'.$ship_model->unique_id.'/documents', self::DISK);
 
         $ship_model->documents()->create([
             'unique_id' => (string) Str::uuid(),
@@ -65,14 +63,19 @@ class ShipDocumentController extends Controller
         $ship_model = Ship::query()->firstWhere('unique_id', $ship);
         $document_model = $ship_model?->documents()->firstWhere('unique_id', $document);
 
-        if (! $document_model || ! Storage::disk(self::DISK)->exists($document_model->document_path)) {
+        if (! $document_model) {
+            return redirect()->route('ship.show', $ship)->with('error', 'Dokumen tidak ditemukan.');
+        }
+
+        $disk = Storage::disk(self::DISK)->exists($document_model->document_path) ? self::DISK : 'local';
+        if (! Storage::disk($disk)->exists($document_model->document_path)) {
             return redirect()->route('ship.show', $ship)->with('error', 'Dokumen tidak ditemukan.');
         }
 
         $extension = pathinfo($document_model->document_path, PATHINFO_EXTENSION);
         $download_name = Str::slug($document_model->document_name) . ($extension !== '' ? '.' . $extension : '');
 
-        return Storage::disk(self::DISK)->download($document_model->document_path, $download_name);
+        return Storage::disk($disk)->download($document_model->document_path, $download_name);
     }
 
     public function destroy(string $ship, string $document): RedirectResponse
@@ -85,6 +88,7 @@ class ShipDocumentController extends Controller
         }
 
         Storage::disk(self::DISK)->delete($document_model->document_path);
+        Storage::disk('local')->delete($document_model->document_path);
         $document_model->delete();
 
         return redirect()->route('ship.show', $ship)->with('success', 'Dokumen kapal berhasil dihapus.');

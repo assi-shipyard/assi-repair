@@ -13,10 +13,39 @@ class ProjectJobDocument extends Model
     use HasPublicUniqueId;
 
     public const TYPE_REPAIR_LIST = 'repair_list';
+
     public const TYPE_INITIAL_BOQ = 'initial_boq';
+
     public const TYPE_SATISFACTION_NOTES = 'satisfaction_notes';
+
     public const TYPE_FINAL_BOQ = 'final_boq';
+
     public const TYPE_DOCKING_REPORT = 'docking_report';
+
+    public const TYPE_LABELS = [
+        self::TYPE_REPAIR_LIST => 'Repair List',
+        self::TYPE_INITIAL_BOQ => 'RAB Awal',
+        self::TYPE_SATISFACTION_NOTES => 'Satisfaction Notes',
+        self::TYPE_DOCKING_REPORT => 'Docking Report',
+        self::TYPE_FINAL_BOQ => 'RAB Akhir',
+    ];
+
+    // Which job-list columns each phase works with; every phase shares the same tables.
+    public const PHASE_FEATURES = [
+        self::TYPE_REPAIR_LIST => ['prices' => false, 'progress' => false],
+        self::TYPE_INITIAL_BOQ => ['prices' => true, 'progress' => false],
+        self::TYPE_SATISFACTION_NOTES => ['prices' => false, 'progress' => true],
+        self::TYPE_DOCKING_REPORT => ['prices' => false, 'progress' => true],
+        self::TYPE_FINAL_BOQ => ['prices' => true, 'progress' => true],
+    ];
+
+    // The phase whose latest job list seeds a new document of the key phase.
+    public const PREVIOUS_PHASE = [
+        self::TYPE_INITIAL_BOQ => self::TYPE_REPAIR_LIST,
+        self::TYPE_SATISFACTION_NOTES => self::TYPE_INITIAL_BOQ,
+        self::TYPE_DOCKING_REPORT => self::TYPE_INITIAL_BOQ,
+        self::TYPE_FINAL_BOQ => self::TYPE_SATISFACTION_NOTES,
+    ];
 
     protected $table = 'project_job_documents';
 
@@ -92,11 +121,33 @@ class ProjectJobDocument extends Model
         return $this->status === 'draft';
     }
 
+    public function features(): array
+    {
+        return self::PHASE_FEATURES[$this->document_type] ?? ['prices' => false, 'progress' => false];
+    }
+
+    public function can_be_edited_by(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        $permission = match ($this->document_type) {
+            self::TYPE_INITIAL_BOQ => 'edit-project-quotation',
+            self::TYPE_FINAL_BOQ => 'edit-project-realization',
+            self::TYPE_SATISFACTION_NOTES => 'edit-project-satisfaction-note',
+            default => 'edit-project',
+        };
+
+        return $user->hasRole('admin') || $user->can($permission) || $user->can('edit-project');
+    }
+
     public static function cloneWithChildren(self $source, array $attributes = []): self
     {
         return DB::transaction(function () use ($source, $attributes): self {
             $actor_id = $attributes['actor_id'] ?? null;
-            unset($attributes['actor_id']);
+            $with_photos = $attributes['with_photos'] ?? true;
+            unset($attributes['actor_id'], $attributes['with_photos']);
 
             $target = $source->replicate([
                 'unique_id',
@@ -122,13 +173,15 @@ class ProjectJobDocument extends Model
 
             $target->save();
 
-            $source->loadMissing('jobs.materials', 'jobs.photos');
+            $source->loadMissing($with_photos ? ['jobs.materials', 'jobs.photos'] : ['jobs.materials']);
+            $id_map = [];
 
             foreach ($source->jobs as $job) {
-                $newJob = $job->replicate(['unique_id', 'project_job_document_id', 'source_job_id']);
+                $newJob = $job->replicate(['unique_id', 'project_job_document_id', 'source_job_id', 'parent_job_id']);
                 $newJob->project_job_document_id = $target->id;
                 $newJob->source_job_id = $job->id;
                 $newJob->save();
+                $id_map[$job->id] = $newJob->id;
 
                 foreach ($job->materials as $material) {
                     $newMaterial = $material->replicate(['unique_id', 'project_document_job_id']);
@@ -136,10 +189,17 @@ class ProjectJobDocument extends Model
                     $newMaterial->save();
                 }
 
-                foreach ($job->photos as $photo) {
+                foreach ($with_photos ? $job->photos : [] as $photo) {
                     $newPhoto = $photo->replicate(['unique_id', 'project_document_job_id']);
                     $newPhoto->project_document_job_id = $newJob->id;
                     $newPhoto->save();
+                }
+            }
+
+            // Parents may be sorted after their children, so the tree is relinked after all rows exist.
+            foreach ($source->jobs->whereNotNull('parent_job_id') as $job) {
+                if (isset($id_map[$job->parent_job_id])) {
+                    ProjectDocumentJob::query()->whereKey($id_map[$job->id])->update(['parent_job_id' => $id_map[$job->parent_job_id]]);
                 }
             }
 

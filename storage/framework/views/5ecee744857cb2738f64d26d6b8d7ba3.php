@@ -75,7 +75,8 @@
                             <button type="button" class="btn btn-primary w-100 document-action" data-bs-toggle="modal" data-bs-target="#document-modal" data-document-type="<?php echo e($document_type); ?>" data-document-label="<?php echo e($documentTypeLabels[$document_type]); ?>" data-source-id="<?php echo e($latest_document->unique_id); ?>" data-source-revision="<?php echo e($latest_document->revision_no); ?>"><i class="ti ti-copy-plus me-1"></i>Buat Revisi</button>
                         <?php elseif($stage_is_ready): ?>
                             <div class="stage-empty text-secondary small mb-3">Belum ada dokumen untuk tahap ini.</div>
-                            <button type="button" class="btn btn-primary w-100 mt-auto document-action" data-bs-toggle="modal" data-bs-target="#document-modal" data-document-type="<?php echo e($document_type); ?>" data-document-label="<?php echo e($documentTypeLabels[$document_type]); ?>"><i class="ti ti-file-plus me-1"></i>Buat Dokumen</button>
+                            <?php ($copy_type = \App\Models\ProjectJobDocument::PREVIOUS_PHASE[$document_type] ?? null); ?>
+                            <button type="button" class="btn btn-primary w-100 mt-auto document-action" data-bs-toggle="modal" data-bs-target="#document-modal" data-document-type="<?php echo e($document_type); ?>" data-document-label="<?php echo e($documentTypeLabels[$document_type]); ?>" <?php if($copy_type && $documentsByType->get($copy_type, collect())->isNotEmpty()): ?> data-copy-from="<?php echo e($documentTypeLabels[$copy_type]); ?>" <?php endif; ?>><i class="ti ti-file-plus me-1"></i>Buat Dokumen</button>
                         <?php else: ?>
                             <div class="stage-empty text-secondary small mb-3">Tahap ini terbuka setelah tahap sebelumnya tersedia.</div>
                             <button type="button" class="btn btn-outline-secondary w-100 mt-auto" disabled><i class="ti ti-lock me-1"></i>Belum Tersedia</button>
@@ -127,6 +128,13 @@
                 <div class="modal-header"><div><h3 class="modal-title" id="document-modal-title">Buat Dokumen</h3><div class="text-secondary small" id="document-modal-description"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
                 <div class="modal-body">
                     <div class="mb-3"><label class="form-label" for="document-number-input">Nomor Dokumen</label><input id="document-number-input" class="form-control" name="document_number" maxlength="100" value="<?php echo e(old('document_number')); ?>" placeholder="Contoh: RL/001/VIII/2026"></div>
+                    <div class="mb-3 d-none" id="copy-previous-group">
+                        <label class="form-check form-switch mb-1">
+                            <input type="checkbox" class="form-check-input" id="copy-previous-input" name="copy_previous" value="1" checked>
+                            <span class="form-check-label">Salin daftar pekerjaan dari <strong id="copy-previous-label"></strong></span>
+                        </label>
+                        <div class="form-hint">Kelompok, sub pekerjaan, volume, harga satuan, dan material ikut disalin dari revisi terakhir tahap tersebut.</div>
+                    </div>
                     <div class="mb-3 d-none" id="revision-reason-group"><label class="form-label required" for="revision-reason-input">Alasan Revisi</label><textarea id="revision-reason-input" class="form-control" name="revision_reason" rows="2" maxlength="1000" placeholder="Contoh: Hasil negosiasi harga dengan pemilik kapal"><?php echo e(old('revision_reason')); ?></textarea><div class="form-hint">Alasan ini tampil pada riwayat dan perbandingan revisi.</div></div>
                     <div><label class="form-label" for="document-notes-input">Catatan</label><textarea id="document-notes-input" class="form-control" name="notes" rows="3" placeholder="Catatan untuk revisi atau dokumen ini"><?php echo e(old('notes')); ?></textarea></div>
                 </div>
@@ -163,6 +171,10 @@
                 document.getElementById('document-modal-description').textContent = is_revision ? 'Revisi baru akan menyalin data dari Revisi ' + this.dataset.sourceRevision + '.' : 'Dokumen baru akan dibuat untuk tahap ini.';
                 document.getElementById('revision-reason-group').classList.toggle('d-none', !is_revision);
                 document.getElementById('revision-reason-input').required = is_revision;
+                var copy_from = is_revision ? '' : (this.dataset.copyFrom || '');
+                document.getElementById('copy-previous-group').classList.toggle('d-none', copy_from === '');
+                document.getElementById('copy-previous-input').disabled = copy_from === '';
+                document.getElementById('copy-previous-label').textContent = copy_from;
                 document.getElementById('document-submit-button').textContent = is_revision ? 'Buat Revisi' : 'Buat Dokumen';
             });
         });

@@ -60,7 +60,7 @@ return [
             'report' => false,
         ],
 
-        // Shared ship file storage: docking-request/ holds pending uploads, projects/{project_code}/documents/ holds approved ones.
+        // Private application files live here; future app documents belong under app-documents/.
         'ship' => [
             'driver' => 'local',
             'root' => env('SHIP_STORAGE_ROOT', '/mnt/ship'),
@@ -69,22 +69,6 @@ return [
                 'directory' => ['public' => 0775, 'private' => 0700],
             ],
             'throw' => true,
-        ],
-
-        // Custom Disk for Ship Repair Application
-        'ship_repair' => [
-            'driver' => 'local',
-            'root' => '/mnt/ship_repair',
-            'permissions' => [
-                'file' => [
-                    'public' => 0664,
-                    'private' => 0600,
-                ],
-                'directory' => [
-                    'public' => 0775,
-                    'private' => 0700,
-                ],
-            ],
         ],
 
     ],

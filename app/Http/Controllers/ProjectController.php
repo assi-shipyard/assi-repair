@@ -483,6 +483,10 @@ class ProjectController extends Controller
             return redirect()->route('project.index')->with('error', 'Proyek tidak dapat dihapus karena memiliki progres lebih dari 0%.');
         }
 
+        if ($project->customer_access()->exists() || $project->customer_documents()->exists() || $project->customer_feedback()->exists()) {
+            return redirect()->route('project.index')->with('error', 'Proyek tidak dapat dihapus karena memiliki akses atau riwayat pelanggan. Riwayat harus dipertahankan untuk audit.');
+        }
+
         // Store the project code for the success message, then delete the project and redirect back to the project index with a success message
         $projectCode = $project->project_code;
         $project->delete();

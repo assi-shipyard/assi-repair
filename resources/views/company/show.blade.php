@@ -17,7 +17,7 @@
 
     @php
         $logo_url = $company->logo_path
-            ? Storage::disk('public')->url('company_logos/' . $company->logo_path)
+            ? route('company.logo', $company->unique_id)
             : asset('assets/img/default_profile.jpg');
         $profile_completion = collect([
             $company->address,
@@ -278,7 +278,7 @@
                                                 <td class="fw-semibold">{{ $document->document_name }}</td>
                                                 <td><span class="badge bg-cyan-lt text-cyan">{{ $document->document_type }}</span></td>
                                                 <td class="text-break">
-                                                    <a href="{{ Storage::disk('public')->url($document->document_path) }}" target="_blank" rel="noopener noreferrer">
+                                                    <a href="{{ route('company.documents.download', [$company->unique_id, $document->unique_id ?? $document->id]) }}" target="_blank" rel="noopener noreferrer">
                                                         {{ basename((string) $document->document_path) }}
                                                     </a>
                                                 </td>
