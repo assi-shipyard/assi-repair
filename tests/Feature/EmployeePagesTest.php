@@ -46,15 +46,16 @@ class EmployeePagesTest extends TestCase
         $this->get(route('employee.create'))->assertRedirect(route('login'));
     }
 
-    public function test_empty_directory_uses_datatables_empty_state(): void
+    public function test_empty_directory_uses_card_empty_state(): void
     {
         $this->sign_in();
 
         $this->get(route('employee.index'))->assertOk()
-            ->assertSee('Daftar Pengguna')
+            ->assertSee('Akun Karyawan Internal')
             ->assertSee('0 Karyawan Terdaftar')
             ->assertSee('Belum ada karyawan terdaftar.')
-            ->assertSee('employee-table')
+            ->assertSee('employee-cards')
+            ->assertDontSee('<table', false)
             ->assertDontSee('colspan=', false)
             ->assertDontSee('box-shadow');
     }
@@ -86,6 +87,25 @@ class EmployeePagesTest extends TestCase
             ->assertSee(route('employee.edit', $employee->unique_id), false);
     }
 
+    public function test_employee_cards_include_private_photo_and_search_preserves_pagination(): void
+    {
+        $this->sign_in();
+        $position = $this->position();
+        for ($index = 1; $index <= 13; $index++) {
+            Employee::create([
+                'name' => sprintf('Karyawan %02d', $index), 'employee_id' => (string) (199600000 + $index),
+                'position_id' => $position->id, 'profile_photo_path' => $index === 1 ? 'employees/profile.jpg' : null,
+            ]);
+        }
+        $employee = Employee::where('employee_id', '199600001')->firstOrFail();
+        $this->get(route('employee.index'))->assertOk()->assertSee(route('employee.photo', $employee->unique_id), false)
+            ->assertSee('Karyawan 01')->assertDontSee('Karyawan 13')->assertDontSee('<table', false);
+        $this->get(route('employee.index', ['search' => 'Karyawan', 'page' => 2]))->assertOk()
+            ->assertSee('Karyawan 13')->assertDontSee('Karyawan 01')->assertSee('search=Karyawan', false);
+        $this->get(route('employee.index', ['search' => '199600001']))->assertSee('Karyawan 01')->assertDontSee('Karyawan 02');
+        $this->get(route('employee.index', ['search' => ['invalid']]))->assertSessionHasErrors('search');
+    }
+
     public function test_creation_form_displays_options_upload_and_password_guidance(): void
     {
         $this->sign_in();
@@ -111,10 +131,10 @@ class EmployeePagesTest extends TestCase
 
         $this->withSession([
             'errors' => $errors,
-            '_old_input' => ['name' => 'Nama Tersimpan', 'employee_id' => '001234567'],
+            '_old_input' => ['name' => 'Nama Tersimpan', 'employee_id' => '199607021'],
         ])->get(route('employee.create'))->assertOk()
             ->assertSee('value="Nama Tersimpan"', false)
-            ->assertSee('value="001234567"', false)
+            ->assertSee('value="199607021"', false)
             ->assertSee('<div class="invalid-feedback">NIK sudah terdaftar.</div>', false);
     }
 
@@ -125,30 +145,70 @@ class EmployeePagesTest extends TestCase
 
         $this->post(route('employee.store'), [
             'name' => 'Pengguna Baru',
-            'employee_id' => '001234567',
+            'employee_id' => '199607021',
             'email' => null,
             'position_id' => $position->id,
         ])->assertSessionHasNoErrors()->assertRedirect(route('employee.index'));
 
-        $employee = Employee::where('employee_id', '001234567')->firstOrFail();
+        $employee = Employee::where('employee_id', '199607021')->firstOrFail();
         $this->assertNotNull($employee->user);
-        $this->assertTrue(Hash::check('001234567', $employee->user->password));
+        $this->assertTrue(Hash::check('199607021', $employee->user->password));
 
         $this->post(route('employee.store'), [
             'name' => 'Pengguna Duplikat',
-            'employee_id' => '001234567',
+            'employee_id' => '199607021',
             'position_id' => $position->id,
         ])->assertSessionHasErrors('employee_id');
+    }
+
+    public function test_nik_form_uses_local_numeric_validation_without_availability_requests(): void
+    {
+        $this->sign_in();
+        $employee = $this->employee();
+
+        foreach ([route('employee.create'), route('employee.edit', $employee->unique_id)] as $url) {
+            $this->get($url)->assertOk()
+                ->assertSee('inputmode="numeric" pattern="[1-9][0-9]{8}" minlength="9" maxlength="9"', false)
+                ->assertSee("this.value.replace(/[^0-9]/g, '').slice(0, 9)", false)
+                ->assertSee('employee_id: { required: true, digits: true, minlength: 9, maxlength: 9, pattern: /^[1-9][0-9]{8}$/ }', false)
+                ->assertDontSee('check-nik')
+                ->assertDontSee('nik-feedback')
+                ->assertDontSee('NIK belum dapat diperiksa');
+        }
+    }
+
+    public function test_create_and_update_reject_nik_that_is_not_a_nine_digit_string(): void
+    {
+        $this->sign_in();
+        $employee = $this->employee();
+        $payload = [
+            'name' => 'Karyawan Uji',
+            'email' => null,
+            'position_id' => $employee->position_id,
+            'status' => 'active',
+        ];
+        $original_password = $employee->user->password;
+
+        foreach (['', '012345678', '000000000', '12345678', '1234567890', '12345a789', '1234 6789', '12345.789', '-12345678', '１２３４５６７８９', ['123456789'], 123456789] as $invalid_nik) {
+            $this->post(route('employee.store'), [...$payload, 'employee_id' => $invalid_nik])
+                ->assertSessionHasErrors('employee_id');
+            $this->put(route('employee.update', $employee->unique_id), [...$payload, 'employee_id' => $invalid_nik])
+                ->assertSessionHasErrors('employee_id');
+        }
+
+        $this->assertDatabaseCount('employees', 1);
+        $this->assertSame('199607021', $employee->fresh()->employee_id);
+        $this->assertSame($original_password, $employee->user->fresh()->password);
     }
 
     private function employee(): Employee
     {
         $position = $this->position();
-        $user = User::create(['employee_id' => '001234567', 'password' => 'existing-password']);
+        $user = User::create(['employee_id' => '199607021', 'password' => 'existing-password']);
 
         return Employee::create([
             'name' => 'Pengguna Pengujian',
-            'employee_id' => '001234567',
+            'employee_id' => '199607021',
             'position_id' => $position->id,
             'user_id' => $user->id,
             'status' => 'inactive',
@@ -173,7 +233,7 @@ class EmployeePagesTest extends TestCase
         $this->get(route('employee.edit', $employee->unique_id))->assertOk()
             ->assertSee('Ubah Pengguna')
             ->assertSee('value="Pengguna Pengujian"', false)
-            ->assertSee('value="001234567"', false)
+            ->assertSee('value="199607021"', false)
             ->assertSee('value="inactive" selected', false)
             ->assertSee('value="'.$manager->id.'" selected', false)
             ->assertSee('value="'.$employee->position_id.'" selected', false)
@@ -199,7 +259,7 @@ class EmployeePagesTest extends TestCase
         $this->get(route('employee.show', $employee->unique_id))->assertOk()
             ->assertSee('Detail Pengguna')
             ->assertSee('Pengguna Pengujian')
-            ->assertSee('NIK 001234567')
+            ->assertSee('NIK 199607021')
             ->assertSee('Tidak Aktif')
             ->assertSee('Belum diisi')
             ->assertSee('Staf Pengujian')
@@ -256,7 +316,7 @@ class EmployeePagesTest extends TestCase
 
         $this->put(route('employee.update', $employee->unique_id), [
             'name' => 'Nama Diperbarui',
-            'employee_id' => '001234567',
+            'employee_id' => '199607021',
             'email' => null,
             'position_id' => $employee->position_id,
             'status' => 'active',

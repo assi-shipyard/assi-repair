@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\account_directory_request;
 use App\Http\Requests\Customer\manage_account_request;
 use App\Http\Requests\Customer\manage_project_access_request;
 use App\Http\Requests\Customer\publish_document_request;
@@ -15,28 +16,39 @@ use App\Services\customer_management_service;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class account_management_controller extends Controller
 {
     public function __construct(private readonly customer_management_service $management) {}
 
-    public function index(): View
+    public function index(account_directory_request $request): View
     {
-        return view('accounts.index', $this->management->account_data());
+        return view('accounts.index', $this->management->account_data(User::TYPE_ADMIN, $request->validated()));
+    }
+
+    public function customers(account_directory_request $request): View
+    {
+        return view('accounts.index', $this->management->account_data(User::TYPE_CUSTOMER, $request->validated()));
+    }
+
+    public function photo(User $user): StreamedResponse
+    {
+        return $this->management->photo($user);
     }
 
     public function store(manage_account_request $request): RedirectResponse
     {
         $this->management->create_account($request->user(), $request->validated());
 
-        return redirect()->route('accounts.index')->with('success', 'Akun berhasil dibuat. Sampaikan kata sandi awal melalui saluran aman.');
+        return redirect()->route($request->validated('account_type') === User::TYPE_CUSTOMER ? 'accounts.customers' : 'accounts.index')->with('success', 'Akun berhasil dibuat. Sampaikan kata sandi awal melalui saluran aman.');
     }
 
     public function status(manage_account_request $request, User $user): RedirectResponse
     {
         $this->management->set_account_status($request->user(), $user, $request->boolean('is_active'));
 
-        return redirect()->route('accounts.index')->with('success', 'Status akun berhasil diperbarui.');
+        return redirect()->route($user->is_customer() ? 'accounts.customers' : ($user->account_type === User::TYPE_INTERNAL ? 'employee.index' : 'accounts.index'))->with('success', 'Status akun berhasil diperbarui.');
     }
 
     public function projects(Request $request): View
@@ -55,7 +67,7 @@ class account_management_controller extends Controller
     {
         $this->management->update_account($request->user(), $user, $request->validated());
 
-        return redirect()->route('accounts.index')->with('success', 'Akun berhasil diperbarui.');
+        return redirect()->route($user->is_customer() ? 'accounts.customers' : 'accounts.index')->with('success', 'Akun berhasil diperbarui.');
     }
 
     public function access(manage_project_access_request $request): RedirectResponse

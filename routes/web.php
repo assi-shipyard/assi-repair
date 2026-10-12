@@ -58,6 +58,8 @@ Route::middleware(['auth', 'account_access'])->prefix('customer')->name('custome
 Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): void {
     Route::middleware('role:admin')->group(function (): void {
         Route::get('/accounts', [account_management_controller::class, 'index'])->name('accounts.index');
+        Route::get('/customer-accounts', [account_management_controller::class, 'customers'])->name('accounts.customers');
+        Route::get('/accounts/{user}/photo', [account_management_controller::class, 'photo'])->whereUuid('user')->name('accounts.photo');
         Route::post('/accounts', [account_management_controller::class, 'store'])->name('accounts.store');
         Route::get('/accounts/{user}/edit', [account_management_controller::class, 'edit'])->whereUuid('user')->name('accounts.edit');
         Route::put('/accounts/{user}', [account_management_controller::class, 'update'])->whereUuid('user')->name('accounts.update');
@@ -136,7 +138,6 @@ Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): v
         Route::get('/', 'index')->name('index');
         Route::get('/create', 'create')->name('create');
         Route::post('/', 'store')->name('store');
-        Route::post('/check-nik', 'check_nik')->name('check-nik');
         Route::get('/{employee}', 'show')->name('show');
         Route::get('/{employee}/edit', 'edit')->name('edit');
         Route::put('/{employee}', 'update')->name('update');

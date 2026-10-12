@@ -1,6 +1,9 @@
 @push('scripts')
 <script>
     $(function () {
+        $.validator.addMethod('profile_photo_size', function (value, element) {
+            return this.optional(element) || !element.files || element.files[0].size <= 2097152;
+        }, 'Ukuran foto profil maksimal 2 MB.');
         $.extend($.validator.messages, {
             required: 'Kolom ini wajib diisi.',
             email: 'Format email tidak valid.',
@@ -16,7 +19,11 @@
             $(this).validate({
                 errorClass: 'text-danger small',
                 errorElement: 'div',
-                rules: { password_confirmation: { equalTo: '[name="password"]' } }
+                rules: {
+                    password_confirmation: { equalTo: '[name="password"]' },
+                    profile_photo: { profile_photo_size: true, extension: 'jpg|jpeg|png|webp' }
+                },
+                messages: { profile_photo: { extension: 'Foto profil harus berformat JPG, JPEG, PNG, atau WEBP.' } }
             });
         });
     });

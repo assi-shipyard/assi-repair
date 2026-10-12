@@ -2,7 +2,7 @@
 @section('title', 'Layanan Pelanggan')
 @section('body_title', 'Akses & Persetujuan Pelanggan')
 @section('buttons_beside_title')
-    @role('admin')<a class="btn btn-outline-secondary" href="{{ route('accounts.index') }}">Kelola Semua Akun</a>@endrole
+    @role('admin')<a class="btn btn-outline-secondary" href="{{ route('accounts.customers') }}">Akun Pelanggan</a>@endrole
 @endsection
 @section('content')
     @include('partials.flash')

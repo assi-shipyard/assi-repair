@@ -72,13 +72,28 @@ backfilled with the `admin` account type and a separate username. The legacy
 admin identifier remains in `employee_id` for compatibility with existing data.
 `AdminSeeder` also populates the new fields.
 
-Administrators use **Kelola Semua Akun** to create/edit admin/customer accounts,
+Administrators use the separate **Akun Administrator** and **Akun Pelanggan**
+directories to create/edit admin/customer accounts,
 reset passwords, and activate or suspend accounts. Account type cannot be changed.
 Internal employees continue to use the employee
-form and their nine-digit NIK. Customers sign in at `/customer/login` using
+form and their nine-digit NIK. The first digit cannot be zero because the first
+four digits represent a year. The employee form accepts only digits and
+validates this format locally without an availability
+request. NIK format and uniqueness are checked again on the server when saving.
+Customers sign in at `/customer/login` using
 email, and must change their administrator-provisioned initial password before
 accessing projects. Deliver initial credentials through an independently
 verified, secure channel; automatic email invitations are not implemented.
+
+**Karyawan Internal** and **Akun Pelanggan** use responsive profile cards with
+server-side search, status filters, and twelve cards per page. Employee cards
+show NIK, position, unit, manager, email, status, and existing profile photos.
+Customer cards show company, email, status, active project access count, and
+registration date. Admins have their own restricted directory.
+Run the account-profile-photo migration to enable private customer/admin photo
+uploads on create/edit forms. JPG, PNG, and WEBP uploads are limited to 2 MB and
+4,000 x 4,000 pixels, stored on the private `ship` disk, and served only through
+admin-authorized UUID routes. Accounts without a photo show a fallback avatar.
 
 Under **Akses & Persetujuan Pelanggan**, assign each customer explicitly to
 projects. Their company represents their employer, not necessarily the vessel

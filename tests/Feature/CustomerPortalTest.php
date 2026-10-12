@@ -352,7 +352,7 @@ class CustomerPortalTest extends TestCase
     {
         $admin = $this->admin();
         $company = Company::create(['unique_id' => (string) Str::uuid(), 'name' => 'Surveyor Eksternal', 'address' => 'Alamat Uji']);
-        $this->actingAs($admin)->get(route('accounts.index'))->assertOk()->assertSee('Kelola Semua Akun');
+        $this->actingAs($admin)->get(route('accounts.index'))->assertOk()->assertSee('Akun Administrator');
         $this->post(route('accounts.store'), [
             'account_type' => 'customer', 'name' => 'Pelanggan Baru', 'email' => 'NEW@EXAMPLE.TEST',
             'company_id' => $company->unique_id, 'password' => 'SecretPassword123', 'password_confirmation' => 'SecretPassword123',
@@ -399,11 +399,11 @@ class CustomerPortalTest extends TestCase
         $unit = OrganizationalUnit::create(['name' => 'Divisi Uji', 'type' => 'division']);
         $position = Position::create(['name' => 'Staf Uji', 'organizational_unit_id' => $unit->id]);
         $this->actingAs($admin)->post(route('employee.store'), [
-            'name' => 'Karyawan Baru', 'employee_id' => '001234567', 'position_id' => $position->id, 'email' => null,
+            'name' => 'Karyawan Baru', 'employee_id' => '199607021', 'position_id' => $position->id, 'email' => null,
         ])->assertSessionHasNoErrors();
         $this->assertSame('customer', $customer->fresh()->account_type);
         $this->assertNull($customer->fresh()->employee_id);
-        $employee = Employee::where('employee_id', '001234567')->firstOrFail();
+        $employee = Employee::where('employee_id', '199607021')->firstOrFail();
         $this->assertNotSame($customer->id, $employee->user_id);
         $this->assertSame('internal', $employee->user->account_type);
         $this->post(route('employee.store'), [

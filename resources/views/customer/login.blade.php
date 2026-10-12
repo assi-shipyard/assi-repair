@@ -28,6 +28,7 @@
     </main>
     <script src="{{ asset('assets/dist/js/jquery-3.7.1.min.js') }}"></script>
     <script src="{{ asset('assets/dist/js/jquery-validation/jquery.validate.min.js') }}"></script>
+    <script src="{{ asset('assets/dist/js/jquery-validation/additional-methods.min.js') }}"></script>
     @include('customer.validation')
     @stack('scripts')
 </body>

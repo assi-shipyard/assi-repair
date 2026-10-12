@@ -20,9 +20,8 @@
                             </div>
                             <div class="col-md-6 form-group">
                                 <label class="form-label required" for="employee_id">NIK</label>
-                                <input class="form-control @error('employee_id') is-invalid @enderror" name="employee_id" id="employee_id" value="{{ old('employee_id', $employee?->employee_id) }}" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" aria-describedby="nik-help nik-feedback" required>
-                                <div class="form-text" id="nik-help">Nomor induk karyawan terdiri dari tepat 9 digit, termasuk angka nol di awal.</div>
-                                <div id="nik-feedback" class="form-text" aria-live="polite"></div>
+                                <input class="form-control @error('employee_id') is-invalid @enderror" type="text" name="employee_id" id="employee_id" value="{{ old('employee_id', $employee?->employee_id) }}" inputmode="numeric" pattern="[1-9][0-9]{8}" minlength="9" maxlength="9" aria-describedby="nik-help" required>
+                                <div class="form-text" id="nik-help">NIK terdiri dari tepat 9 digit dan tidak boleh diawali angka 0. Empat digit pertama merupakan tahun.</div>
                                 @error('employee_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
                             <div class="col-md-6 form-group">
@@ -182,37 +181,11 @@
                 if (preview_url) { URL.revokeObjectURL(preview_url); }
             });
 
-            const original_nik = @js($employee?->employee_id);
-            let nik_timeout = null;
-            let nik_request = null;
-            $('#employee_id').on('input', function () {
-                clearTimeout(nik_timeout);
-                if (nik_request) { nik_request.abort(); nik_request = null; }
-                const nik = $(this).val().toString();
-                const feedback = $('#nik-feedback');
-                feedback.removeClass('text-success text-danger').text('');
-                if (!/^[0-9]{9}$/.test(nik)) { return; }
-                if (nik === original_nik) { feedback.text('NIK karyawan saat ini.'); return; }
-                feedback.text('Memeriksa NIK...');
-                nik_timeout = setTimeout(function () {
-                    nik_request = $.post(@js(route('employee.check-nik')), { employee_id: nik })
-                        .done(function (response) {
-                            if ($('#employee_id').val() !== nik) { return; }
-                            feedback.addClass(response.available ? 'text-success' : 'text-danger')
-                                .text(response.available ? 'NIK tersedia.' : 'NIK sudah terdaftar.');
-                        })
-                        .fail(function (xhr, status) {
-                            if (status === 'abort' || $('#employee_id').val() !== nik) { return; }
-                            feedback.addClass('text-danger').text('NIK belum dapat diperiksa. Sistem akan memvalidasi ulang saat akun disimpan.');
-                        });
-                }, 500);
-            });
-
             const validator = $('#employee-form').validate({
                 ignore: [],
                 rules: {
                     name: { required: true, maxlength: 255 },
-                    employee_id: { required: true, digits: true, minlength: 9, maxlength: 9 },
+                    employee_id: { required: true, digits: true, minlength: 9, maxlength: 9, pattern: /^[1-9][0-9]{8}$/ },
                     email: { email: true, maxlength: 255 },
                     position_id: { required: true },
                     status: { required: true },
@@ -224,7 +197,7 @@
                 },
                 messages: {
                     name: { required: 'Nama lengkap wajib diisi.', maxlength: 'Nama maksimal 255 karakter.' },
-                    employee_id: { required: 'NIK wajib diisi.', digits: 'NIK harus berupa angka.', minlength: 'NIK harus tepat 9 digit.', maxlength: 'NIK harus tepat 9 digit.' },
+                    employee_id: { required: 'NIK wajib diisi.', digits: 'NIK harus berupa angka.', minlength: 'NIK harus tepat 9 digit.', maxlength: 'NIK harus tepat 9 digit.', pattern: 'NIK tidak boleh diawali angka 0. Empat digit pertama merupakan tahun.' },
                     email: { email: 'Masukkan alamat email yang valid.', maxlength: 'Email maksimal 255 karakter.' },
                     position_id: { required: 'Pilih jabatan karyawan.' },
                     status: { required: 'Pilih status karyawan.' },
@@ -246,6 +219,10 @@
                     $(element).removeClass('is-invalid');
                     $(element).next('.select2').find('.select2-selection').removeClass('is-invalid');
                 },
+            });
+            $('#employee_id').on('input', function () {
+                this.value = this.value.replace(/[^0-9]/g, '').slice(0, 9);
+                validator.element(this);
             });
             $('#position_id, #manager_id').on('change', function () { validator.element(this); });
         });

@@ -324,10 +324,11 @@
                                     <div class="dropdown-menu-columns">
                                         <div class="dropdown-menu-column">
                                             <h6 class="dropdown-header">Users</h6>
-                                            <a href="{{ route('accounts.index') }}" class="dropdown-item">Kelola Semua Akun</a>
+                                            <a href="{{ route('accounts.index') }}" class="dropdown-item">Akun Administrator</a>
+                                            <a href="{{ route('accounts.customers') }}" class="dropdown-item">Akun Pelanggan</a>
                                             <a href="{{ route('accounts.projects') }}" class="dropdown-item">Akses &amp; Persetujuan Pelanggan</a>
                                             <a href="{{ route('employee.create') }}" class="dropdown-item">Buat Akun Baru</a>
-                                            <a href="{{ route('employee.index') }}" class="dropdown-item">Daftar User</a>
+                                            <a href="{{ route('employee.index') }}" class="dropdown-item">Karyawan Internal</a>
 
                                             <div class="dropdown-divider"></div>
 

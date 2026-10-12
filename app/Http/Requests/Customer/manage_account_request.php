@@ -43,12 +43,19 @@ class manage_account_request extends FormRequest
             'email' => ['required', 'email:rfc', 'max:64', Rule::unique('users', 'email')->ignore($user?->id)],
             'company_id' => [Rule::requiredIf($account_type === 'customer'), Rule::excludeIf($account_type !== 'customer'), 'uuid', Rule::exists('companies', 'unique_id')],
             'password' => [$is_update ? 'nullable' : 'required', 'confirmed', 'max:128', Password::min(12)->letters()->numbers()->mixedCase()],
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:max_width=4000,max_height=4000'],
+            'remove_photo' => ['sometimes', 'boolean'],
         ];
     }
 
     public function messages(): array
     {
         return [
+            'profile_photo.image' => 'Foto profil harus berupa gambar.',
+            'profile_photo.mimes' => 'Foto profil harus berformat JPG, JPEG, PNG, atau WEBP.',
+            'profile_photo.max' => 'Ukuran foto profil maksimal 2 MB.',
+            'profile_photo.dimensions' => 'Resolusi foto profil maksimal 4.000 x 4.000 piksel.',
+            'remove_photo.boolean' => 'Pilihan hapus foto tidak valid.',
             'account_type.required' => 'Jenis akun wajib dipilih.',
             'account_type.in' => 'Jenis akun tidak valid.',
             'account_type.prohibited' => 'Jenis akun tidak dapat diubah.',

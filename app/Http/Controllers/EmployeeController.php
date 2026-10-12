@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\account_directory_request;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\User;
@@ -26,13 +27,29 @@ class EmployeeController extends Controller
 
     private const PROFILE_PHOTO_MAX_DIMENSION = 1600;
 
-    public function index(): View
+    public function index(account_directory_request $request): View
     {
-        $employees = Employee::with(['position.organizational_unit', 'manager'])
-            ->orderBy('name')
-            ->get();
+        $filters = $request->validated();
+        $base_query = Employee::query()->where(function ($query): void {
+            $query->whereDoesntHave('user')->orWhereHas('user', fn ($user_query) => $user_query->where('account_type', User::TYPE_INTERNAL));
+        });
+        $total = (clone $base_query)->count();
+        $active_total = (clone $base_query)->where('status', 'active')->count();
+        $inactive_total = (clone $base_query)->where('status', 'inactive')->count();
+        $employees = $base_query->with(['position.organizational_unit', 'manager', 'user'])
+            ->when($filters['search'] ?? null, function ($query, string $search): void {
+                $query->where(function ($query) use ($search): void {
+                    $query->where('name', 'like', '%'.$search.'%')->orWhere('employee_id', 'like', '%'.$search.'%')
+                        ->orWhere('email', 'like', '%'.$search.'%')
+                        ->orWhereHas('position', fn ($position_query) => $position_query->where('name', 'like', '%'.$search.'%')
+                            ->orWhereHas('organizational_unit', fn ($unit_query) => $unit_query->where('name', 'like', '%'.$search.'%')))
+                        ->orWhereHas('manager', fn ($manager_query) => $manager_query->where('name', 'like', '%'.$search.'%'));
+                });
+            })
+            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->orderBy('name')->paginate(12)->withQueryString();
 
-        return view('employee.index', compact('employees'));
+        return view('employee.index', compact('employees', 'filters', 'total', 'active_total', 'inactive_total'));
     }
 
     public function create(): View
@@ -62,20 +79,6 @@ class EmployeeController extends Controller
         }
 
         return redirect()->route('employee.index')->with('success', 'Karyawan berhasil dibuat.');
-    }
-
-    public function check_nik(Request $request)
-    {
-        $request->validate(['employee_id' => 'required|string']);
-
-        $exists = Employee::query()
-            ->where('employee_id', $request->employee_id)
-            ->when($request->exclude_id, function ($query) use ($request) {
-                $query->where('id', '!=', $request->exclude_id);
-            })
-            ->exists();
-
-        return response()->json(['available' => !$exists]);
     }
 
     public function show(string $employee): View
@@ -174,7 +177,7 @@ class EmployeeController extends Controller
     private function rules(?int $employee_id = null, bool $is_update = false): array
     {
         $email_rule = 'nullable|email|unique:employees,email';
-        $employee_code_rule = 'required|digits:9|unique:employees,employee_id';
+        $employee_code_rule = 'required|string|digits:9|regex:/^[1-9][0-9]{8}$/|unique:employees,employee_id';
 
         if ($employee_id !== null) {
             $email_rule .= ','.$employee_id;
@@ -232,6 +235,8 @@ class EmployeeController extends Controller
             'email.max' => 'Email maksimal 64 karakter.',
             'email.unique' => 'Email sudah ada.',
             'employee_id.required' => 'Nomor induk karyawan wajib diisi.',
+            'employee_id.string' => 'Nomor induk karyawan harus berupa 9 digit angka.',
+            'employee_id.regex' => 'NIK harus tepat 9 digit dan tidak boleh diawali angka 0. Empat digit pertama merupakan tahun.',
             'employee_id.digits' => 'Nomor induk karyawan harus berupa 9 digit angka.',
             'employee_id.unique' => 'Nomor induk karyawan sudah ada.',
             'status.required' => 'Status wajib diisi.',

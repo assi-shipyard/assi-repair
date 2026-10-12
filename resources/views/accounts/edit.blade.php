@@ -2,14 +2,20 @@
 @section('title', 'Ubah Akun')
 @section('body_title', 'Ubah Akun')
 @section('buttons_beside_title')
-    <a href="{{ route('accounts.index') }}" class="btn btn-outline-secondary">Daftar Akun</a>
+    <a href="{{ route($user->is_customer() ? 'accounts.customers' : 'accounts.index') }}" class="btn btn-outline-secondary">Daftar Akun</a>
 @endsection
 @section('content')
     @include('partials.flash')
     <div class="card"><div class="card-header"><h3 class="card-title">{{ $user->is_customer() ? 'Pelanggan' : 'Admin' }}</h3></div><div class="card-body">
-        <form class="customer_form" method="POST" action="{{ route('accounts.update', $user) }}">
+        <form class="customer_form" method="POST" action="{{ route('accounts.update', $user) }}" enctype="multipart/form-data">
             @csrf @method('PUT')
             <div class="row g-3">
+                <div class="col-12">
+                    @if ($user->profile_photo_path)<img src="{{ route('accounts.photo', $user) }}" class="avatar avatar-lg object-fit-cover mb-2" alt="Foto profil {{ $user->name }}">@endif
+                    <label for="profile_photo" class="form-label">Foto Profil (Opsional)</label><input id="profile_photo" name="profile_photo" type="file" class="form-control" accept="image/jpeg,image/png,image/webp">
+                    <small class="text-secondary">JPG, PNG, atau WEBP; maksimal 2 MB dan 4.000 x 4.000 piksel.</small>
+                    @if ($user->profile_photo_path)<label class="form-check mt-2"><input type="checkbox" name="remove_photo" value="1" class="form-check-input" @checked(old('remove_photo'))><span class="form-check-label">Hapus foto profil</span></label>@endif
+                </div>
                 <div class="col-md-6"><label for="name" class="form-label">Nama Lengkap</label><input id="name" name="name" class="form-control" required maxlength="255" value="{{ old('name', $user->name) }}"></div>
                 <div class="col-md-6"><label for="email" class="form-label">Email</label><input id="email" name="email" type="email" class="form-control" required maxlength="64" value="{{ old('email', $user->email) }}"></div>
                 @if ($user->is_customer())

@@ -11,10 +11,13 @@ use App\Models\customer_project_access;
 use App\Models\Project;
 use App\Models\ProjectJobDocument;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class customer_management_service
 {
@@ -23,10 +26,24 @@ class customer_management_service
         private readonly ProjectDocumentComparisonService $comparison,
     ) {}
 
-    public function account_data(): array
+    public function account_data(string $account_type = User::TYPE_ADMIN, array $filters = []): array
     {
+        $query = User::query()->where('account_type', $account_type);
+
         return [
-            'users' => User::query()->with(['employee', 'company'])->orderBy('account_type')->latest('id')->paginate(20),
+            'account_type' => $account_type,
+            'filters' => $filters,
+            'total' => (clone $query)->count(),
+            'active_total' => (clone $query)->where('is_active', true)->count(),
+            'users' => $query->with('company')
+                ->withCount(['customer_access' => fn ($access_query) => $access_query->where('is_active', true)])
+                ->when($filters['search'] ?? null, function ($query, string $search): void {
+                    $query->where(fn ($query) => $query->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('email', 'like', '%'.$search.'%')->orWhere('username', 'like', '%'.$search.'%')
+                        ->orWhereHas('company', fn ($company_query) => $company_query->where('name', 'like', '%'.$search.'%')));
+                })
+                ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('is_active', $status === 'active'))
+                ->orderBy('name')->orderBy('id')->paginate(12)->withQueryString(),
             'companies' => Company::query()->orderBy('id')->lazy(100),
         ];
     }
@@ -47,6 +64,7 @@ class customer_management_service
             if ($user->account_type === User::TYPE_ADMIN) {
                 $user->assignRole(Role::findOrCreate('admin', 'web'));
             }
+            $this->save_photo($user, $data);
             $this->portal->audit($actor, 'account.created', $user->unique_id, ['account_type' => $user->account_type]);
         });
     }
@@ -91,8 +109,12 @@ class customer_management_service
 
     public function update_account(User $actor, User $user, array $data): void
     {
-        DB::transaction(function () use ($actor, $user, $data): void {
+        $old_photo_path = null;
+        $photo_changed = false;
+        DB::transaction(function () use ($actor, $user, $data, &$old_photo_path, &$photo_changed): void {
             $user = User::query()->lockForUpdate()->findOrFail($user->id);
+            $old_photo_path = $user->profile_photo_path;
+            $photo_changed = isset($data['profile_photo']) || (bool) ($data['remove_photo'] ?? false);
             abort_unless(in_array($user->account_type, [User::TYPE_ADMIN, User::TYPE_CUSTOMER], true), 403, 'Gunakan formulir karyawan untuk akun internal.');
             $before = $user->only(['name', 'username', 'email', 'company_id']);
             $user->fill([
@@ -108,12 +130,17 @@ class customer_management_service
             }
             $user->remember_token = null;
             $user->save();
+            $this->save_photo($user, $data);
             DB::table('sessions')->where('user_id', $user->id)->delete();
             $this->portal->audit($actor, 'account.updated', $user->unique_id, [
                 'before' => $before, 'after' => $user->only(['name', 'username', 'email', 'company_id']),
                 'password_reset' => $password_reset,
+                'photo_changed' => isset($data['profile_photo']) || (bool) ($data['remove_photo'] ?? false),
             ]);
         });
+        if ($photo_changed && $old_photo_path !== null) {
+            Storage::disk('ship')->delete($old_photo_path);
+        }
     }
 
     public function save_access(User $actor, array $data): void
@@ -242,5 +269,22 @@ class customer_management_service
                 'previous_approver_id' => $previous_approver->unique_id, 'approver_id' => $approver->unique_id,
             ]);
         });
+    }
+
+    public function photo(User $user): StreamedResponse
+    {
+        abort_unless($user->profile_photo_path !== null && Storage::disk('ship')->exists($user->profile_photo_path), 404);
+
+        return Storage::disk('ship')->response($user->profile_photo_path, null, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
+    private function save_photo(User $user, array $data): void
+    {
+        $photo = $data['profile_photo'] ?? null;
+        if (! $photo instanceof UploadedFile && ! ($data['remove_photo'] ?? false)) {
+            return;
+        }
+        $user->profile_photo_path = $photo instanceof UploadedFile ? $photo->store('accounts/profile-photos', 'ship') : null;
+        $user->save();
     }
 }
