@@ -88,6 +88,8 @@ verified, secure channel; automatic email invitations are not implemented.
 **Karyawan Internal** and **Akun Pelanggan** use responsive profile cards with
 server-side search, status filters, and twelve cards per page. Employee cards
 show NIK, position, unit, manager, email, status, and existing profile photos.
+Account directories use Tabler pagination with Indonesian labels and a single
+navigation row; mobile screens show previous/next controls without page numbers.
 Customer cards show company, email, status, active project access count, and
 registration date. Admins have their own restricted directory.
 Run the account-profile-photo migration to enable private customer/admin photo

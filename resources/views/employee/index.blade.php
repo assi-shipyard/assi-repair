@@ -50,6 +50,6 @@
             <div class="col-12"><div class="card"><div class="card-body text-center text-secondary py-5">{{ $total === 0 ? 'Belum ada karyawan terdaftar.' : 'Tidak ada karyawan yang cocok dengan pencarian.' }}</div></div></div>
         @endforelse
     </div>
-    <div class="mt-3">{{ $employees->links() }}</div>
+    <div class="mt-3">{{ $employees->onEachSide(1)->links('accounts.partials.pagination') }}</div>
     @include('customer.validation')
 @endsection

@@ -49,7 +49,7 @@
             <div class="col-12"><div class="card"><div class="card-body text-center text-secondary py-5"><?php echo e($total === 0 ? 'Belum ada karyawan terdaftar.' : 'Tidak ada karyawan yang cocok dengan pencarian.'); ?></div></div></div>
         <?php endif; ?>
     </div>
-    <div class="mt-3"><?php echo e($employees->links()); ?></div>
+    <div class="mt-3"><?php echo e($employees->onEachSide(1)->links('accounts.partials.pagination')); ?></div>
     <?php echo $__env->make('customer.validation', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 <?php $__env->stopSection(); ?>
 

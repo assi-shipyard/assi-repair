@@ -54,7 +54,9 @@ class AccountDirectoriesTest extends TestCase
         for ($index = 1; $index <= 13; $index++) {
             User::create(['account_type' => 'customer', 'name' => sprintf('Pelanggan %02d', $index), 'company_id' => $company->id, 'password' => 'SecretPassword123']);
         }
-        $this->actingAs($admin)->get(route('accounts.customers'))->assertSee('Pelanggan 01')->assertDontSee('Pelanggan 13');
+        $this->actingAs($admin)->get(route('accounts.customers'))->assertSee('Pelanggan 01')->assertDontSee('Pelanggan 13')
+            ->assertSee('Menampilkan 1 hingga 12 dari 13 data')->assertSee('Navigasi halaman')
+            ->assertDontSee('Showing')->assertDontSee('sm:hidden', false);
         $this->get(route('accounts.customers', ['search' => 'Surveyor', 'page' => 2]))->assertSee('Pelanggan 13')->assertDontSee('Pelanggan 01')->assertSee('search=Surveyor', false);
     }
 

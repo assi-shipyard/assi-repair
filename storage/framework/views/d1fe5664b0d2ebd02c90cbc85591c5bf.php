@@ -53,7 +53,7 @@
             <div class="col-12"><div class="card"><div class="card-body text-center text-secondary py-5"><?php echo e($total === 0 ? 'Belum ada akun terdaftar.' : 'Tidak ada akun yang cocok dengan pencarian.'); ?></div></div></div>
         <?php endif; ?>
     </div>
-    <div class="my-3"><?php echo e($users->links()); ?></div>
+    <div class="my-3"><?php echo e($users->onEachSide(1)->links('accounts.partials.pagination')); ?></div>
     <div class="card" id="create-account"><div class="card-header"><h3 class="card-title">Buat Akun <?php echo e($is_customer_directory ? 'Pelanggan' : 'Admin'); ?></h3></div><div class="card-body">
         <form class="customer_form" action="<?php echo e(route('accounts.store')); ?>" method="POST" enctype="multipart/form-data">
             <?php echo csrf_field(); ?>

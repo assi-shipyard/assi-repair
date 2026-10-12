@@ -99,7 +99,9 @@ class EmployeePagesTest extends TestCase
         }
         $employee = Employee::where('employee_id', '199600001')->firstOrFail();
         $this->get(route('employee.index'))->assertOk()->assertSee(route('employee.photo', $employee->unique_id), false)
-            ->assertSee('Karyawan 01')->assertDontSee('Karyawan 13')->assertDontSee('<table', false);
+            ->assertSee('Karyawan 01')->assertDontSee('Karyawan 13')->assertDontSee('<table', false)
+            ->assertSee('Menampilkan 1 hingga 12 dari 13 data')->assertSee('Navigasi halaman')
+            ->assertDontSee('Showing')->assertDontSee('sm:hidden', false);
         $this->get(route('employee.index', ['search' => 'Karyawan', 'page' => 2]))->assertOk()
             ->assertSee('Karyawan 13')->assertDontSee('Karyawan 01')->assertSee('search=Karyawan', false);
         $this->get(route('employee.index', ['search' => '199600001']))->assertSee('Karyawan 01')->assertDontSee('Karyawan 02');
