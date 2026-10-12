@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Project\save_document_job_material_request;
 use App\Http\Requests\Project\save_document_job_request;
+use App\Http\Requests\Project\save_minimum_override_request;
 use App\Http\Requests\Project\search_price_items_request;
 use App\Http\Resources\price_book_item_option_resource;
 use App\Models\Project;
@@ -71,6 +72,22 @@ class project_boq_controller extends Controller
         $this->boq->delete_material($document, $this->material($this->job($document, $job_id), $material_id), $this->auth->id());
 
         return $this->back_to($document, 'Material berhasil dihapus.');
+    }
+
+    public function save_minimum_override(save_minimum_override_request $request, string $project_id, string $document_id): RedirectResponse
+    {
+        $document = $this->editable_document($project_id, $document_id);
+        $is_set = $request->validated('action') === 'set';
+
+        $this->boq->set_minimum_override(
+            $document,
+            $request->validated('price_book_item_id'),
+            $is_set ? (string) $request->validated('minimum_quantity') : null,
+            $is_set ? $request->validated('reason') : null,
+            $this->auth->id(),
+        );
+
+        return $this->back_to($document, $is_set ? 'Minimum hasil negosiasi berhasil disimpan.' : 'Minimum dikembalikan sesuai Kamus Harga.');
     }
 
     public function price_items(search_price_items_request $request, string $project_id): AnonymousResourceCollection

@@ -31,12 +31,14 @@ class ProjectJobDocument extends Model
     ];
 
     // Which job-list columns each phase works with; every phase shares the same tables.
+    // Satisfaction Notes keeps internal prices only to weight jobs added during repair; its export hides them,
+    // and its progress comes from approved daily reports instead of manual edits.
     public const PHASE_FEATURES = [
-        self::TYPE_REPAIR_LIST => ['prices' => false, 'progress' => false],
-        self::TYPE_INITIAL_BOQ => ['prices' => true, 'progress' => false],
-        self::TYPE_SATISFACTION_NOTES => ['prices' => false, 'progress' => true],
-        self::TYPE_DOCKING_REPORT => ['prices' => false, 'progress' => true],
-        self::TYPE_FINAL_BOQ => ['prices' => true, 'progress' => true],
+        self::TYPE_REPAIR_LIST => ['prices' => false, 'export_prices' => false, 'progress' => false, 'progress_reports' => false],
+        self::TYPE_INITIAL_BOQ => ['prices' => true, 'export_prices' => true, 'progress' => false, 'progress_reports' => false],
+        self::TYPE_SATISFACTION_NOTES => ['prices' => true, 'export_prices' => false, 'progress' => true, 'progress_reports' => true],
+        self::TYPE_DOCKING_REPORT => ['prices' => false, 'export_prices' => false, 'progress' => true, 'progress_reports' => false],
+        self::TYPE_FINAL_BOQ => ['prices' => true, 'export_prices' => true, 'progress' => true, 'progress_reports' => false],
     ];
 
     // The phase whose latest job list seeds a new document of the key phase.
@@ -83,6 +85,7 @@ class ProjectJobDocument extends Model
             'locked_at' => 'datetime',
             'submitted_at' => 'datetime',
             'superseded_at' => 'datetime',
+            'minimum_overrides' => 'array',
         ];
     }
 
@@ -123,7 +126,7 @@ class ProjectJobDocument extends Model
 
     public function features(): array
     {
-        return self::PHASE_FEATURES[$this->document_type] ?? ['prices' => false, 'progress' => false];
+        return self::PHASE_FEATURES[$this->document_type] ?? self::PHASE_FEATURES[self::TYPE_REPAIR_LIST];
     }
 
     public function can_be_edited_by(?User $user): bool

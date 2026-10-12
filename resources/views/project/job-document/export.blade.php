@@ -1,12 +1,13 @@
 @php
     $features = $sheet['features'];
-    $show_prices = $features['prices'];
+    $show_prices = $features['export_prices'];
     $show_progress = $features['progress'];
+    $progress_weight_column = $show_progress && ! $show_prices;
     $money = fn ($value): string => $value === null ? '-' : number_format((float) $value, 2, ',', '.');
     $qty = fn ($value): string => $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 4, ',', '.'), '0'), ',');
     $percent = fn ($value): string => $value === null ? '-' : number_format((float) $value, 2, ',', '.').'%';
     $status_labels = ['pending' => 'Belum Mulai', 'ongoing' => 'Berjalan', 'completed' => 'Selesai', 'cancelled' => 'Batal'];
-    $column_count = 4 + ($show_prices ? 3 : 0) + ($show_progress ? 2 : 0);
+    $column_count = 4 + ($show_prices ? 3 : 0) + ($show_progress ? 3 + ($progress_weight_column ? 1 : 0) : 0);
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -76,7 +77,9 @@
                     <th style="width: 6%">Bobot</th>
                 @endif
                 @if ($show_progress)
+                    @if ($progress_weight_column)<th style="width: 7%">Bobot</th>@endif
                     <th style="width: 7%">Progres</th>
+                    <th style="width: 8%">Tertimbang</th>
                     <th style="width: 8%">Status</th>
                 @endif
             </tr>
@@ -91,7 +94,9 @@
                         <td class="right">{{ $percent($group['weight']) }}</td>
                     @endif
                     @if ($show_progress)
+                        @if ($progress_weight_column)<td class="right">{{ $percent($group['weight']) }}</td>@endif
                         <td class="right">{{ $percent($group['progress']) }}</td>
+                        <td class="right">{{ $percent($group['weighted']) }}</td>
                         <td></td>
                     @endif
                 </tr>
@@ -101,30 +106,21 @@
                         <td class="nowrap">{{ $row['number'] }}</td>
                         <td style="padding-left: {{ 4 + $row['depth'] * 12 }}px">
                             {{ $job->job_name }}
-                            @if ($job->calculation)
-                                <div class="small muted">
-                                    @if ($job->calculation['type'] === 'plate')
-                                        Pelat {{ $qty($job->calculation['length']) }} × {{ $qty($job->calculation['width']) }} × {{ $qty($job->calculation['thickness']) }} mm × {{ $job->calculation['quantity'] }} = {{ $qty($job->calculation['weight_kg']) }} kg
-                                    @else
-                                        Pipa Ø{{ $qty($job->calculation['diameter']) }} × {{ $qty($job->calculation['wall_thickness']) }} mm, {{ $qty($job->calculation['pipe_length']) }} mm × {{ $job->calculation['quantity'] }} = {{ $qty($job->calculation['weight_kg']) }} kg
-                                    @endif
-                                </div>
-                            @endif
-                            @if ($job->minimum_quantity !== null)
-                                <div class="small muted">Minimum charge {{ $qty($job->minimum_quantity) }} {{ $job->unit }}</div>
-                            @endif
+                            @if ($row['calculation_text_customer'])<div class="small muted">{{ $row['calculation_text_customer'] }}</div>@endif
                             @if ($job->notes)<div class="small muted">{{ $job->notes }}</div>@endif
                         </td>
-                        <td class="right">{{ $qty($job->job_volume_estimated) }}</td>
+                        <td class="right">{{ $qty($show_prices ? ($job->billed_quantity ?? $job->job_volume_estimated) : $job->job_volume_estimated) }}</td>
                         <td class="center">{{ $job->unit ?? '-' }}</td>
                         @if ($show_prices)
                             <td class="right nowrap">{{ $money($job->unit_price) }}</td>
                             <td class="right nowrap">{{ $money($job->est_price) }}</td>
-                            <td class="right">{{ $percent($job->job_weight_percent) }}</td>
+                            <td class="right">{{ $percent($show_progress ? ($row['progress']['weight'] ?? null) : $job->job_weight_percent) }}</td>
                         @endif
                         @if ($show_progress)
-                            <td class="right">{{ $percent($job->progress_percent ?? 0) }}</td>
-                            <td class="center">{{ $status_labels[$job->status] ?? $job->status }}</td>
+                            @if ($progress_weight_column)<td class="right">{{ $percent($row['progress']['weight'] ?? null) }}</td>@endif
+                            <td class="right">{{ $percent($row['progress']['actual'] ?? '0') }}</td>
+                            <td class="right">{{ $percent($row['progress']['weighted'] ?? null) }}</td>
+                            <td class="center">{{ $status_labels[$row['progress']['status'] ?? $job->status] ?? $job->status }}</td>
                         @endif
                     </tr>
                     @foreach ($row['materials'] as $material_row)
@@ -134,14 +130,14 @@
                             <td style="padding-left: {{ 16 + $row['depth'] * 12 }}px">
                                 {{ $material_row['letter'] }}. {{ $material->material_name }}@if ($material->dimension) · {{ $material->dimension }}@endif
                             </td>
-                            <td class="right">{{ $qty($material->volume) }}</td>
+                            <td class="right">{{ $qty($show_prices ? ($material->billed_quantity ?? $material->volume) : $material->volume) }}</td>
                             <td class="center">{{ $material->unit ?? '-' }}</td>
                             @if ($show_prices)
                                 <td class="right nowrap">{{ $money($material->unit_price) }}</td>
                                 <td class="right nowrap">{{ $money($material->price) }}</td>
                                 <td></td>
                             @endif
-                            @if ($show_progress)<td></td><td></td>@endif
+                            @if ($show_progress)<td colspan="{{ $progress_weight_column ? 4 : 3 }}"></td>@endif
                         </tr>
                     @endforeach
                 @endforeach
@@ -164,8 +160,9 @@
                 <tr>
                     <th style="width: 8%">No</th>
                     <th>Rekapitulasi Kelompok Pekerjaan</th>
-                    @if ($show_prices)<th>Jumlah (IDR)</th><th>Bobot</th>@endif
-                    @if ($show_progress)<th>Progres</th>@endif
+                    @if ($show_prices)<th>Jumlah (IDR)</th>@endif
+                    @if ($show_prices || $show_progress)<th>Bobot</th>@endif
+                    @if ($show_progress)<th>Progres</th><th>Tertimbang</th>@endif
                 </tr>
             </thead>
             <tbody>
@@ -173,20 +170,16 @@
                     <tr>
                         <td class="center">{{ $group['roman'] }}</td>
                         <td>{{ $group['label'] }}</td>
-                        @if ($show_prices)
-                            <td class="right nowrap">{{ $money($group['total']) }}</td>
-                            <td class="right">{{ $percent($group['weight']) }}</td>
-                        @endif
-                        @if ($show_progress)<td class="right">{{ $percent($group['progress']) }}</td>@endif
+                        @if ($show_prices)<td class="right nowrap">{{ $money($group['total']) }}</td>@endif
+                        <td class="right">{{ $percent($group['weight']) }}</td>
+                        @if ($show_progress)<td class="right">{{ $percent($group['progress']) }}</td><td class="right">{{ $percent($group['weighted']) }}</td>@endif
                     </tr>
                 @endforeach
                 <tr class="total">
                     <td colspan="2" class="right">TOTAL</td>
-                    @if ($show_prices)
-                        <td class="right nowrap">{{ $money($sheet['grand_total']) }}</td>
-                        <td class="right">{{ bccomp($sheet['grand_total'], '0', 2) > 0 ? '100,00%' : '-' }}</td>
-                    @endif
-                    @if ($show_progress)<td class="right">{{ $percent($sheet['progress']) }}</td>@endif
+                    @if ($show_prices)<td class="right nowrap">{{ $money($sheet['grand_total']) }}</td>@endif
+                    <td class="right">{{ count($sheet['groups']) > 0 && collect($sheet['groups'])->contains(fn ($group) => $group['weight'] !== null) ? '100,00%' : '-' }}</td>
+                    @if ($show_progress)<td class="right">{{ $percent($sheet['progress']) }}</td><td class="right">{{ $percent($sheet['progress']) }}</td>@endif
                 </tr>
             </tbody>
         </table>

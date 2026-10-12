@@ -16,6 +16,7 @@ use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\PriceBookController;
+use App\Http\Controllers\progress_report_controller;
 use App\Http\Controllers\project_boq_controller;
 use App\Http\Controllers\project_job_group_controller;
 use App\Http\Controllers\ProjectController;
@@ -210,12 +211,23 @@ Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): v
         ->whereUuid(['projectId', 'document', 'job', 'material'])->group(function (): void {
             Route::get('/price-items', 'price_items')->name('price-items');
             Route::get('/{document}/export', 'export')->name('export');
+            Route::put('/{document}/minimum-overrides', 'save_minimum_override')->name('minimum-override.save');
             Route::post('/{document}/jobs', 'store_job')->name('job.store');
             Route::put('/{document}/jobs/{job}', 'update_job')->name('job.update');
             Route::delete('/{document}/jobs/{job}', 'destroy_job')->name('job.destroy');
             Route::post('/{document}/jobs/{job}/materials', 'store_material')->name('material.store');
             Route::put('/{document}/jobs/{job}/materials/{material}', 'update_material')->name('material.update');
             Route::delete('/{document}/jobs/{job}/materials/{material}', 'destroy_material')->name('material.destroy');
+        });
+
+    Route::controller(progress_report_controller::class)->prefix('project/{projectId}/progress-reports')->name('project.progress-report.')
+        ->whereUuid(['projectId', 'report'])->group(function (): void {
+            Route::post('/', 'store')->name('store');
+            Route::get('/{report}', 'show')->name('show');
+            Route::put('/{report}', 'update')->name('update');
+            Route::post('/{report}/approve', 'approve')->name('approve');
+            Route::post('/{report}/return', 'return')->name('return');
+            Route::delete('/{report}', 'destroy')->name('destroy');
         });
 
     Route::controller(ProjectJobDocumentPageController::class)->prefix('project/{projectId}/job-document')->name('project.job-document.workflow.')->group(function (): void {

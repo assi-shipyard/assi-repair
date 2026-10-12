@@ -11,6 +11,9 @@
         ]
         : null;
     $responsible_kinds = ['internal_unit' => 'Unit Internal', 'subcontractor' => 'Subkontraktor'];
+    $calc_rules = \App\Services\boq_rule_service::RULES;
+    $plate_materials = \App\Services\boq_rule_service::PLATE_MATERIALS;
+    $default_safety_factor = $sheet['last_safety_factor'] ?? 1.1;
 @endphp
 
 <div class="modal modal-blur fade" id="boq-job-modal" tabindex="-1" aria-hidden="true">
@@ -47,7 +50,7 @@
                     <div class="col-md-6">
                         <label class="form-label" for="boq-job-price-item">Item Kamus Harga</label>
                         <select class="form-select" name="price_book_item_id" id="boq-job-price-item" data-group="service" @disabled($price_book === null)></select>
-                        <div class="form-hint" id="boq-job-price-hint">{{ $price_book ? 'Opsional. Mengisi satuan, harga, dan minimum charge.' : 'Kamus harga belum tersedia.' }}</div>
+                        <div class="form-hint" id="boq-job-price-hint">{{ $price_book ? 'Opsional. Mengisi satuan, harga, aturan, dan minimum.' : 'Kamus harga belum tersedia.' }}</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label required" for="boq-job-name">Uraian Pekerjaan</label>
@@ -71,29 +74,57 @@
 
                     <div class="col-12">
                         <div class="border rounded p-3">
-                            <div class="d-flex flex-wrap align-items-center gap-3">
-                                <div class="fw-semibold"><i class="ti ti-calculator me-1"></i>Kalkulator Pelat / Pipa</div>
-                                <select class="form-select form-select-sm w-auto" name="calculation[type]" id="boq-calc-type">
-                                    <option value="">Tidak dipakai</option>
-                                    @foreach (\App\Services\project_boq_service::CALCULATION_TYPES as $calc_key => $calc_label)
-                                        <option value="{{ $calc_key }}">{{ $calc_label }}</option>
-                                    @endforeach
-                                </select>
-                                <select class="form-select form-select-sm w-auto d-none" name="calculation[basis]" id="boq-calc-basis"></select>
+                            <input type="hidden" name="price_item_rule" value="">
+                            <input type="hidden" name="calculation[type]" id="boq-calc-type" value="">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="boq-calc-rule"><i class="ti ti-calculator me-1"></i>Aturan Perhitungan</label>
+                                    <select class="form-select" name="calculation_rule" id="boq-calc-rule">
+                                        <option value="">Umum (volume diisi manual)</option>
+                                        @foreach ($calc_rules as $rule_key => $rule)
+                                            <option value="{{ $rule_key }}">{{ $rule['label'] }} ({{ $rule['unit'] }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-6"><div class="form-hint mb-md-2" id="boq-calc-rule-hint">Aturan otomatis mengikuti item Kamus Harga bila item tersebut memiliki aturan.</div></div>
                             </div>
-                            <div class="row g-2 mt-1 d-none" id="boq-calc-fields">
-                                <div class="col-6 col-md-3 calc-plate"><label class="form-label small">Panjang (mm)</label><input type="number" class="form-control form-control-sm" name="calculation[length]" min="0" step="0.01"></div>
-                                <div class="col-6 col-md-3 calc-plate"><label class="form-label small">Lebar (mm)</label><input type="number" class="form-control form-control-sm" name="calculation[width]" min="0" step="0.01"></div>
-                                <div class="col-6 col-md-3 calc-plate"><label class="form-label small">Tebal (mm)</label><input type="number" class="form-control form-control-sm" name="calculation[thickness]" min="0" step="0.01"></div>
-                                <div class="col-6 col-md-3 calc-pipe"><label class="form-label small">Diameter luar (mm)</label><input type="number" class="form-control form-control-sm" name="calculation[diameter]" min="0" step="0.01"></div>
-                                <div class="col-6 col-md-3 calc-pipe"><label class="form-label small">Tebal dinding (mm)</label><input type="number" class="form-control form-control-sm" name="calculation[wall_thickness]" min="0" step="0.01"></div>
-                                <div class="col-6 col-md-3 calc-pipe"><label class="form-label small">Panjang (mm)</label><input type="number" class="form-control form-control-sm" name="calculation[pipe_length]" min="0" step="0.01"></div>
-                                <div class="col-4 col-md-2"><label class="form-label small">Jumlah</label><input type="number" class="form-control form-control-sm" name="calculation[quantity]" min="1" step="1" value="1"></div>
-                                <div class="col-4 col-md-2"><label class="form-label small">Massa jenis</label><input type="number" class="form-control form-control-sm" name="calculation[density]" min="1" step="0.01" value="7850"></div>
-                                <div class="col-4 col-md-2"><label class="form-label small">Faktor aman</label><input type="number" class="form-control form-control-sm" name="calculation[safety_factor]" min="1" max="5" step="0.01" value="1.1"></div>
-                                <div class="col-12"><div class="small text-secondary" id="boq-calc-preview"></div></div>
+
+                            <div class="row g-2 mt-1 d-none calc-panel" data-panel="plate">
+                                <div class="col-md-4">
+                                    <label class="form-label small required">Bahan Pelat</label>
+                                    <select class="form-select form-select-sm" name="calculation[material]">
+                                        @foreach ($plate_materials as $material_key => $plate_material)
+                                            <option value="{{ $material_key }}">{{ $plate_material['label'] }} ({{ number_format($plate_material['density'], 0, ',', '.') }} kg/m³)</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-4 col-md-2"><label class="form-label small required">Panjang (mm)</label><input type="number" class="form-control form-control-sm" name="calculation[length]" min="0" step="0.01"></div>
+                                <div class="col-4 col-md-2"><label class="form-label small required">Lebar (mm)</label><input type="number" class="form-control form-control-sm" name="calculation[width]" min="0" step="0.01"></div>
+                                <div class="col-4 col-md-2"><label class="form-label small required">Tebal (mm)</label><input type="number" class="form-control form-control-sm" name="calculation[thickness]" min="0" step="0.01"></div>
+                                <div class="col-6 col-md-1"><label class="form-label small required">Keping</label><input type="number" class="form-control form-control-sm" name="calculation[quantity]" min="1" step="1" value="1"></div>
+                                <div class="col-6 col-md-1"><label class="form-label small required" title="Faktor keamanan sesuai tipe kapal">Faktor</label><input type="number" class="form-control form-control-sm" name="calculation[safety_factor]" min="1" max="3" step="0.01" value="{{ $default_safety_factor }}"></div>
                             </div>
-                            <div class="form-hint mt-1">Bila dipakai, volume dan satuan diisi otomatis dari hasil kalkulator. Pipa di bawah 500 mm ditagih 500 mm, di bawah 1.000 mm ditagih 1.000 mm per batang.</div>
+
+                            <div class="row g-2 mt-1 d-none calc-panel" data-panel="pipe">
+                                <div class="col-md-6"><label class="form-label small">Ukuran Pipa</label><input type="text" class="form-control form-control-sm" name="calculation[size]" maxlength="50" placeholder="Contoh: 2 inci SCH 40"></div>
+                                <div class="col-6 col-md-3"><label class="form-label small required">Panjang / batang (m)</label><input type="number" class="form-control form-control-sm" name="calculation[length_m]" min="0" max="1000" step="0.001"></div>
+                                <div class="col-6 col-md-3"><label class="form-label small required">Jumlah batang</label><input type="number" class="form-control form-control-sm" name="calculation[quantity]" min="1" step="1" value="1"></div>
+                            </div>
+
+                            <div class="mt-2 d-none calc-panel" data-panel="tugboat">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-vcenter mb-2">
+                                        <thead><tr><th>Mulai</th><th>Selesai</th><th class="text-center">Libur</th><th class="w-1"></th></tr></thead>
+                                        <tbody id="boq-tug-rows"></tbody>
+                                    </table>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="boq-tug-add"><i class="ti ti-plus me-1"></i>Tambah Pemakaian</button>
+                                <div class="small text-secondary mt-2">
+                                    Tarif: Senin–Jumat 07.30–16.30 100%, 16.30–22.30 150%, 22.30–07.30 200%; Sabtu, Minggu &amp; hari libur 200% / 250% / 300%. Durasi tiap pemakaian dibulatkan ke atas per jam.
+                                </div>
+                            </div>
+
+                            <div class="small mt-2 d-none" id="boq-calc-preview"></div>
                         </div>
                     </div>
 
@@ -119,7 +150,15 @@
                         <input type="date" class="form-control" name="est_finish_date" id="boq-job-est-finish">
                     </div>
 
-                    @if ($show_progress)
+                    @if ($show_progress && $uses_reports)
+                        <div class="col-md-6">
+                            <label class="form-label" for="boq-job-actual-volume">Volume Realisasi</label>
+                            <input type="number" class="form-control" name="actual_volume" id="boq-job-actual-volume" min="0" step="0.0001">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div class="small text-secondary"><i class="ti ti-info-circle me-1"></i>Progres, status, dan tanggal realisasi diisi melalui laporan Progres Harian.</div>
+                        </div>
+                    @elseif ($show_progress)
                         <div class="col-6 col-md-3">
                             <label class="form-label" for="boq-job-progress">Progres (%)</label>
                             <input type="number" class="form-control" name="progress_percent" id="boq-job-progress" min="0" max="100" step="0.01">
@@ -240,7 +279,12 @@
         (function () {
             const job_store_action = @json(route('project.job-document.workflow.job.store', $job_base));
             const price_items_url = @json(route('project.job-document.workflow.price-items', $project->unique_id));
-            const calc_bases = @json(\App\Services\project_boq_service::CALCULATION_BASES);
+            const calc_rules = @json($calc_rules);
+            const plate_materials = @json($plate_materials);
+            const tug_rates = @json(\App\Services\boq_rule_service::TUGBOAT_RATES);
+            const tug_max_entries = @json(\App\Services\boq_rule_service::MAX_TUGBOAT_ENTRIES);
+            const tug_max_hours = @json(\App\Services\boq_rule_service::MAX_TUGBOAT_HOURS);
+            const default_safety_factor = @json((string) $default_safety_factor);
             const old_form = @json($old_form);
             const $job_modal = $('#boq-job-modal');
             const $job_form = $('#boq-job-form');
@@ -276,12 +320,14 @@
                     project_job_group_id: { required: () => $job_form.find('[name=parent_job_id]').val() === '' },
                     est_finish_date: { date_not_before: '#boq-job-est-start' },
                     actual_finish_date: { date_not_before: '#boq-job-actual-start' },
-                    'calculation[length]': { required: () => $('#boq-calc-type').val() === 'plate', min: 0.01 },
-                    'calculation[width]': { required: () => $('#boq-calc-type').val() === 'plate', min: 0.01 },
-                    'calculation[thickness]': { required: () => $('#boq-calc-type').val() === 'plate', min: 0.01 },
-                    'calculation[diameter]': { required: () => $('#boq-calc-type').val() === 'pipe', min: 0.01 },
-                    'calculation[wall_thickness]': { required: () => $('#boq-calc-type').val() === 'pipe', min: 0.01 },
-                    'calculation[pipe_length]': { required: () => $('#boq-calc-type').val() === 'pipe', min: 0.01 },
+                    'calculation[material]': { required: true },
+                    'calculation[length]': { required: true, min: 0.01, max: 1000000 },
+                    'calculation[width]': { required: true, min: 0.01, max: 1000000 },
+                    'calculation[thickness]': { required: true, min: 0.01, max: 1000 },
+                    'calculation[quantity]': { required: true, digits: true, min: 1, max: 100000 },
+                    'calculation[safety_factor]': { required: true, number: true, min: 1, max: 3 },
+                    'calculation[size]': { maxlength: 50 },
+                    'calculation[length_m]': { required: true, min: 0.001, max: 1000 },
                 },
                 messages: {
                     project_job_group_id: { required: 'Kelompok pekerjaan wajib dipilih.' },
@@ -357,9 +403,11 @@
             init_price_select($('#boq-job-price-item'), $job_modal, function (item) {
                 if (item) {
                     if ($('#boq-job-name').val() === '') { $('#boq-job-name').val(item.name); }
-                    if ($('#boq-calc-type').val() === '') { $('#boq-job-unit').val(item.unit); }
+                    $('#boq-job-unit').val(item.unit);
                     $('#boq-job-unit-price').val(item.unit_price);
                 }
+                $job_form.data('minimum', item ? item.minimum_quantity : null);
+                set_item_rule(item ? item.calculation_rule : null);
                 show_minimum($('#boq-job-minimum'), item ? item.minimum_quantity : null, item ? item.unit : '');
             });
             init_price_select($('#boq-material-price-item'), $material_modal, function (item) {
@@ -371,53 +419,134 @@
                 show_minimum($('#boq-material-minimum'), item ? item.minimum_quantity : null, item ? item.unit : '');
             });
 
-            // Mirrors project_boq_service::calculate() so users see the result before saving.
-            function refresh_calculator() {
-                const type = $('#boq-calc-type').val();
-                const $basis = $('#boq-calc-basis');
-                const current_basis = $basis.val();
-                $('#boq-calc-fields, #boq-calc-basis').toggleClass('d-none', type === '');
-                $('#boq-job-volume, #boq-job-unit').prop('readonly', type !== '');
-                if (type === '') { $('#boq-calc-preview').text(''); return; }
+            const $rule = $('#boq-calc-rule');
+            const $tug_rows = $('#boq-tug-rows');
+            let tug_index = 0;
 
-                if ($basis.data('type') !== type) {
-                    $basis.empty().data('type', type);
-                    Object.entries(calc_bases[type]).forEach(([key, label]) => $basis.append(new Option(label, key)));
-                    if (current_basis && calc_bases[type][current_basis]) { $basis.val(current_basis); }
-                }
-                $('.calc-plate').toggleClass('d-none', type !== 'plate');
-                $('.calc-pipe').toggleClass('d-none', type !== 'pipe');
-
-                const field = name => parseFloat($job_form.find('[name="calculation[' + name + ']"]').val()) || 0;
-                const quantity = Math.max(1, Math.trunc(field('quantity')) || 1);
-                const density = field('density') > 0 ? field('density') : 7850;
-                const safety = field('safety_factor') >= 1 ? field('safety_factor') : 1.1;
-                const basis = $basis.val();
-                let weight = 0, volume = 0, unit = '', detail = '';
-
-                if (type === 'plate') {
-                    weight = field('length') * field('width') * field('thickness') * 1e-9 * density * quantity * safety;
-                    const area = field('length') * field('width') * 1e-6 * quantity;
-                    volume = basis === 'm2' ? area : weight;
-                    unit = basis === 'm2' ? 'm²' : 'kg';
-                    detail = 'Luas ' + number_id(area, 4) + ' m²';
-                } else {
-                    const length = field('pipe_length');
-                    const billed = length < 500 ? 500 : (length < 1000 ? 1000 : length);
-                    const inner = field('diameter') - 2 * field('wall_thickness');
-                    const section = Math.PI / 4 * (field('diameter') ** 2 - inner ** 2) * 1e-6;
-                    const length_m = billed / 1000 * quantity;
-                    weight = section * billed / 1000 * quantity * density * safety;
-                    volume = basis === 'm' ? length_m : weight;
-                    unit = basis === 'm' ? 'm' : 'kg';
-                    detail = 'Panjang tagih ' + number_id(billed, 0) + ' mm/batang, total ' + number_id(length_m, 4) + ' m';
-                }
-                $('#boq-job-volume').val(volume > 0 ? volume.toFixed(4) : '');
-                $('#boq-job-unit').val(unit);
-                $('#boq-calc-preview').text('Berat ' + number_id(weight, 4) + ' kg · ' + detail + ' → volume ' + number_id(volume, 4) + ' ' + unit);
+            // An item with a rule dictates the calculation; other options stay locked until the item changes.
+            function set_item_rule(rule) {
+                $job_form.find('[name=price_item_rule]').val(rule || '');
+                if (rule && calc_rules[rule]) { $rule.val(rule); }
+                $rule.find('option').prop('disabled', false);
+                if (rule && calc_rules[rule]) { $rule.find('option').not('[value="' + rule + '"]').prop('disabled', true); }
+                refresh_calculator();
             }
-            $('#boq-calc-type, #boq-calc-basis').on('change', refresh_calculator);
-            $('#boq-calc-fields').on('input', 'input', refresh_calculator);
+
+            function add_tug_row(entry) {
+                if ($tug_rows.children().length >= tug_max_entries) { return; }
+                const index = tug_index++;
+                const name = field => 'calculation[entries][' + index + '][' + field + ']';
+                const $row = $('<tr>').append(
+                    $('<td>').append($('<input type="datetime-local" class="form-control form-control-sm" required>').attr('name', name('start_at')).val(entry?.start_at || '')),
+                    $('<td>').append($('<input type="datetime-local" class="form-control form-control-sm" required>').attr('name', name('end_at')).val(entry?.end_at || '')),
+                    $('<td class="text-center">').append(
+                        $('<input type="hidden" value="0">').attr('name', name('is_holiday')),
+                        $('<input type="checkbox" class="form-check-input" value="1" title="Hari libur nasional (tarif akhir pekan)">').attr('name', name('is_holiday'))
+                            .prop('checked', [true, 1, '1', 'true'].includes(entry?.is_holiday))
+                    ),
+                    $('<td>').append('<button type="button" class="btn btn-sm btn-ghost-danger btn-icon boq-tug-remove" aria-label="Hapus baris"><i class="ti ti-x"></i></button>')
+                );
+                $tug_rows.append($row);
+                $row.find('[type=datetime-local]').each(function () {
+                    $(this).rules('add', { required: true, messages: { required: 'Waktu wajib diisi.' } });
+                });
+                $row.find('[name$="[end_at]"]').rules('add', { tug_after_start: true, tug_max_hours: true });
+            }
+
+            $.validator.addMethod('tug_after_start', function (value, element) {
+                const start = $(element).closest('tr').find('[name$="[start_at]"]').val();
+                return this.optional(element) || !start || value > start;
+            }, 'Selesai harus setelah mulai.');
+            $.validator.addMethod('tug_max_hours', function (value, element) {
+                const start = parse_local($(element).closest('tr').find('[name$="[start_at]"]').val());
+                const end = parse_local(value);
+                return this.optional(element) || start === null || end === null || (end - start) / 3600000 <= tug_max_hours;
+            }, 'Satu pemakaian maksimal ' + tug_max_hours + ' jam.');
+
+            $('#boq-tug-add').on('click', () => { add_tug_row(null); refresh_calculator(); });
+            $tug_rows.on('click', '.boq-tug-remove', function () {
+                $(this).closest('tr').remove();
+                if ($tug_rows.children().length === 0) { add_tug_row(null); }
+                refresh_calculator();
+            });
+
+            // Wall-clock arithmetic in UTC so the browser time zone cannot shift the WIB tariff bands.
+            function parse_local(value) {
+                const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value || '');
+                return match ? Date.UTC(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]) : null;
+            }
+
+            function tug_entry_summary(start, end, is_holiday) {
+                const hours = Math.ceil((end - start) / 3600000);
+                const billed_end = start + hours * 3600000;
+                let cursor = start, equivalent = 0;
+                while (cursor < billed_end) {
+                    const date = new Date(cursor);
+                    const minute = date.getUTCHours() * 60 + date.getUTCMinutes();
+                    const [band, band_end] = minute >= 450 && minute < 990 ? ['day', 990] : (minute >= 990 && minute < 1350 ? ['evening', 1350] : (minute < 450 ? ['night', 450] : ['night', 1440]));
+                    const day_start = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+                    const segment_end = Math.min(day_start + band_end * 60000, billed_end);
+                    const day_type = is_holiday || [0, 6].includes(date.getUTCDay()) ? 'weekend' : 'weekday';
+                    equivalent += (segment_end - cursor) / 60000 * tug_rates[day_type][band];
+                    cursor = segment_end;
+                }
+                return { hours: hours, equivalent: equivalent / 6000 };
+            }
+
+            // Mirrors boq_rule_service so users see the result before saving; the server recalculates on save.
+            function refresh_calculator() {
+                const rule = $rule.val();
+                const config = calc_rules[rule] || null;
+                const calculator = config && config.calculator ? rule : '';
+                const minimum = $job_form.data('minimum');
+                $('#boq-calc-type').val(calculator);
+                $('#boq-calc-rule-hint').text(config ? config.hint : 'Aturan otomatis mengikuti item Kamus Harga bila item tersebut memiliki aturan.');
+                $('.calc-panel').each(function () {
+                    const active = this.dataset.panel === calculator;
+                    $(this).toggleClass('d-none', !active).find('input, select').prop('disabled', !active);
+                });
+                $('#boq-job-volume').prop('readonly', calculator !== '');
+                $('#boq-job-unit').prop('readonly', config !== null);
+                if (config) { $('#boq-job-unit').val(config.unit); }
+                if (calculator === 'tugboat' && $tug_rows.children().length === 0) { add_tug_row(null); }
+
+                const field = name => parseFloat($job_form.find('[data-panel="' + calculator + '"] [name="calculation[' + name + ']"]').val()) || 0;
+                const quantity = Math.max(1, Math.trunc(field('quantity')) || 1);
+                let volume = null, text = '';
+
+                if (calculator === 'plate') {
+                    const material = plate_materials[$job_form.find('[name="calculation[material]"]').val()] || plate_materials.steel;
+                    const piece = field('length') * field('width') * field('thickness') * 1e-9 * material.density * field('safety_factor');
+                    volume = piece * quantity;
+                    const billed_piece = minimum && piece > 0 && piece < minimum ? Number(minimum) : piece;
+                    text = 'Berat ' + number_id(piece, 4) + ' kg/keping × ' + quantity + ' = <strong>' + number_id(volume, 4) + ' kg</strong>'
+                        + (billed_piece !== piece ? ' · ditagih ' + number_id(billed_piece * quantity, 4) + ' kg (minimum ' + number_id(minimum, 4) + ' kg/keping)' : '');
+                } else if (calculator === 'pipe') {
+                    const length = field('length_m');
+                    const billed = length <= 0.5 ? 0.5 : (length < 1 ? 1 : length);
+                    volume = length * quantity;
+                    text = 'Panjang ' + number_id(volume, 4) + ' m · <strong>ditagih ' + number_id(billed * quantity, 4) + ' m</strong>' + (billed !== length ? ' (' + number_id(billed, 4) + ' m/batang)' : '');
+                } else if (calculator === 'tugboat') {
+                    let hours = 0, equivalent = 0;
+                    $tug_rows.children().each(function () {
+                        const start = parse_local($(this).find('[name$="[start_at]"]').val());
+                        const end = parse_local($(this).find('[name$="[end_at]"]').val());
+                        if (start === null || end === null || end <= start) { return; }
+                        const summary = tug_entry_summary(start, end, $(this).find('[type=checkbox]').is(':checked'));
+                        hours += summary.hours;
+                        equivalent += summary.equivalent;
+                    });
+                    volume = hours;
+                    text = 'Pemakaian ' + number_id(hours, 0) + ' jam · <strong>ditagih ' + number_id(equivalent, 4) + ' jam setara tarif dasar</strong>';
+                } else if (config && config.round_up) {
+                    text = 'Volume dibulatkan ke atas saat ditagih.';
+                }
+
+                if (calculator !== '') { $('#boq-job-volume').val(volume > 0 ? volume.toFixed(4) : ''); }
+                $('#boq-calc-preview').toggleClass('d-none', text === '').html(text);
+            }
+            $rule.on('change', refresh_calculator);
+            $('.calc-panel').on('input change', 'input, select', refresh_calculator);
 
             function open_job_form(options) {
                 reset_form($job_form, job_validator);
@@ -430,16 +559,20 @@
                 $('#boq-job-title').text(options.title);
                 $('#boq-group-field').toggleClass('d-none', is_child);
                 $('#boq-parent-info').toggleClass('d-none', !options.parent_name).find('strong').text(options.parent_name || '');
-                $('#boq-calc-basis').removeData('type');
-                fill_form($job_form, options.values || {});
+                const values = $.extend(true, {}, options.values || {});
+                const entries = values.calculation?.entries;
+                if (values.calculation) { delete values.calculation.entries; }
+                $tug_rows.empty();
+                $job_form.find('.calc-panel [name="calculation[safety_factor]"]').val(default_safety_factor);
+                $job_form.data('minimum', options.minimum ?? null);
+                $rule.find('option').prop('disabled', false);
+                $job_form.find('.calc-panel input, .calc-panel select').prop('disabled', false);
+                fill_form($job_form, values);
+                Object.values(entries || {}).forEach(entry => add_tug_row(entry));
                 set_price_option($('#boq-job-price-item'), options.price_item);
                 $job_form.find('[name=price_item_text]').val(options.price_item ? options.price_item.text : '');
+                set_item_rule(options.price_item_rule || null);
                 show_minimum($('#boq-job-minimum'), options.minimum, $('#boq-job-unit').val());
-                refresh_calculator();
-                if (options.values && options.values.calculation) {
-                    $('#boq-calc-basis').val(options.values.calculation.basis);
-                    refresh_calculator();
-                }
                 $job_modal.modal('show');
             }
 
@@ -466,7 +599,7 @@
                 const job = JSON.parse(this.dataset.job);
                 const values = Object.assign({}, job);
                 ['id', 'action', 'is_child', 'price_item', 'minimum_quantity'].forEach(key => delete values[key]);
-                open_job_form({ action: job.action, method: 'PUT', title: 'Ubah Pekerjaan', is_child: job.is_child, values: values, price_item: job.price_item, minimum: job.minimum_quantity });
+                open_job_form({ action: job.action, method: 'PUT', title: 'Ubah Pekerjaan', is_child: job.is_child, values: values, price_item: job.price_item, price_item_rule: job.price_item?.rule, minimum: job.minimum_quantity });
             });
 
             $(document).on('click', '.boq-add-material', function () {
@@ -501,10 +634,10 @@
                 const input = old_form.input || {};
                 const price_item = input.price_book_item_id ? { id: input.price_book_item_id, text: input.price_item_text || input.price_book_item_id } : null;
                 const values = Object.assign({}, input);
-                ['price_book_item_id', 'price_item_text', 'parent_job_id'].forEach(key => delete values[key]);
+                ['price_book_item_id', 'price_item_text', 'parent_job_id', 'price_item_rule'].forEach(key => delete values[key]);
                 const $alert = $((old_form.kind === 'job' ? '#boq-job-form' : '#boq-material-form') + ' .alert-danger').detach();
                 if (old_form.kind === 'job') {
-                    open_job_form({ action: old_form.action, method: old_form.method, title: old_form.title || 'Pekerjaan', is_child: input.form_is_child === '1', parent_id: input.parent_job_id, values: values, price_item: price_item });
+                    open_job_form({ action: old_form.action, method: old_form.method, title: old_form.title || 'Pekerjaan', is_child: input.form_is_child === '1', parent_id: input.parent_job_id, values: values, price_item: price_item, price_item_rule: input.price_item_rule });
                     $job_form.find('.modal-body').prepend($alert);
                 } else {
                     open_material_form({ action: old_form.action, method: old_form.method, title: old_form.title, values: values, price_item: price_item });

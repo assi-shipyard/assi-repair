@@ -7,11 +7,13 @@
                 @forelse ($items as $item)
                     <tr>
                         <td><div class="text-secondary small">{{ $item->code }}</div><div class="fw-bold">{{ $item->name }}</div>@if ($item->description)<div class="text-secondary small">{{ $item->description }}</div>@endif</td>
-                        <td>{{ $item->unit }}</td>
+                        <td>{{ $item->unit }}@if ($item->calculation_rule)<div><span class="badge bg-azure-lt">{{ \App\Services\boq_rule_service::RULES[$item->calculation_rule]['label'] ?? $item->calculation_rule }}</span></div>@endif</td>
                         <td class="text-end text-nowrap">{{ number_format((float) $item->unit_price, 2, ',', '.') }}</td>
                         <td class="text-nowrap">
                             @if ($item->has_minimum_charge)
                                 <span class="badge bg-orange-lt">{{ number_format((float) $item->minimum_quantity, 3, ',', '.') }} {{ $item->unit }}</span>
+                            @elseif ($item->calculation_rule === 'pipe')
+                                <span class="text-secondary">Pembulatan 0,5 / 1 m per batang</span>
                             @else
                                 <span class="text-secondary">Tanpa minimum</span>
                             @endif

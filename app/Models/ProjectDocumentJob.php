@@ -6,6 +6,7 @@ use App\Models\Concerns\HasPublicUniqueId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class ProjectDocumentJob extends Model
 {
@@ -17,14 +18,17 @@ class ProjectDocumentJob extends Model
         'unique_id',
         'project_job_document_id',
         'source_job_id',
+        'lineage_uuid',
         'project_job_group_id',
         'parent_job_id',
         'price_book_item_id',
+        'calculation_rule',
         'job_name',
         'job_volume_estimated',
         'unit',
         'unit_price',
         'minimum_quantity',
+        'billed_quantity',
         'calculation',
         'notes',
         'responsible_kind',
@@ -46,6 +50,13 @@ class ProjectDocumentJob extends Model
         'sort_order',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $job): void {
+            $job->lineage_uuid ??= (string) Str::uuid();
+        });
+    }
+
     protected function casts(): array
     {
         return [
@@ -58,6 +69,7 @@ class ProjectDocumentJob extends Model
             'job_volume_estimated' => 'decimal:4',
             'unit_price' => 'decimal:2',
             'minimum_quantity' => 'decimal:4',
+            'billed_quantity' => 'decimal:4',
             'calculation' => 'array',
             'est_start_date' => 'date',
             'est_finish_date' => 'date',

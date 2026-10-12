@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Project;
 
-use App\Services\project_boq_service;
+use App\Services\boq_rule_service;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -12,6 +13,8 @@ use Illuminate\Validation\Validator;
 class save_document_job_request extends FormRequest
 {
     private const MAX_DIMENSION = 1000000;
+
+    private const CALCULATOR_TYPES = ['plate', 'pipe', 'tugboat'];
 
     public function authorize(): bool
     {
@@ -30,8 +33,6 @@ class save_document_job_request extends FormRequest
 
     public function rules(): array
     {
-        $type = $this->input('calculation.type');
-
         return [
             'job_name' => ['required', 'string', 'max:191'],
             'project_job_group_id' => ['nullable', 'uuid', Rule::exists('project_job_groups', 'unique_id')],
@@ -50,18 +51,21 @@ class save_document_job_request extends FormRequest
             'actual_start_date' => ['nullable', 'date'],
             'actual_finish_date' => ['nullable', 'date', 'after_or_equal:actual_start_date'],
             'actual_volume' => ['nullable', 'numeric', 'min:0', 'max:99999999999999'],
+            'calculation_rule' => ['nullable', Rule::in(array_keys(boq_rule_service::RULES))],
             'calculation' => ['nullable', 'array'],
-            'calculation.type' => ['nullable', Rule::in(array_keys(project_boq_service::CALCULATION_TYPES))],
-            'calculation.basis' => ['required_with:calculation.type', Rule::in(array_keys(project_boq_service::CALCULATION_BASES[$type] ?? []))],
-            'calculation.quantity' => ['required_with:calculation.type', 'integer', 'min:1', 'max:100000'],
-            'calculation.density' => ['nullable', 'numeric', 'gt:0', 'max:100000'],
-            'calculation.safety_factor' => ['nullable', 'numeric', 'min:1', 'max:5'],
+            'calculation.type' => ['nullable', Rule::in(self::CALCULATOR_TYPES)],
+            'calculation.quantity' => ['exclude_if:calculation.type,tugboat', 'required_with:calculation.type', 'integer', 'min:1', 'max:100000'],
+            'calculation.material' => ['exclude_unless:calculation.type,plate', 'required', Rule::in(array_keys(boq_rule_service::PLATE_MATERIALS))],
+            'calculation.safety_factor' => ['exclude_unless:calculation.type,plate', 'required', 'numeric', 'min:1', 'max:3'],
             'calculation.length' => ['exclude_unless:calculation.type,plate', 'required', 'numeric', 'gt:0', 'max:'.self::MAX_DIMENSION],
             'calculation.width' => ['exclude_unless:calculation.type,plate', 'required', 'numeric', 'gt:0', 'max:'.self::MAX_DIMENSION],
             'calculation.thickness' => ['exclude_unless:calculation.type,plate', 'required', 'numeric', 'gt:0', 'max:1000'],
-            'calculation.diameter' => ['exclude_unless:calculation.type,pipe', 'required', 'numeric', 'gt:0', 'max:10000'],
-            'calculation.wall_thickness' => ['exclude_unless:calculation.type,pipe', 'required', 'numeric', 'gt:0', 'max:1000'],
-            'calculation.pipe_length' => ['exclude_unless:calculation.type,pipe', 'required', 'numeric', 'gt:0', 'max:'.self::MAX_DIMENSION],
+            'calculation.size' => ['exclude_unless:calculation.type,pipe', 'nullable', 'string', 'max:50'],
+            'calculation.length_m' => ['exclude_unless:calculation.type,pipe', 'required', 'numeric', 'gt:0', 'max:1000'],
+            'calculation.entries' => ['exclude_unless:calculation.type,tugboat', 'required', 'array', 'min:1', 'max:'.boq_rule_service::MAX_TUGBOAT_ENTRIES],
+            'calculation.entries.*.start_at' => ['exclude_unless:calculation.type,tugboat', 'required', 'date_format:Y-m-d\\TH:i'],
+            'calculation.entries.*.end_at' => ['exclude_unless:calculation.type,tugboat', 'required', 'date_format:Y-m-d\\TH:i'],
+            'calculation.entries.*.is_holiday' => ['exclude_unless:calculation.type,tugboat', 'nullable', 'boolean'],
         ];
     }
 
@@ -69,11 +73,19 @@ class save_document_job_request extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                $diameter = (float) $this->input('calculation.diameter');
-                $wall = (float) $this->input('calculation.wall_thickness');
+                if ($this->input('calculation.type') !== 'tugboat' || $validator->errors()->isNotEmpty()) {
+                    return;
+                }
 
-                if ($this->input('calculation.type') === 'pipe' && $diameter > 0 && $wall * 2 >= $diameter) {
-                    $validator->errors()->add('calculation.wall_thickness', 'Tebal dinding harus kurang dari setengah diameter pipa.');
+                foreach ((array) $this->input('calculation.entries') as $index => $entry) {
+                    $start = CarbonImmutable::createFromFormat('Y-m-d\\TH:i', (string) $entry['start_at']);
+                    $end = CarbonImmutable::createFromFormat('Y-m-d\\TH:i', (string) $entry['end_at']);
+
+                    if ($end <= $start) {
+                        $validator->errors()->add("calculation.entries.$index.end_at", 'Waktu selesai pemakaian kapal tunda harus setelah waktu mulai.');
+                    } elseif ($start->diffInHours($end) > boq_rule_service::MAX_TUGBOAT_HOURS) {
+                        $validator->errors()->add("calculation.entries.$index.end_at", 'Satu pemakaian kapal tunda maksimal '.boq_rule_service::MAX_TUGBOAT_HOURS.' jam.');
+                    }
                 }
             },
         ];
@@ -104,15 +116,24 @@ class save_document_job_request extends FormRequest
             'status.in' => 'Status pekerjaan tidak valid.',
             'actual_finish_date.after_or_equal' => 'Tanggal aktual selesai harus sama atau setelah tanggal aktual mulai.',
             'actual_volume.numeric' => 'Volume aktual harus berupa angka.',
+            'calculation_rule.in' => 'Aturan perhitungan tidak valid.',
             'calculation.type.in' => 'Jenis kalkulator tidak valid.',
-            'calculation.basis.required_with' => 'Dasar perhitungan wajib dipilih.',
-            'calculation.basis.in' => 'Dasar perhitungan tidak sesuai jenis kalkulator.',
+            'calculation.material.required' => 'Jenis bahan pelat wajib dipilih.',
+            'calculation.material.in' => 'Jenis bahan pelat tidak valid.',
+            'calculation.safety_factor.required' => 'Faktor keamanan wajib diisi.',
+            'calculation.entries.required' => 'Isi minimal satu pemakaian kapal tunda.',
+            'calculation.entries.min' => 'Isi minimal satu pemakaian kapal tunda.',
+            'calculation.entries.max' => 'Pemakaian kapal tunda maksimal '.boq_rule_service::MAX_TUGBOAT_ENTRIES.' baris.',
+            'calculation.entries.*.start_at.required' => 'Waktu mulai pemakaian wajib diisi.',
+            'calculation.entries.*.end_at.required' => 'Waktu selesai pemakaian wajib diisi.',
+            'calculation.entries.*.start_at.date_format' => 'Format waktu mulai tidak valid.',
+            'calculation.entries.*.end_at.date_format' => 'Format waktu selesai tidak valid.',
+            'calculation.size.max' => 'Ukuran pipa maksimal 50 karakter.',
             'calculation.quantity.required_with' => 'Jumlah wajib diisi.',
             'calculation.quantity.integer' => 'Jumlah harus berupa bilangan bulat.',
             'calculation.quantity.min' => 'Jumlah minimal 1.',
-            'calculation.density.gt' => 'Massa jenis harus lebih dari 0.',
             'calculation.safety_factor.min' => 'Faktor keamanan minimal 1.',
-            'calculation.safety_factor.max' => 'Faktor keamanan maksimal 5.',
+            'calculation.safety_factor.max' => 'Faktor keamanan maksimal 3.',
             'calculation.*.required' => 'Ukuran kalkulator wajib diisi.',
             'calculation.*.numeric' => 'Ukuran kalkulator harus berupa angka.',
             'calculation.*.gt' => 'Ukuran kalkulator harus lebih dari 0.',

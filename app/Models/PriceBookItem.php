@@ -15,7 +15,7 @@ class PriceBookItem extends Model
     public const GROUPS = ['material' => 'Material', 'service' => 'Jasa'];
 
     protected $fillable = [
-        'group', 'code', 'name', 'unit', 'unit_price',
+        'group', 'code', 'name', 'unit', 'calculation_rule', 'unit_price',
         'has_minimum_charge', 'minimum_quantity', 'description',
     ];
 

@@ -18,6 +18,7 @@ class price_book_item_option_resource extends JsonResource
             'name' => $this->name,
             'group' => $this->group,
             'unit' => $this->unit,
+            'calculation_rule' => $this->calculation_rule,
             'unit_price' => $this->unit_price,
             'minimum_quantity' => $this->has_minimum_charge ? $this->minimum_quantity : null,
         ];

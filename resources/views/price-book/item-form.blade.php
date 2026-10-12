@@ -29,6 +29,16 @@
                             <label for="name" class="form-label required">Nama Material / Jasa</label>
                             <input id="name" name="name" class="form-control" maxlength="255" value="{{ old('name', $item->name) }}" required>
                         </div>
+                        <div class="col-md-8">
+                            <label for="calculation_rule" class="form-label">Aturan Perhitungan</label>
+                            <select id="calculation_rule" name="calculation_rule" class="form-select">
+                                <option value="">Umum (tanpa aturan khusus)</option>
+                                @foreach (\App\Services\boq_rule_service::RULES as $rule_key => $rule)
+                                    <option value="{{ $rule_key }}" data-unit="{{ $rule['unit'] }}" data-hint="{{ $rule['hint'] }}" @selected(old('calculation_rule', $item->calculation_rule) === $rule_key)>{{ $rule['label'] }} ({{ $rule['unit'] }})</option>
+                                @endforeach
+                            </select>
+                            <div class="form-hint" id="rule-hint">Aturan disalin ke pekerjaan saat item dipilih, sehingga perubahan aturan tidak memengaruhi dokumen yang sudah dibuat.</div>
+                        </div>
                         <div class="col-md-4">
                             <label for="unit" class="form-label required">Satuan</label>
                             <input id="unit" name="unit" class="form-control" maxlength="30" placeholder="kg, lembar, jam, ..." value="{{ old('unit', $item->unit) }}" required>
@@ -38,7 +48,7 @@
                             <input type="number" id="unit_price" name="unit_price" class="form-control" min="0" max="999999999999.99" step="0.01" value="{{ old('unit_price', $item->unit_price) }}" required>
                             <div class="form-hint">Gunakan titik untuk desimal, tanpa pemisah ribuan. Contoh: 15000.50.</div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4" id="minimum-toggle">
                             <label class="form-check mt-md-4">
                                 <input type="hidden" name="has_minimum_charge" value="0">
                                 <input type="checkbox" id="has_minimum_charge" name="has_minimum_charge" class="form-check-input" value="1" @checked(old('has_minimum_charge', $item->has_minimum_charge))>
@@ -69,13 +79,28 @@
     @include('price-book.partials.validation')
     <script>
         $(function () {
+            const default_rule_hint = $('#rule-hint').text();
+
             function toggle_minimum() {
-                const has_minimum = $('#has_minimum_charge').is(':checked');
+                const is_pipe = $('#calculation_rule').val() === 'pipe';
+                const has_minimum = !is_pipe && $('#has_minimum_charge').is(':checked');
+                $('#minimum-toggle').toggle(!is_pipe);
                 $('#minimum-field').toggle(has_minimum);
                 $('#minimum_quantity').prop('disabled', !has_minimum);
             }
+
+            function apply_rule() {
+                const $option = $('#calculation_rule option:selected');
+                const unit = $option.data('unit');
+                $('#unit').prop('readonly', Boolean(unit));
+                if (unit) { $('#unit').val(unit); }
+                $('#rule-hint').text($option.data('hint') || default_rule_hint);
+                toggle_minimum();
+            }
+
             $('#has_minimum_charge').on('change', toggle_minimum);
-            toggle_minimum();
+            $('#calculation_rule').on('change', apply_rule);
+            apply_rule();
             $('#price-item-form').validate({
                 ...price_form_options,
                 rules: {
@@ -83,6 +108,7 @@
                     code: { required: true, maxlength: 30, price_code: true },
                     name: { required: true, maxlength: 255 },
                     unit: { required: true, maxlength: 30 },
+                    calculation_rule: { maxlength: 20 },
                     unit_price: { required: true, number: true, min: 0, max: 999999999999.99, price_decimal: 2 },
                     minimum_quantity: { required: function () { return $('#has_minimum_charge').is(':checked'); }, number: true, min: 0.001, max: 999999999.999, price_decimal: 3 },
                     description: { maxlength: 2000 }

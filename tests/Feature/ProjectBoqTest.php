@@ -134,7 +134,9 @@ class ProjectBoqTest extends TestCase
         $this->assertSame($item->id, $job->price_book_item_id);
         $this->assertSame('jam', $job->unit);
         $this->assertSame('4.0000', $job->minimum_quantity);
-        $this->assertSame('2000000.00', $job->est_price);
+        $this->assertSame('1.0000', $job->fresh()->job_volume_estimated);
+        $this->assertSame('4.0000', $job->fresh()->billed_quantity);
+        $this->assertSame('2000000.00', $job->fresh()->est_price);
 
         $item->update(['minimum_quantity' => '8']);
         $this->put(route('project.job-document.workflow.job.update', [$this->project->unique_id, $document->unique_id, $job->unique_id]), [
@@ -158,27 +160,138 @@ class ProjectBoqTest extends TestCase
         ])->assertSessionHasErrors('price_book_item_id');
     }
 
-    public function test_plate_and_pipe_calculator_sets_volume(): void
+    public function test_plate_rule_converts_dimensions_to_kg_and_applies_minimum_per_piece(): void
     {
         $document = $this->document();
-        $plate = $this->store_job($document, [
-            'job_name' => 'Pelat', 'project_job_group_id' => $this->group()->unique_id,
-            'calculation' => ['type' => 'plate', 'basis' => 'kg', 'length' => 1000, 'width' => 1000, 'thickness' => 10, 'quantity' => 2, 'density' => 7850, 'safety_factor' => 1.1],
-        ]);
-        $this->assertSame('172.7000', $plate->job_volume_estimated);
-        $this->assertSame('kg', $plate->unit);
+        $item = $this->item(['code' => 'PLT', 'name' => 'Pelat', 'unit' => 'kg', 'unit_price' => '1000', 'calculation_rule' => 'plate', 'has_minimum_charge' => true, 'minimum_quantity' => '15']);
+        $plate = fn (array $calculation): array => [
+            'job_name' => 'Pelat', 'project_job_group_id' => $this->group()->unique_id, 'price_book_item_id' => $item->unique_id,
+            'calculation' => ['type' => 'plate', 'material' => 'steel', 'quantity' => 1, 'safety_factor' => 1, ...$calculation],
+        ];
 
-        $pipe = $this->store_job($document, [
-            'job_name' => 'Pipa', 'project_job_group_id' => $this->group('Perpipaan')->unique_id,
-            'calculation' => ['type' => 'pipe', 'basis' => 'm', 'diameter' => 60.3, 'wall_thickness' => 3.9, 'pipe_length' => 300, 'quantity' => 3],
-        ]);
-        $this->assertSame('1.5000', $pipe->job_volume_estimated);
-        $this->assertSame(500, (int) $pipe->calculation['billed_length_mm']);
+        $small = $this->store_job($document, $plate(['length' => 300, 'width' => 200, 'thickness' => 8, 'quantity' => 3]));
+        $large = $this->store_job($document, $plate(['length' => 1000, 'width' => 1000, 'thickness' => 10, 'quantity' => 2, 'safety_factor' => 1.1]));
+        $aluminium = $this->store_job($document, $plate(['material' => 'aluminium', 'length' => 1000, 'width' => 1000, 'thickness' => 10]));
+
+        $this->assertSame('plate', $small->fresh()->calculation_rule);
+        $this->assertSame('11.3040', $small->fresh()->job_volume_estimated);
+        $this->assertSame('45.0000', $small->fresh()->billed_quantity, '3 pieces of 3,768 kg are each billed at the 15 kg minimum.');
+        $this->assertSame('45000.00', $small->fresh()->est_price);
+        $this->assertSame('172.7000', $large->fresh()->billed_quantity);
+        $this->assertSame('27.0000', $aluminium->fresh()->billed_quantity);
+        $this->assertSame('kg', $aluminium->fresh()->unit);
 
         $this->post(route('project.job-document.workflow.job.store', [$this->project->unique_id, $document->unique_id]), [
-            'job_name' => 'Pipa salah', 'project_job_group_id' => $this->group('Perpipaan')->unique_id,
-            'calculation' => ['type' => 'pipe', 'basis' => 'kg', 'diameter' => 50, 'wall_thickness' => 30, 'pipe_length' => 1000, 'quantity' => 1],
-        ])->assertSessionHasErrors('calculation.wall_thickness');
+            'job_name' => 'Tanpa kalkulator', 'project_job_group_id' => $this->group()->unique_id, 'price_book_item_id' => $item->unique_id, 'job_volume_estimated' => '10',
+        ])->assertSessionHasErrors('calculation');
+
+        $this->post(route('project.job-document.workflow.job.store', [$this->project->unique_id, $document->unique_id]), $plate(['material' => 'gold', 'length' => 1, 'width' => 1, 'thickness' => 1, 'safety_factor' => 5]))
+            ->assertSessionHasErrors(['calculation.material', 'calculation.safety_factor']);
+    }
+
+    public function test_pipe_rule_bills_short_pieces_in_steps(): void
+    {
+        $document = $this->document();
+        $item = $this->item(['code' => 'PIP', 'name' => 'Pipa', 'unit' => 'm', 'unit_price' => '100', 'calculation_rule' => 'pipe']);
+        $billed = [];
+
+        foreach (['0.3' => '1.0000', '0.5' => '1.0000', '0.75' => '2.0000', '1.2' => '2.4000'] as $length => $expected) {
+            $job = $this->store_job($document, [
+                'job_name' => 'Pipa '.$length, 'project_job_group_id' => $this->group('Perpipaan')->unique_id, 'price_book_item_id' => $item->unique_id,
+                'calculation' => ['type' => 'pipe', 'size' => '2 inci', 'length_m' => $length, 'quantity' => 2],
+            ]);
+            $billed[$length] = [$expected, $job];
+        }
+
+        foreach ($billed as $length => [$expected, $job]) {
+            $this->assertSame($expected, $job->fresh()->billed_quantity, 'Pipa '.$length.' m');
+            $this->assertSame(number_format((float) $length * 2, 4, '.', ''), $job->fresh()->job_volume_estimated);
+        }
+    }
+
+    public function test_project_minimum_aggregates_rounded_usage_and_can_be_negotiated(): void
+    {
+        $document = $this->document();
+        $crane = $this->item(['code' => 'CRN', 'calculation_rule' => 'crane', 'unit_price' => '100', 'has_minimum_charge' => true, 'minimum_quantity' => '8']);
+        $job_data = fn (string $name, string $hours): array => ['job_name' => $name, 'project_job_group_id' => $this->group('Docking')->unique_id, 'price_book_item_id' => $crane->unique_id, 'job_volume_estimated' => $hours];
+
+        $first = $this->store_job($document, $job_data('Crane propeller', '2.5'));
+        $second = $this->store_job($document, $job_data('Crane katup', '1.2'));
+
+        $this->assertSame('6.0000', $first->fresh()->billed_quantity, '3 h rounded up plus the 3 h shortfall to reach 8 h.');
+        $this->assertSame('2.0000', $second->fresh()->billed_quantity);
+        $this->assertSame('800.00', app(project_boq_service::class)->build_sheet($document->fresh())['grand_total']);
+
+        $route = route('project.job-document.workflow.minimum-override.save', [$this->project->unique_id, $document->unique_id]);
+        $this->put($route, ['price_book_item_id' => $crane->unique_id, 'action' => 'set', 'minimum_quantity' => '4'])->assertSessionHasErrors('reason');
+        $this->put($route, ['price_book_item_id' => $crane->unique_id, 'action' => 'set', 'minimum_quantity' => '4', 'reason' => 'Disepakati saat negosiasi'])
+            ->assertSessionHasNoErrors()->assertRedirect();
+
+        $this->assertSame('3.0000', $first->fresh()->billed_quantity);
+        $this->assertSame('4.0000', $document->fresh()->minimum_overrides[$crane->unique_id]['minimum']);
+        $this->assertDatabaseHas('project_job_document_histories', ['project_job_document_id' => $document->id, 'action' => 'minimum_override_set']);
+
+        $minimums = app(project_boq_service::class)->build_sheet($document->fresh())['minimums'];
+        $this->assertSame('Disepakati saat negosiasi', $minimums[0]['override']['reason']);
+
+        $this->put($route, ['price_book_item_id' => $crane->unique_id, 'action' => 'clear'])->assertSessionHasNoErrors();
+        $this->assertSame('6.0000', $first->fresh()->billed_quantity);
+        $this->assertDatabaseHas('project_job_document_histories', ['project_job_document_id' => $document->id, 'action' => 'minimum_override_cleared']);
+
+        $unused = $this->item(['code' => 'UNUSED']);
+        $this->put($route, ['price_book_item_id' => $unused->unique_id, 'action' => 'set', 'minimum_quantity' => '1', 'reason' => 'Tidak dipakai'])
+            ->assertSessionHasErrors();
+    }
+
+    public function test_tugboat_rule_applies_day_and_time_rates(): void
+    {
+        $document = $this->document();
+        $tug = $this->item(['code' => 'TUG', 'calculation_rule' => 'tugboat', 'unit_price' => '1000']);
+
+        $job = $this->store_job($document, [
+            'job_name' => 'Kapal tunda', 'project_job_group_id' => $this->group('Docking')->unique_id, 'price_book_item_id' => $tug->unique_id,
+            'calculation' => ['type' => 'tugboat', 'entries' => [
+                ['start_at' => '2026-10-19T15:30', 'end_at' => '2026-10-19T17:10', 'is_holiday' => '0'],
+                ['start_at' => '2026-10-24T06:00', 'end_at' => '2026-10-24T08:00', 'is_holiday' => '0'],
+                ['start_at' => '2026-10-20T10:00', 'end_at' => '2026-10-20T11:00', 'is_holiday' => '1'],
+            ]],
+        ])->fresh();
+
+        // Mon 2 h (1 h × 100% + 1 h × 150%) + Sat 2 h (1,5 h × 300% + 0,5 h × 200%) + holiday 1 h × 200%.
+        $this->assertSame('5.0000', $job->job_volume_estimated);
+        $this->assertSame('10.0000', $job->billed_quantity);
+        $this->assertSame('10000.00', $job->est_price);
+        $this->assertSame('jam', $job->unit);
+
+        $this->post(route('project.job-document.workflow.job.store', [$this->project->unique_id, $document->unique_id]), [
+            'job_name' => 'Kapal tunda salah', 'project_job_group_id' => $this->group('Docking')->unique_id, 'price_book_item_id' => $tug->unique_id,
+            'calculation' => ['type' => 'tugboat', 'entries' => [['start_at' => '2026-10-19T10:00', 'end_at' => '2026-10-19T09:00']]],
+        ])->assertSessionHasErrors('calculation.entries.0.end_at');
+    }
+
+    public function test_customer_text_hides_minimums_and_price_item_rule_forces_unit(): void
+    {
+        $document = $this->document();
+        $item = $this->item(['code' => 'PLT', 'unit' => 'kg', 'calculation_rule' => 'plate', 'has_minimum_charge' => true, 'minimum_quantity' => '15']);
+        $this->store_job($document, [
+            'job_name' => 'Pelat doubler', 'project_job_group_id' => $this->group()->unique_id, 'price_book_item_id' => $item->unique_id,
+            'calculation' => ['type' => 'plate', 'material' => 'steel', 'length' => 300, 'width' => 200, 'thickness' => 8, 'quantity' => 3, 'safety_factor' => 1],
+        ]);
+
+        $row = app(project_boq_service::class)->build_sheet($document->fresh())['groups'][0]['rows'][0];
+        $this->assertStringContainsString('kg/keping', $row['calculation_text']);
+        $this->assertStringNotContainsString('kg/keping', $row['calculation_text_customer']);
+        $this->assertStringContainsString('300 × 200 × 8 mm × 3 keping', $row['calculation_text_customer']);
+
+        $this->get(route('project.job-document.workflow.show', [$this->project->unique_id, $document->unique_id]))
+            ->assertOk()->assertSee('Batas Minimum')->assertSee('Tagih 45');
+
+        $this->post(route('price-book.items.store', $this->book), [
+            'group' => 'service', 'code' => 'PIPE-2', 'name' => 'Pipa baru', 'unit' => 'batang', 'calculation_rule' => 'pipe',
+            'unit_price' => '1000', 'has_minimum_charge' => '1', 'minimum_quantity' => '5',
+        ])->assertSessionHasNoErrors();
+        $pipe = PriceBookItem::where('code', 'PIPE-2')->firstOrFail();
+        $this->assertSame(['m', 'pipe', false], [$pipe->unit, $pipe->calculation_rule, (bool) $pipe->has_minimum_charge]);
     }
 
     public function test_materials_and_cascading_delete(): void
@@ -192,7 +305,9 @@ class ProjectBoqTest extends TestCase
             ->assertSessionHasNoErrors();
         $material = $child->materials()->firstOrFail();
         $this->assertSame('300.00', $material->price);
-        $this->assertSame('25.00', $root->fresh()->job_weight_percent);
+        // Materials never carry weight; the only priced job line gets the full 100%.
+        $this->assertSame('100.00', $root->fresh()->job_weight_percent);
+        $this->assertSame('0.00', $child->fresh()->job_weight_percent);
 
         $this->put(route('project.job-document.workflow.material.update', [...$base, $material->unique_id]), ['material_name' => 'Elektroda', 'volume' => '1', 'unit_price' => '100'])
             ->assertSessionHasNoErrors();

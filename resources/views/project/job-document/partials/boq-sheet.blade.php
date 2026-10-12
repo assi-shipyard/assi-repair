@@ -8,8 +8,16 @@
     $fmt_money = fn ($value): string => number_format((float) $value, 2, ',', '.');
     $fmt_qty = fn ($value): string => $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 4, ',', '.'), '0'), ',');
     $fmt_date = fn ($date): ?string => $date?->locale('id')->translatedFormat('j F Y');
-    $column_count = 4 + ($show_prices ? 3 : 0) + ($show_progress ? 2 : 0) + ($can_edit ? 1 : 0);
+    $uses_reports = $features['progress_reports'] ?? false;
+    $progress_weight_column = $show_progress && ! $show_prices;
+    $fmt_pct = fn ($value): string => $value === null ? '-' : number_format((float) $value, 2, ',', '.').'%';
+    $column_count = 4 + ($show_prices ? 3 : 0) + ($show_progress ? 3 + ($progress_weight_column ? 1 : 0) : 0) + ($can_edit ? 1 : 0);
     $job_base = [$project->unique_id, $document->unique_id];
+    $rule_labels = collect(\App\Services\boq_rule_service::RULES)->map(fn (array $rule): string => $rule['label'])->all();
+    $old_minimum = $errors->hasAny(['minimum_quantity', 'reason', 'price_book_item_id']) && old('action') === 'set'
+        ? ['item_id' => old('price_book_item_id'), 'minimum' => old('minimum_quantity'), 'reason' => old('reason')]
+        : null;
+    $billed_differs = fn ($billed, $volume): bool => $billed !== null && $volume !== null && bccomp((string) $billed, (string) $volume, 4) !== 0;
 @endphp
 
 <div class="row row-cards mb-3">
@@ -50,10 +58,16 @@
         <div>
             Pekerjaan dikelompokkan per kelompok pekerjaan (I, II, ...) dan dapat memiliki sub pekerjaan (1.1, 1.1.1) maksimal {{ $max_depth }} tingkat.
             @if ($show_prices)
-                Jumlah dihitung dari volume × harga satuan; bila item Kamus Harga memiliki minimum charge, volume tagih memakai nilai minimum tersebut. Bobot dihitung ulang otomatis setiap ada perubahan.
+                Jumlah dihitung dari volume tagih × harga satuan. Volume tagih mengikuti aturan perhitungan item (pelat, pipa, docking, crane, kapal tunda, luasan) dan batas minimum proyek. Bobot dihitung ulang otomatis setiap ada perubahan.
                 <div class="mt-1 small">Kamus Harga proyek: <strong>{{ $price_book?->name ?? 'Belum tersedia' }}</strong>{{ $price_book && $project->price_book_id === null ? ' (kamus acuan)' : '' }}</div>
             @elseif ($show_progress)
                 Progres tertimbang memakai bobot dari RAB yang disalin ke tahap ini.
+            @endif
+            @if ($show_progress)
+                <div class="mt-1 small">
+                    Progres pekerjaan induk dihitung otomatis dari sub pekerjaannya: <strong>Bobot</strong> = porsi biaya pekerjaan beserta sub pekerjaannya, <strong>Progres</strong> = realisasi aktual, <strong>Tertimbang</strong> = progres × bobot.
+                    @if ($uses_reports) Progres hanya berubah melalui laporan <strong>Progres Harian</strong> yang disetujui PIMPRO Reparasi dan PPC. @endif
+                </div>
             @endif
         </div>
     </div>
@@ -71,7 +85,8 @@
                             <th>Kelompok Pekerjaan</th>
                             <th class="text-end">Pekerjaan</th>
                             @if ($show_prices)<th class="text-end">Jumlah (IDR)</th><th class="text-end">Bobot</th>@endif
-                            @if ($show_progress)<th class="text-end" style="min-width: 9rem">Progres</th>@endif
+                            @if ($progress_weight_column)<th class="text-end">Bobot</th>@endif
+                            @if ($show_progress)<th class="text-end" style="min-width: 9rem">Progres</th><th class="text-end">Tertimbang</th>@endif
                         </tr>
                     </thead>
                     <tbody>
@@ -84,8 +99,13 @@
                                     <td class="text-end">{{ $fmt_money($group['total']) }}</td>
                                     <td class="text-end">{{ $group['weight'] !== null ? number_format((float) $group['weight'], 2, ',', '.').'%' : '-' }}</td>
                                 @endif
+                                @if ($progress_weight_column)<td class="text-end">{{ $fmt_pct($group['weight']) }}</td>@endif
                                 @if ($show_progress)
-                                    <td class="text-end">{{ $group['progress'] !== null ? number_format((float) $group['progress'], 2, ',', '.').'%' : '-' }}</td>
+                                    <td class="text-end">
+                                        {{ $fmt_pct($group['progress']) }}
+                                        <div class="progress progress-sm mt-1"><div class="progress-bar bg-success" style="width: {{ (float) ($group['progress'] ?? 0) }}%"></div></div>
+                                    </td>
+                                    <td class="text-end">{{ $fmt_pct($group['weighted']) }}</td>
                                 @endif
                             </tr>
                         @endforeach
@@ -96,7 +116,7 @@
                                 <td colspan="3" class="text-end">Total</td>
                                 <td class="text-end">{{ $fmt_money($sheet['grand_total']) }}</td>
                                 <td class="text-end">{{ bccomp($sheet['grand_total'], '0', 2) > 0 ? '100,00%' : '-' }}</td>
-                                @if ($show_progress)<td class="text-end">{{ $sheet['progress'] !== null ? number_format((float) $sheet['progress'], 2, ',', '.').'%' : '-' }}</td>@endif
+                                @if ($show_progress)<td class="text-end">{{ $fmt_pct($sheet['progress']) }}</td><td class="text-end">{{ $fmt_pct($sheet['progress']) }}</td>@endif
                             </tr>
                         </tfoot>
                     @endif
@@ -104,6 +124,80 @@
             </div>
         </div>
     @endif
+@endif
+
+@if ($show_prices && count($sheet['minimums']) > 0)
+    <div class="card mb-3">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">Batas Minimum &amp; Negosiasi</h3>
+                <div class="card-subtitle">Hanya tampil di internal. Dokumen untuk pelanggan tidak menampilkan penerapan minimum.</div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table table-sm">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Berlaku</th>
+                        <th class="text-end">Minimum</th>
+                        <th class="text-end">Terpakai</th>
+                        <th class="text-end">Ditagih</th>
+                        <th>Keterangan</th>
+                        @if ($can_edit)<th class="w-1"></th>@endif
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($sheet['minimums'] as $minimum_row)
+                        @php $override = $minimum_row['override']; @endphp
+                        <tr>
+                            <td><div class="small text-secondary">{{ $minimum_row['item']->code }}</div><div>{{ $minimum_row['item']->name }}</div></td>
+                            <td class="text-nowrap">{{ $minimum_row['scope'] === 'piece' ? 'Per keping' : 'Total proyek' }} <span class="text-secondary small">({{ $minimum_row['line_count'] }} baris)</span></td>
+                            <td class="text-end text-nowrap">
+                                @if ($override)
+                                    <span class="badge bg-purple-lt">{{ bccomp((string) $override['minimum'], '0', 4) === 0 ? 'Ditiadakan' : $fmt_qty($override['minimum']).' '.$minimum_row['unit'] }}</span>
+                                    @if ($minimum_row['original'] !== null)<div class="small text-secondary text-decoration-line-through">{{ $fmt_qty($minimum_row['original']) }} {{ $minimum_row['unit'] }}</div>@endif
+                                @else
+                                    {{ $minimum_row['original'] !== null ? $fmt_qty($minimum_row['original']).' '.$minimum_row['unit'] : '-' }}
+                                @endif
+                            </td>
+                            <td class="text-end text-nowrap">{{ $fmt_qty($minimum_row['used']) }} {{ $minimum_row['unit'] }}</td>
+                            <td class="text-end text-nowrap fw-semibold">{{ $fmt_qty($minimum_row['billed']) }} {{ $minimum_row['unit'] }}</td>
+                            <td class="small">
+                                @if (bccomp($minimum_row['shortfall'], '0', 4) > 0)
+                                    <span class="text-warning">Kekurangan {{ $fmt_qty($minimum_row['shortfall']) }} {{ $minimum_row['unit'] }} dibebankan ke baris pemakaian terbesar.</span>
+                                @endif
+                                @if ($override)
+                                    <div class="text-secondary">Negosiasi: {{ $override['reason'] }} — {{ $override['user_name'] ?? 'Pengguna' }}, {{ \Carbon\CarbonImmutable::parse($override['at'])->timezone(config('app.timezone'))->locale('id')->translatedFormat('j F Y H.i') }} WIB</div>
+                                @endif
+                            </td>
+                            @if ($can_edit)
+                                <td class="text-nowrap">
+                                    <button type="button" class="btn btn-sm btn-outline-primary boq-minimum-edit"
+                                        data-item-id="{{ $minimum_row['item']->unique_id }}"
+                                        data-item-name="{{ $minimum_row['item']->code.' — '.$minimum_row['item']->name }}"
+                                        data-unit="{{ $minimum_row['unit'] }}"
+                                        data-minimum="{{ $override['minimum'] ?? $minimum_row['original'] }}"
+                                        data-reason="{{ $override['reason'] ?? '' }}">Ubah</button>
+                                    @if ($override)
+                                        <form method="POST" action="{{ route('project.job-document.workflow.minimum-override.save', $job_base) }}" class="d-inline">
+                                            @csrf @method('PUT')
+                                            <input type="hidden" name="price_book_item_id" value="{{ $minimum_row['item']->unique_id }}">
+                                            <input type="hidden" name="action" value="clear">
+                                            <button type="submit" class="btn btn-sm btn-ghost-secondary">Reset</button>
+                                        </form>
+                                    @endif
+                                </td>
+                            @endif
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer small text-secondary">
+            <i class="ti ti-info-circle me-1"></i>Perubahan minimum hasil negosiasi tercatat di riwayat dokumen. Total akhir setelah negosiasi disetujui oleh Manajer Pemasaran.
+        </div>
+    </div>
 @endif
 
 <div class="card">
@@ -135,7 +229,9 @@
                         <th class="text-end">Bobot</th>
                     @endif
                     @if ($show_progress)
+                        @if ($progress_weight_column)<th class="text-end">Bobot</th>@endif
                         <th class="text-end">Progres</th>
+                        <th class="text-end">Tertimbang</th>
                         <th>Status</th>
                     @endif
                     @if ($can_edit)<th class="w-1"></th>@endif
@@ -151,7 +247,9 @@
                             <td class="text-end fw-bold">{{ $group['weight'] !== null ? number_format((float) $group['weight'], 2, ',', '.').'%' : '-' }}</td>
                         @endif
                         @if ($show_progress)
-                            <td class="text-end fw-bold">{{ $group['progress'] !== null ? number_format((float) $group['progress'], 2, ',', '.').'%' : '-' }}</td>
+                            @if ($progress_weight_column)<td class="text-end fw-bold">{{ $fmt_pct($group['weight']) }}</td>@endif
+                            <td class="text-end fw-bold">{{ $fmt_pct($group['progress']) }}</td>
+                            <td class="text-end fw-bold">{{ $fmt_pct($group['weighted']) }}</td>
                             <td></td>
                         @endif
                         @if ($can_edit)<td></td>@endif
@@ -167,7 +265,8 @@
                                 'is_child' => $job->parent_job_id !== null,
                                 'job_name' => $job->job_name,
                                 'project_job_group_id' => $group['group']?->unique_id,
-                                'price_item' => $job->price_book_item ? ['id' => $job->price_book_item->unique_id, 'text' => $job->price_book_item->code.' — '.$job->price_book_item->name] : null,
+                                'price_item' => $job->price_book_item ? ['id' => $job->price_book_item->unique_id, 'text' => $job->price_book_item->code.' — '.$job->price_book_item->name, 'rule' => $job->price_book_item->calculation_rule] : null,
+                                'calculation_rule' => $job->calculation_rule,
                                 'minimum_quantity' => $job->minimum_quantity,
                                 'job_volume_estimated' => $job->job_volume_estimated,
                                 'unit' => $job->unit,
@@ -194,17 +293,9 @@
                                     </div>
                                     <div class="small text-secondary d-flex flex-wrap column-gap-2">
                                         @if ($job->price_book_item)<span><i class="ti ti-book me-1"></i>{{ $job->price_book_item->code }}</span>@endif
-                                        @if ($job->minimum_quantity !== null)<span class="text-warning">Min. {{ $fmt_qty($job->minimum_quantity) }} {{ $job->unit }}</span>@endif
-                                        @if ($calculation)
-                                            <span><i class="ti ti-calculator me-1"></i>
-                                                @if ($calculation['type'] === 'plate')
-                                                    Pelat {{ $fmt_qty($calculation['length']) }}×{{ $fmt_qty($calculation['width']) }}×{{ $fmt_qty($calculation['thickness']) }} mm × {{ $calculation['quantity'] }}
-                                                @else
-                                                    Pipa Ø{{ $fmt_qty($calculation['diameter']) }}×{{ $fmt_qty($calculation['wall_thickness']) }} mm, {{ $fmt_qty($calculation['pipe_length']) }} mm × {{ $calculation['quantity'] }}
-                                                @endif
-                                                = {{ $fmt_qty($calculation['weight_kg']) }} kg
-                                            </span>
-                                        @endif
+                                        @if ($job->calculation_rule)<span class="badge bg-azure-lt">{{ $rule_labels[$job->calculation_rule] ?? $job->calculation_rule }}</span>@endif
+                                        @if ($show_prices && $job->minimum_quantity !== null)<span class="text-warning">Min. {{ $fmt_qty($job->minimum_quantity) }} {{ $job->unit }}</span>@endif
+                                        @if ($row['calculation_text'])<span><i class="ti ti-calculator me-1"></i>{{ $row['calculation_text'] }}</span>@endif
                                         @if ($job->responsible_name)<span><i class="ti ti-user me-1"></i>{{ $job->responsible_name }}</span>@endif
                                         @if ($job->est_start_date || $job->est_finish_date)<span><i class="ti ti-calendar me-1"></i>{{ $fmt_date($job->est_start_date) ?? '-' }} – {{ $fmt_date($job->est_finish_date) ?? '-' }}</span>@endif
                                         @if ($job->photos->isNotEmpty())<span><i class="ti ti-photo me-1"></i>{{ $job->photos->count() }} foto</span>@endif
@@ -212,7 +303,12 @@
                                     @if ($job->notes)<div class="small text-secondary fst-italic">{{ $job->notes }}</div>@endif
                                 </div>
                             </td>
-                            <td class="text-end text-nowrap">{{ $fmt_qty($job->job_volume_estimated) }}</td>
+                            <td class="text-end text-nowrap">
+                                {{ $fmt_qty($job->job_volume_estimated) }}
+                                @if ($show_prices && $billed_differs($job->billed_quantity, $job->job_volume_estimated))
+                                    <div class="small text-warning" title="Volume yang ditagihkan setelah aturan perhitungan dan minimum">Tagih {{ $fmt_qty($job->billed_quantity) }}</div>
+                                @endif
+                            </td>
                             <td>{{ $job->unit ?? '-' }}</td>
                             @if ($show_prices)
                                 <td class="text-end text-nowrap">{{ $job->unit_price !== null ? $fmt_money($job->unit_price) : '-' }}</td>
@@ -222,11 +318,14 @@
                                         <div class="small text-secondary" title="Termasuk material dan sub pekerjaan">Σ {{ $fmt_money($row['subtotal']) }}</div>
                                     @endif
                                 </td>
-                                <td class="text-end">{{ $job->job_weight_percent !== null ? number_format((float) $job->job_weight_percent, 2, ',', '.').'%' : '-' }}</td>
+                                <td class="text-end">{{ $fmt_pct($show_progress ? ($row['progress']['weight'] ?? null) : $job->job_weight_percent) }}</td>
                             @endif
                             @if ($show_progress)
-                                <td class="text-end text-nowrap">{{ number_format((float) ($job->progress_percent ?? 0), 2, ',', '.') }}%</td>
-                                <td><span class="badge {{ $job_status_classes[$job->status] ?? 'bg-secondary-lt' }}">{{ $job_status_labels[$job->status] ?? $job->status }}</span></td>
+                                @php($row_status = $row['progress']['status'] ?? $job->status)
+                                @if ($progress_weight_column)<td class="text-end">{{ $fmt_pct($row['progress']['weight'] ?? null) }}</td>@endif
+                                <td class="text-end text-nowrap {{ $row['has_children'] ? 'fst-italic' : '' }}" @if ($row['has_children']) title="Dihitung dari sub pekerjaan" @endif>{{ $fmt_pct($row['progress']['actual'] ?? '0') }}</td>
+                                <td class="text-end text-nowrap">{{ $fmt_pct($row['progress']['weighted'] ?? null) }}</td>
+                                <td><span class="badge {{ $job_status_classes[$row_status] ?? 'bg-secondary-lt' }}">{{ $job_status_labels[$row_status] ?? $row_status }}</span></td>
                             @endif
                             @if ($can_edit)
                                 <td class="text-end">
@@ -254,17 +353,22 @@
                                     <div class="small" style="padding-left: {{ $row['depth'] * 1.25 + 1.25 }}rem">
                                         <span class="text-secondary">{{ $material_row['letter'] }}.</span> {{ $material->material_name }}
                                         @if ($material->dimension)<span class="text-secondary">· {{ $material->dimension }}</span>@endif
-                                        @if ($material->minimum_quantity !== null)<span class="text-warning">· Min. {{ $fmt_qty($material->minimum_quantity) }} {{ $material->unit }}</span>@endif
+                                        @if ($show_prices && $material->minimum_quantity !== null)<span class="text-warning">· Min. {{ $fmt_qty($material->minimum_quantity) }} {{ $material->unit }}</span>@endif
                                     </div>
                                 </td>
-                                <td class="text-end small text-nowrap">{{ $fmt_qty($material->volume) }}</td>
+                                <td class="text-end small text-nowrap">
+                                    {{ $fmt_qty($material->volume) }}
+                                    @if ($show_prices && $billed_differs($material->billed_quantity, $material->volume))
+                                        <div class="text-warning">Tagih {{ $fmt_qty($material->billed_quantity) }}</div>
+                                    @endif
+                                </td>
                                 <td class="small">{{ $material->unit ?? '-' }}</td>
                                 @if ($show_prices)
                                     <td class="text-end small text-nowrap">{{ $material->unit_price !== null ? $fmt_money($material->unit_price) : '-' }}</td>
                                     <td class="text-end small text-nowrap">{{ $material->price !== null ? $fmt_money($material->price) : '-' }}</td>
                                     <td></td>
                                 @endif
-                                @if ($show_progress)<td></td><td></td>@endif
+                                @if ($show_progress)<td colspan="{{ $progress_weight_column ? 4 : 3 }}"></td>@endif
                                 @if ($can_edit)
                                     <td class="text-end text-nowrap">
                                         <button type="button" class="btn btn-sm btn-ghost-primary btn-icon boq-edit-material" aria-label="Ubah material"
@@ -316,6 +420,45 @@
     @include('project.job-document.partials.boq-modals')
 @endif
 
+@if ($can_edit && $show_prices && count($sheet['minimums']) > 0)
+    <div class="modal modal-blur fade" id="boq-minimum-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" id="boq-minimum-form" method="POST" action="{{ route('project.job-document.workflow.minimum-override.save', $job_base) }}" novalidate>
+                @csrf
+                @method('PUT')
+                <input type="hidden" name="action" value="set">
+                <input type="hidden" name="price_book_item_id" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title">Minimum Hasil Negosiasi</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    @if ($errors->has('minimum_quantity') || $errors->has('reason') || $errors->has('price_book_item_id'))
+                        <div class="alert alert-danger"><ul class="mb-0 ps-3">@foreach (['price_book_item_id', 'minimum_quantity', 'reason'] as $error_key)@foreach ($errors->get($error_key) as $error)<li>{{ $error }}</li>@endforeach @endforeach</ul></div>
+                    @endif
+                    <div class="mb-3 fw-semibold" id="boq-minimum-item"></div>
+                    <div class="mb-3">
+                        <label class="form-label required" for="boq-minimum-quantity">Minimum Baru</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="minimum_quantity" id="boq-minimum-quantity" min="0" step="0.0001" required>
+                            <span class="input-group-text" id="boq-minimum-unit"></span>
+                        </div>
+                        <div class="form-hint">Isi 0 untuk meniadakan minimum pada dokumen ini.</div>
+                    </div>
+                    <div>
+                        <label class="form-label required" for="boq-minimum-reason">Alasan Negosiasi</label>
+                        <textarea class="form-control" name="reason" id="boq-minimum-reason" rows="3" minlength="5" maxlength="500" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+@endif
+
 @push('scripts')
     <script>
         (function () {
@@ -338,6 +481,39 @@
                 });
                 $('#boq-search-empty').toggleClass('d-none', visible > 0 || term === '');
             });
+
+            const $minimum_form = $('#boq-minimum-form');
+            if ($minimum_form.length) {
+                $minimum_form.validate({
+                    errorElement: 'div',
+                    errorClass: 'invalid-feedback',
+                    highlight: element => $(element).addClass('is-invalid'),
+                    unhighlight: element => $(element).removeClass('is-invalid'),
+                    errorPlacement: (error, element) => error.insertAfter(element.closest('.input-group').length ? element.closest('.input-group') : element),
+                    rules: { minimum_quantity: { required: true, number: true, min: 0, max: 999999999 }, reason: { required: true, minlength: 5, maxlength: 500 } },
+                    messages: {
+                        minimum_quantity: { required: 'Minimum baru wajib diisi.', number: 'Masukkan angka yang valid.', min: 'Minimum tidak boleh negatif.' },
+                        reason: { required: 'Alasan negosiasi wajib diisi.', minlength: 'Alasan minimal 5 karakter.', maxlength: 'Alasan maksimal 500 karakter.' },
+                    },
+                });
+                const open_minimum = function (data) {
+                    $minimum_form.find('[name=price_book_item_id]').val(data.item_id);
+                    $('#boq-minimum-item').text(data.item_name || '');
+                    $('#boq-minimum-unit').text(data.unit || '');
+                    $('#boq-minimum-quantity').val(data.minimum || '');
+                    $('#boq-minimum-reason').val(data.reason || '');
+                    $('#boq-minimum-modal').modal('show');
+                };
+                $(document).on('click', '.boq-minimum-edit', function () {
+                    $minimum_form.find('.alert-danger').remove();
+                    open_minimum({ item_id: this.dataset.itemId, item_name: this.dataset.itemName, unit: this.dataset.unit, minimum: this.dataset.minimum, reason: this.dataset.reason });
+                });
+                const old_minimum = @json($old_minimum);
+                if (old_minimum) {
+                    const $button = $('.boq-minimum-edit[data-item-id="' + old_minimum.item_id + '"]');
+                    open_minimum({ ...old_minimum, item_name: $button.data('itemName'), unit: $button.data('unit') });
+                }
+            }
         })();
     </script>
 @endpush

@@ -8,6 +8,7 @@ use App\Models\ProjectDocumentJob;
 use App\Models\ProjectDocumentJobPhoto;
 use App\Models\ProjectJobDocument;
 use App\Services\project_boq_service;
+use App\Services\project_progress_service;
 use App\Services\ProjectDocumentComparisonService;
 use App\Services\ProjectJobDocumentService;
 use Illuminate\Http\RedirectResponse;
@@ -21,7 +22,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ProjectJobDocumentPageController extends Controller
 {
     // Forward declare the service in the constructor
-    public function __construct(private ProjectJobDocumentService $service, private ProjectDocumentComparisonService $comparison, private project_boq_service $boq) {}
+    public function __construct(private ProjectJobDocumentService $service, private ProjectDocumentComparisonService $comparison, private project_boq_service $boq, private project_progress_service $progress) {}
 
     public function index(string $projectId): View|RedirectResponse
     {
@@ -89,6 +90,11 @@ class ProjectJobDocumentPageController extends Controller
 
         $histories = $document->histories()->latest('id')->limit(100)->get();
         $actor_names = $this->actor_names($histories->pluck('actor_id'));
+        $progress_reports = collect();
+        if ($document->features()['progress_reports']) {
+            $project->loadMissing(['leader:id,name', 'ppc:id,name']);
+            $progress_reports = $this->progress->reports($project);
+        }
 
         return view($this->documentView($document), [
             'project' => $project,
@@ -106,6 +112,9 @@ class ProjectJobDocumentPageController extends Controller
             'sheet' => $this->boq->build_sheet($document),
             'job_groups' => $this->boq->active_groups(),
             'price_book' => $this->boq->price_book_for($project),
+            'progress_reports' => $progress_reports,
+            'can_report_progress' => $document->features()['progress_reports'] && $this->progress->can_report(auth()->user(), $project),
+            'has_open_report' => $progress_reports->contains(fn ($report): bool => $report->status !== 'approved'),
         ]);
     }
 
@@ -449,6 +458,11 @@ class ProjectJobDocumentPageController extends Controller
         }
 
         $document->load('jobs');
+
+        if ($this->progress->open_report($project) !== null) {
+            return redirect()->route('project.job-document.workflow.index', $project->unique_id)
+                ->with('error', 'Masih ada laporan progres harian yang belum disetujui. Selesaikan laporan tersebut sebelum finalisasi.');
+        }
 
         if ($document->jobs->isEmpty()) {
             return redirect()->route('project.job-document.workflow.index', $project->unique_id)

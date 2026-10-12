@@ -24,31 +24,32 @@ class demo_boq_seeder extends Seeder
     private const PROJECT_CODE = 'D.001.26.O.h';
 
     private const PRICE_ITEMS = [
-        ['service', 'JS-UM-01', 'Penyediaan listrik darat', 'hari', 1500000, null],
-        ['service', 'JS-UM-02', 'Penyediaan air tawar', 'ton', 75000, null],
-        ['service', 'JS-UM-03', 'Gas free certificate & fire watch', 'ls', 6500000, null],
-        ['service', 'JS-DOC-01', 'Naik dan turun dok', 'ls', 45000000, null],
-        ['service', 'JS-DOC-02', 'Sewa dok', 'hari', 12000000, 3],
-        ['service', 'JS-DOC-03', 'Kapal tunda (tug assist)', 'jam', 3500000, 4],
-        ['service', 'JS-DOC-04', 'Sewa crane 25 ton', 'jam', 750000, 4],
-        ['service', 'JS-LB-01', 'Penggantian pelat baja (cropping & renewal)', 'kg', 42000, 50],
-        ['service', 'JS-LB-02', 'Pengukuran ketebalan pelat (UT)', 'titik', 25000, 100],
-        ['service', 'JS-CT-01', 'Sandblasting SA 2.5', 'm²', 85000, null],
-        ['service', 'JS-CT-02', 'Pengecatan per lapis', 'm²', 18000, null],
-        ['service', 'JS-CT-03', 'Penulisan draft mark & nama kapal', 'ls', 7500000, null],
-        ['service', 'JS-PM-01', 'Overhaul & polishing propeller', 'ls', 28000000, null],
-        ['service', 'JS-PM-02', 'Cabut, periksa, pasang poros propeller', 'ls', 35000000, null],
-        ['service', 'JS-PM-03', 'Overhaul katup laut', 'bh', 2750000, null],
-        ['service', 'JS-PP-01', 'Penggantian pipa baja', 'kg', 55000, 10],
-        ['service', 'JS-KL-01', 'Megger test motor listrik', 'unit', 450000, null],
-        ['material', 'MT-PL-10', 'Pelat baja SS400 10 mm', 'kg', 18500, null],
-        ['material', 'MT-PL-12', 'Pelat baja SS400 12 mm', 'kg', 18500, null],
-        ['material', 'MT-EL-01', 'Elektroda las E7016', 'kg', 45000, null],
-        ['material', 'MT-CT-01', 'Cat antifouling', 'liter', 285000, null],
-        ['material', 'MT-CT-02', 'Cat anticorrosive', 'liter', 165000, null],
-        ['material', 'MT-ZN-01', 'Zinc anode', 'bh', 650000, null],
-        ['material', 'MT-PP-01', 'Pipa baja SCH40 2 inci', 'm', 210000, null],
-        ['material', 'MT-PK-01', 'Gasket & packing', 'set', 350000, null],
+        ['service', 'JS-UM-01', 'Penyediaan listrik darat', 'hari', 1500000, null, null],
+        ['service', 'JS-UM-02', 'Penyediaan air tawar', 'ton', 75000, null, null],
+        ['service', 'JS-UM-03', 'Gas free certificate & fire watch', 'ls', 6500000, null, null],
+        ['service', 'JS-DOC-01', 'Naik dan turun dok', 'ls', 45000000, null, null],
+        ['service', 'JS-DOC-02', 'Sewa dok', 'hari', 12000000, 2, 'docking'],
+        ['service', 'JS-DOC-03', 'Kapal tunda (tug assist)', 'jam', 3500000, null, 'tugboat'],
+        ['service', 'JS-DOC-04', 'Sewa crane 25 ton', 'jam', 750000, 8, 'crane'],
+        ['service', 'JS-LB-01', 'Penggantian pelat baja (cropping & renewal)', 'kg', 42000, 15, 'plate'],
+        ['service', 'JS-LB-02', 'Pengukuran ketebalan pelat (UT)', 'titik', 25000, 100, null],
+        ['service', 'JS-CT-01', 'Sandblasting SA 2.5', 'm²', 85000, null, 'area'],
+        ['service', 'JS-CT-02', 'Pengecatan per lapis', 'm²', 18000, null, 'area'],
+        ['service', 'JS-CT-04', 'Cleaning lambung (high pressure water jet)', 'm²', 12000, 500, 'area'],
+        ['service', 'JS-CT-03', 'Penulisan draft mark & nama kapal', 'ls', 7500000, null, null],
+        ['service', 'JS-PM-01', 'Overhaul & polishing propeller', 'ls', 28000000, null, null],
+        ['service', 'JS-PM-02', 'Cabut, periksa, pasang poros propeller', 'ls', 35000000, null, null],
+        ['service', 'JS-PM-03', 'Overhaul katup laut', 'bh', 2750000, null, null],
+        ['service', 'JS-PP-01', 'Penggantian pipa baja', 'm', 450000, null, 'pipe'],
+        ['service', 'JS-KL-01', 'Megger test motor listrik', 'unit', 450000, null, null],
+        ['material', 'MT-PL-10', 'Pelat baja SS400 10 mm', 'kg', 18500, null, null],
+        ['material', 'MT-PL-12', 'Pelat baja SS400 12 mm', 'kg', 18500, null, null],
+        ['material', 'MT-EL-01', 'Elektroda las E7016', 'kg', 45000, null, null],
+        ['material', 'MT-CT-01', 'Cat antifouling', 'liter', 285000, null, null],
+        ['material', 'MT-CT-02', 'Cat anticorrosive', 'liter', 165000, null, null],
+        ['material', 'MT-ZN-01', 'Zinc anode', 'bh', 650000, null, null],
+        ['material', 'MT-PP-01', 'Pipa baja SCH40 2 inci', 'm', 210000, null, null],
+        ['material', 'MT-PK-01', 'Gasket & packing', 'set', 350000, null, null],
     ];
 
     public function __construct(
@@ -105,11 +106,12 @@ class demo_boq_seeder extends Seeder
             $book = PriceBook::create(['code' => 'KH-2026', 'name' => 'Kamus Harga Utama 2026', 'reference_slot' => 1, 'description' => 'Contoh kamus harga acuan.']);
         }
 
-        foreach (self::PRICE_ITEMS as [$group, $code, $name, $unit, $price, $minimum]) {
-            $book->items()->firstOrCreate(['code' => $code], [
+        foreach (self::PRICE_ITEMS as [$group, $code, $name, $unit, $price, $minimum, $rule]) {
+            $book->items()->updateOrCreate(['code' => $code], [
                 'group' => $group,
                 'name' => $name,
                 'unit' => $unit,
+                'calculation_rule' => $rule,
                 'unit_price' => $price,
                 'has_minimum_charge' => $minimum !== null,
                 'minimum_quantity' => $minimum,
@@ -120,7 +122,7 @@ class demo_boq_seeder extends Seeder
     // Each entry: [group name, job spec, sub-jobs, materials]. Specs reference price items by code.
     private function job_plan(): array
     {
-        $plate = fn (int $length, int $width, int $thickness, int $quantity): array => ['type' => 'plate', 'basis' => 'kg', 'length' => $length, 'width' => $width, 'thickness' => $thickness, 'quantity' => $quantity, 'density' => 7850, 'safety_factor' => 1.1];
+        $plate = fn (int $length, int $width, int $thickness, int $quantity): array => ['type' => 'plate', 'material' => 'steel', 'length' => $length, 'width' => $width, 'thickness' => $thickness, 'quantity' => $quantity, 'safety_factor' => 1.1];
 
         return [
             ['Pekerjaan Umum', ['job_name' => 'Penyediaan listrik darat selama docking', 'item' => 'JS-UM-01', 'job_volume_estimated' => 14], [], []],
@@ -128,19 +130,24 @@ class demo_boq_seeder extends Seeder
             ['Pekerjaan Umum', ['job_name' => 'Gas free certificate & fire watch tangki', 'item' => 'JS-UM-03', 'job_volume_estimated' => 1], [], []],
 
             ['Pekerjaan Docking', ['job_name' => 'Naik dan turun dok', 'item' => 'JS-DOC-01', 'job_volume_estimated' => 1], [], []],
-            ['Pekerjaan Docking', ['job_name' => 'Sewa dok', 'item' => 'JS-DOC-02', 'job_volume_estimated' => 10], [], []],
-            ['Pekerjaan Docking', ['job_name' => 'Kapal tunda saat naik dan turun dok', 'item' => 'JS-DOC-03', 'job_volume_estimated' => 2, 'notes' => 'Minimum charge 4 jam berlaku.'], [], []],
+            ['Pekerjaan Docking', ['job_name' => 'Sewa dok', 'item' => 'JS-DOC-02', 'job_volume_estimated' => 9.5], [], []],
+            ['Pekerjaan Docking', ['job_name' => 'Kapal tunda saat naik dan turun dok', 'item' => 'JS-DOC-03', 'calculation' => ['type' => 'tugboat', 'entries' => [
+                ['start_at' => '2026-10-19T08:00', 'end_at' => '2026-10-19T10:30', 'is_holiday' => false],
+                ['start_at' => '2026-10-31T16:00', 'end_at' => '2026-10-31T18:00', 'is_holiday' => false],
+            ]], 'notes' => 'Naik dok hari kerja pagi, turun dok Sabtu sore.'], [], []],
 
             ['Pekerjaan Lambung & Konstruksi', ['job_name' => 'Pengukuran ketebalan pelat lambung', 'item' => 'JS-LB-02', 'job_volume_estimated' => 400], [], []],
             ['Pekerjaan Lambung & Konstruksi', ['job_name' => 'Penggantian pelat lambung bawah garis air', 'item' => 'JS-LB-01', 'calculation' => $plate(2400, 1200, 12, 4), 'notes' => 'Frame 45–52 sisi kiri dan kanan.'], [
                 [['job_name' => 'Penggantian pelat bilge keel kiri', 'item' => 'JS-LB-01', 'calculation' => $plate(1800, 300, 10, 1)], [
                     ['material_name' => 'Pelat baja SS400 10 mm', 'item' => 'MT-PL-10', 'volume' => 50],
                 ]],
+                [['job_name' => 'Pemasangan pelat doubler kecil', 'item' => 'JS-LB-01', 'calculation' => $plate(300, 200, 8, 3)], []],
             ], [
                 ['material_name' => 'Pelat baja SS400 12 mm', 'item' => 'MT-PL-12', 'volume' => 325.6, 'dimension' => '2400 × 1200 × 12 mm, 4 lembar'],
                 ['material_name' => 'Elektroda las E7016', 'item' => 'MT-EL-01', 'volume' => 60],
             ]],
 
+            ['Pekerjaan Pengecatan', ['job_name' => 'Cleaning lambung dengan water jet', 'item' => 'JS-CT-04', 'job_volume_estimated' => 420], [], []],
             ['Pekerjaan Pengecatan', ['job_name' => 'Sandblasting lambung bawah garis air', 'item' => 'JS-CT-01', 'job_volume_estimated' => 1250], [], []],
             ['Pekerjaan Pengecatan', ['job_name' => 'Pengecatan lambung bawah garis air', 'notes' => 'Sistem cat sesuai rekomendasi pabrikan.'], [
                 [['job_name' => 'Anticorrosive 2 lapis', 'item' => 'JS-CT-02', 'job_volume_estimated' => 2500], [
@@ -156,14 +163,16 @@ class demo_boq_seeder extends Seeder
                 [['job_name' => 'Sewa crane untuk angkat propeller', 'item' => 'JS-DOC-04', 'job_volume_estimated' => 3], []],
             ], []],
             ['Pekerjaan Permesinan', ['job_name' => 'Overhaul & polishing propeller', 'item' => 'JS-PM-01', 'job_volume_estimated' => 1], [], []],
-            ['Pekerjaan Permesinan', ['job_name' => 'Overhaul katup laut', 'item' => 'JS-PM-03', 'job_volume_estimated' => 6], [], [
+            ['Pekerjaan Permesinan', ['job_name' => 'Overhaul katup laut', 'item' => 'JS-PM-03', 'job_volume_estimated' => 6], [
+                [['job_name' => 'Sewa crane untuk angkat katup laut', 'item' => 'JS-DOC-04', 'job_volume_estimated' => 1.5], []],
+            ], [
                 ['material_name' => 'Gasket & packing', 'item' => 'MT-PK-01', 'volume' => 6],
             ]],
             ['Pekerjaan Permesinan', ['job_name' => 'Penggantian zinc anode lambung', 'job_volume_estimated' => 40, 'unit' => 'bh', 'unit_price' => 150000, 'notes' => 'Harga jasa pasang tanpa item kamus harga.'], [], [
                 ['material_name' => 'Zinc anode', 'item' => 'MT-ZN-01', 'volume' => 40],
             ]],
 
-            ['Pekerjaan Perpipaan', ['job_name' => 'Penggantian pipa air laut pendingin mesin induk', 'item' => 'JS-PP-01', 'calculation' => ['type' => 'pipe', 'basis' => 'kg', 'diameter' => 60.3, 'wall_thickness' => 3.9, 'pipe_length' => 750, 'quantity' => 4, 'density' => 7850, 'safety_factor' => 1.1]], [], [
+            ['Pekerjaan Perpipaan', ['job_name' => 'Penggantian pipa air laut pendingin mesin induk', 'item' => 'JS-PP-01', 'calculation' => ['type' => 'pipe', 'size' => '2 inci SCH 40', 'length_m' => 0.75, 'quantity' => 4]], [], [
                 ['material_name' => 'Pipa baja SCH40 2 inci', 'item' => 'MT-PP-01', 'volume' => 4],
             ]],
 

@@ -2,7 +2,8 @@
     $status_labels = ['draft' => 'Draft', 'submitted' => 'Diajukan', 'approved' => 'Disetujui', 'locked' => 'Final', 'superseded' => 'Digantikan'];
     $status_classes = ['draft' => 'bg-secondary-lt text-secondary', 'submitted' => 'bg-warning-lt text-warning', 'approved' => 'bg-success-lt text-success', 'locked' => 'bg-success-lt text-success', 'superseded' => 'bg-secondary-lt text-secondary'];
     $document_ref = [$project->unique_id, $document->unique_id];
-    $action_labels = ['created' => 'Dokumen dibuat', 'updated' => 'Dokumen diperbarui', 'copied' => 'Disalin dari revisi sebelumnya', 'revision_created' => 'Revisi dibuat', 'submitted' => 'Diajukan untuk negosiasi', 'returned_to_draft' => 'Dikembalikan ke draft', 'approved' => 'Disetujui', 'superseded' => 'Digantikan revisi baru', 'job_created' => 'Pekerjaan ditambahkan', 'job_updated' => 'Pekerjaan diperbarui', 'job_deleted' => 'Pekerjaan dihapus', 'material_created' => 'Material ditambahkan', 'material_updated' => 'Material diperbarui', 'material_deleted' => 'Material dihapus', 'photo_created' => 'Foto ditambahkan', 'photo_deleted' => 'Foto dihapus'];
+    $action_labels = ['created' => 'Dokumen dibuat', 'updated' => 'Dokumen diperbarui', 'copied' => 'Disalin dari revisi sebelumnya', 'revision_created' => 'Revisi dibuat', 'submitted' => 'Diajukan untuk negosiasi', 'returned_to_draft' => 'Dikembalikan ke draft', 'approved' => 'Disetujui', 'superseded' => 'Digantikan revisi baru', 'job_created' => 'Pekerjaan ditambahkan', 'job_updated' => 'Pekerjaan diperbarui', 'job_deleted' => 'Pekerjaan dihapus', 'material_created' => 'Material ditambahkan', 'material_updated' => 'Material diperbarui', 'material_deleted' => 'Material dihapus', 'photo_created' => 'Foto ditambahkan', 'photo_deleted' => 'Foto dihapus', 'minimum_override_set' => 'Minimum hasil negosiasi diatur', 'minimum_override_cleared' => 'Minimum dikembalikan ke Kamus Harga', 'progress_report_created' => 'Laporan progres harian dibuat', 'progress_report_saved' => 'Progres harian disimpan', 'progress_report_submitted' => 'Laporan progres diajukan', 'progress_report_signed' => 'Laporan progres ditandatangani', 'progress_report_approved' => 'Laporan progres disetujui', 'progress_report_returned' => 'Laporan progres dikembalikan', 'progress_report_deleted' => 'Laporan progres dihapus'];
+    $has_progress_tab = $document->features()['progress_reports'] ?? false;
     $steps = ['draft' => 'Draft', 'submitted' => 'Negosiasi', 'approved' => 'Disetujui'];
     $step_index = match ($document->status) { 'draft' => 0, 'submitted' => 1, default => 2 };
 @endphp
@@ -64,6 +65,9 @@
 
 <ul class="nav nav-tabs mb-3" role="tablist">
     <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab_jobs" role="tab">Pekerjaan <span class="badge bg-secondary-lt ms-1">{{ $document->jobs->count() }}</span></a></li>
+    @if ($has_progress_tab)
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_progress" role="tab">Progres Harian @if ($has_open_report)<span class="badge bg-warning-lt text-warning ms-1">1</span>@endif</a></li>
+    @endif
     <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_changes" role="tab">Perubahan @if ($comparison)<span class="badge bg-warning-lt text-warning ms-1">{{ $comparison['counts']['changed'] + $comparison['counts']['added'] + $comparison['counts']['removed'] }}</span>@endif</a></li>
     <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_revisions" role="tab">Revisi <span class="badge bg-secondary-lt ms-1">{{ $revisions->count() }}</span></a></li>
     <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_history" role="tab">Riwayat</a></li>
@@ -73,6 +77,12 @@
 <div class="tab-pane active show" id="tab_jobs" role="tabpanel">
     @include('project.job-document.partials.boq-sheet')
 </div>
+
+@if ($has_progress_tab)
+<div class="tab-pane" id="tab_progress" role="tabpanel">
+    @include('project.job-document.partials.progress-reports')
+</div>
+@endif
 
 <div class="tab-pane" id="tab_changes" role="tabpanel">
     @if ($comparison)
@@ -113,7 +123,7 @@
             <div class="d-flex gap-3 pb-3 mb-3 border-bottom">
                 <span class="avatar avatar-sm bg-primary-lt text-primary"><i class="ti ti-history"></i></span>
                 <div>
-                    <div class="fw-semibold">{{ $action_labels[$history->action] ?? $history->action }}@if (! empty($history->payload['job_name'])): {{ $history->payload['job_name'] }}@endif</div>
+                    <div class="fw-semibold">{{ $action_labels[$history->action] ?? $history->action }}@if (! empty($history->payload['job_name'])): {{ $history->payload['job_name'] }}@endif @if (! empty($history->payload['report_date'])): {{ \Carbon\Carbon::parse($history->payload['report_date'])->tanggal_indonesia() }}@endif</div>
                     @if (! empty($history->payload['reason']))<div class="small">Alasan: {{ $history->payload['reason'] }}</div>@endif
                     <div class="small text-secondary">{{ $history->created_at?->timezone('Asia/Jakarta')->tanggal_waktu_indonesia() }} WIB &middot; {{ $actor_names[$history->actor_id] ?? 'Sistem' }}</div>
                 </div>

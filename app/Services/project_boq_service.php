@@ -11,6 +11,7 @@ use App\Models\project_job_group;
 use App\Models\ProjectDocumentJob;
 use App\Models\ProjectDocumentJobMaterial;
 use App\Models\ProjectJobDocument;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -21,24 +22,13 @@ final class project_boq_service
 {
     public const MAX_DEPTH = 3;
 
-    public const CALCULATION_TYPES = ['plate' => 'Pelat', 'pipe' => 'Pipa'];
-
-    public const CALCULATION_BASES = [
-        'plate' => ['kg' => 'Berat (kg)', 'm2' => 'Luas (m²)'],
-        'pipe' => ['kg' => 'Berat (kg)', 'm' => 'Panjang (m)'],
-    ];
-
-    private const BASIS_UNITS = ['kg' => 'kg', 'm2' => 'm²', 'm' => 'm'];
-
-    private const DEFAULT_DENSITY = 7850.0;
-
-    private const DEFAULT_SAFETY_FACTOR = 1.1;
-
     private const MONEY_SCALE = 2;
 
     private const PROGRESS_FIELDS = ['progress_percent', 'status', 'actual_start_date', 'actual_finish_date', 'actual_volume'];
 
     private const JOB_FIELDS = ['job_name', 'responsible_kind', 'responsible_name', 'est_start_date', 'est_finish_date', 'notes'];
+
+    public function __construct(private readonly boq_rule_service $rules, private readonly progress_rollup_service $rollup) {}
 
     public function price_book_for(Project $project): ?PriceBook
     {
@@ -98,25 +88,25 @@ final class project_boq_service
             }
 
             $item = $this->resolve_price_item($project, $data['price_book_item_id'] ?? null, 'price_book_item_id');
+            $rule = $item?->calculation_rule ?? ($data['calculation_rule'] ?? null);
             $attributes['price_book_item_id'] = $item?->id;
+            $attributes['calculation_rule'] = $rule;
             $attributes['minimum_quantity'] = $this->minimum_for($item, $job->price_book_item_id, $job->minimum_quantity);
-
-            $calculation = $this->calculate($data['calculation'] ?? []);
-            $attributes['calculation'] = $calculation['calculation'];
-            $attributes['job_volume_estimated'] = $calculation['volume'] ?? $this->decimal_or_null($data['job_volume_estimated'] ?? null);
-            $attributes['unit'] = $calculation['unit'] ?? ($data['unit'] ?? $item?->unit);
+            $attributes = [...$attributes, ...$this->calculated_volume($rule, $data)];
+            $attributes['unit'] = $this->rules->unit_for($rule) ?? ($data['unit'] ?? $item?->unit);
 
             if ($features['prices']) {
                 $attributes['unit_price'] = $this->decimal_or_null($data['unit_price'] ?? null) ?? $item?->unit_price;
             }
 
             if ($features['progress']) {
-                $attributes = [...$attributes, ...array_intersect_key($data, array_flip(self::PROGRESS_FIELDS))];
+                // Progress-report phases only accept realised volume here; progress itself comes from approved daily reports.
+                $fields = $features['progress_reports'] ? ['actual_volume'] : self::PROGRESS_FIELDS;
+                $attributes = [...$attributes, ...array_intersect_key($data, array_flip($fields))];
                 $attributes['status'] ??= 'pending';
             }
 
             $job->fill($attributes);
-            $this->apply_line_total($job, 'job_volume_estimated', 'est_price', 'est_currency', $features['prices']);
 
             if ($is_new) {
                 $job->sort_order = $this->next_job_sort_order($document, $job->project_job_group_id, $job->parent_job_id);
@@ -134,7 +124,7 @@ final class project_boq_service
                 'changes' => $is_new ? null : $job->getChanges(),
             ], $actor_id);
 
-            $this->recalculate_weights($document);
+            $this->recalculate_document($document);
 
             return $job;
         });
@@ -154,7 +144,7 @@ final class project_boq_service
                 'sub_jobs_deleted' => count($ids),
             ], $actor_id);
 
-            $this->recalculate_weights($document);
+            $this->recalculate_document($document);
         });
     }
 
@@ -171,8 +161,9 @@ final class project_boq_service
             $attributes = [
                 'material_name' => $data['material_name'],
                 'price_book_item_id' => $item?->id,
+                'calculation_rule' => $item?->calculation_rule,
                 'volume' => $this->decimal_or_null($data['volume'] ?? null),
-                'unit' => $data['unit'] ?? $item?->unit,
+                'unit' => $this->rules->unit_for($item?->calculation_rule) ?? ($data['unit'] ?? $item?->unit),
                 'dimension' => $data['dimension'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'minimum_quantity' => $this->minimum_for($item, $material->price_book_item_id, $material->minimum_quantity),
@@ -183,7 +174,6 @@ final class project_boq_service
             }
 
             $material->fill($attributes);
-            $this->apply_line_total($material, 'volume', 'price', 'currency', $prices);
 
             if ($is_new) {
                 $material->sort_order = ((int) ProjectDocumentJobMaterial::query()->where('project_document_job_id', $job->id)->max('sort_order')) + 1;
@@ -198,7 +188,7 @@ final class project_boq_service
                 'changes' => $is_new ? null : $material->getChanges(),
             ], $actor_id);
 
-            $this->recalculate_weights($document);
+            $this->recalculate_document($document);
 
             return $material;
         });
@@ -215,37 +205,124 @@ final class project_boq_service
                 'material_name' => $material->material_name,
             ], $actor_id);
 
-            $this->recalculate_weights($document);
+            $this->recalculate_document($document);
         });
     }
 
-    // Weight = (job line + its materials) / document total. Phases without prices keep the weights
-    // inherited from the priced phase they were copied from, so progress stays comparable.
-    public function recalculate_weights(ProjectJobDocument $document): void
+    // Recomputes billed quantities, line totals and weights for the whole document in one pass,
+    // because project-level minimums make every line of the same price item interdependent.
+    // Phases without prices keep the weights inherited from the priced phase they were copied from.
+    // Weights only use job lines (unit price × billed volume); materials never carry weight.
+    public function recalculate_document(ProjectJobDocument $document): void
     {
-        if (! $document->features()['prices']) {
-            return;
-        }
+        $document = ProjectJobDocument::query()->findOrFail($document->id);
+        $jobs = ProjectDocumentJob::query()->where('project_job_document_id', $document->id)->with('materials')->get();
+        $lines = $this->price_lines($document, $jobs)['lines'];
+        $job_totals = [];
 
-        $jobs = ProjectDocumentJob::query()
-            ->where('project_job_document_id', $document->id)
-            ->withSum('materials as materials_total', 'price')
-            ->get(['id', 'est_price', 'job_weight_percent']);
+        foreach ($lines as $line) {
+            $model = $line['model'];
+            [$total_field, $currency_field] = $model instanceof ProjectDocumentJob ? ['est_price', 'est_currency'] : ['price', 'currency'];
+            $total = $line['billed'] === null || $model->unit_price === null
+                ? null
+                : $this->round(bcmul($line['billed'], (string) $model->unit_price, 6), self::MONEY_SCALE);
 
-        $lines = $jobs->mapWithKeys(fn (ProjectDocumentJob $job): array => [
-            $job->id => bcadd($this->money($job->est_price), $this->money($job->materials_total), self::MONEY_SCALE),
-        ]);
-        $total = $lines->reduce(fn (string $carry, string $line): string => bcadd($carry, $line, self::MONEY_SCALE), '0');
-        $has_total = bccomp($total, '0', self::MONEY_SCALE) > 0;
+            $model->billed_quantity = $line['billed'];
+            $model->{$total_field} = $total;
+            if ($total !== null) {
+                $model->{$currency_field} = 'IDR';
+            }
 
-        foreach ($jobs as $job) {
-            $weight = $has_total ? $this->round(bcdiv(bcmul($lines[$job->id], '100', 8), $total, 8), 2) : null;
-            $current = $job->job_weight_percent === null ? null : $this->round((string) $job->job_weight_percent, 2);
+            if ($model->isDirty()) {
+                $model::query()->whereKey($model->id)->update($model->getDirty());
+            }
 
-            if ($weight !== $current) {
-                ProjectDocumentJob::query()->whereKey($job->id)->update(['job_weight_percent' => $weight]);
+            if ($model instanceof ProjectDocumentJob) {
+                $job_totals[$model->id] = $this->money($model->est_price);
             }
         }
+
+        if ($document->features()['prices']) {
+            $this->apply_weights($jobs, $job_totals);
+        }
+
+        if ($document->features()['progress']) {
+            $this->sync_rollup($document);
+        }
+    }
+
+    // Parent rows cache the rolled-up progress and status so lists, finalisation checks and the customer portal can read them directly.
+    public function sync_rollup(ProjectJobDocument $document): void
+    {
+        $jobs = ProjectDocumentJob::query()->where('project_job_document_id', $document->id)
+            ->get(['id', 'parent_job_id', 'job_weight_percent', 'progress_percent', 'status']);
+
+        foreach ($this->rollup->rollup($jobs) as $job_id => $values) {
+            if ($values['is_leaf']) {
+                continue;
+            }
+
+            $job = $jobs->firstWhere('id', $job_id);
+            $current = $job->progress_percent === null ? null : bcadd((string) $job->progress_percent, '0', 2);
+
+            if ($current !== $values['actual'] || $job->status !== $values['status']) {
+                ProjectDocumentJob::query()->whereKey($job_id)->update(['progress_percent' => $values['actual'], 'status' => $values['status']]);
+            }
+        }
+    }
+
+    public function document_progress(ProjectJobDocument $document): ?string
+    {
+        $jobs = ProjectDocumentJob::query()->where('project_job_document_id', $document->id)
+            ->get(['id', 'parent_job_id', 'job_weight_percent', 'progress_percent', 'status']);
+
+        return $this->rollup->combine($this->rollup->rollup($jobs), $this->rollup->roots($jobs)->pluck('id'));
+    }
+
+    // Negotiated minimums replace the snapshotted price-book minimum for one item in this document.
+    public function set_minimum_override(ProjectJobDocument $document, string $item_id, ?string $minimum, ?string $reason, ?int $actor_id): void
+    {
+        DB::transaction(function () use ($document, $item_id, $minimum, $reason, $actor_id): void {
+            $document = ProjectJobDocument::query()->lockForUpdate()->findOrFail($document->id);
+            $item = PriceBookItem::query()->where('unique_id', $item_id)->first();
+            $is_used = $item !== null && (
+                ProjectDocumentJob::query()->where('project_job_document_id', $document->id)->where('price_book_item_id', $item->id)->exists()
+                || ProjectDocumentJobMaterial::query()->where('price_book_item_id', $item->id)
+                    ->whereHas('job', fn ($query) => $query->where('project_job_document_id', $document->id))->exists()
+            );
+
+            if (! $is_used) {
+                throw ValidationException::withMessages(['price_book_item_id' => 'Item tidak digunakan pada dokumen ini.']);
+            }
+
+            $overrides = $document->minimum_overrides ?? [];
+            $previous = $overrides[$item_id]['minimum'] ?? null;
+
+            if ($minimum === null) {
+                unset($overrides[$item_id]);
+            } else {
+                $overrides[$item_id] = [
+                    'minimum' => bcadd($minimum, '0', 4),
+                    'reason' => $reason,
+                    'user_id' => $actor_id,
+                    'at' => now()->toIso8601String(),
+                ];
+            }
+
+            $document->minimum_overrides = $overrides === [] ? null : $overrides;
+            $document->save();
+
+            $this->record_history($document, $minimum === null ? 'minimum_override_cleared' : 'minimum_override_set', [
+                'item_id' => $item_id,
+                'item_code' => $item->code,
+                'item_name' => $item->name,
+                'previous_minimum' => $previous,
+                'minimum' => $minimum === null ? null : bcadd($minimum, '0', 4),
+                'reason' => $reason,
+            ], $actor_id);
+
+            $this->recalculate_document($document);
+        });
     }
 
     public function create_document_from_previous_phase(Project $project, string $document_type, array $attributes, ?int $actor_id): ?ProjectJobDocument
@@ -281,7 +358,7 @@ final class project_boq_service
             'copied_from_revision_no' => $source->revision_no,
         ], $actor_id);
 
-        $this->recalculate_weights($document);
+        $this->recalculate_document($document);
 
         return $document;
     }
@@ -292,8 +369,8 @@ final class project_boq_service
         $document->loadMissing(['jobs.materials.price_book_item', 'jobs.price_book_item']);
         $jobs = $document->jobs;
         $children = $jobs->whereNotNull('parent_job_id')->groupBy('parent_job_id');
-        $known_ids = $jobs->pluck('id')->flip();
-        $roots = $jobs->filter(fn (ProjectDocumentJob $job): bool => $job->parent_job_id === null || ! $known_ids->has($job->parent_job_id));
+        $roots = $this->rollup->roots($jobs);
+        $rollup = $this->rollup->rollup($jobs);
 
         $group_ids = $jobs->pluck('project_job_group_id')->filter()->unique();
         $groups = project_job_group::query()
@@ -315,9 +392,11 @@ final class project_boq_service
             $number = 0;
 
             foreach ($bucket['roots'] as $root) {
-                $total = bcadd($total, $this->flatten($root, (string) ++$number, 0, $children, $rows), self::MONEY_SCALE);
+                $total = bcadd($total, $this->flatten($root, (string) ++$number, 0, $children, $rollup, $rows), self::MONEY_SCALE);
             }
 
+            $root_ids = $bucket['roots']->pluck('id');
+            $weight = $root_ids->reduce(fn (string $carry, int $id): string => bcadd($carry, $rollup[$id]['weight'], 4), '0');
             $grand_total = bcadd($grand_total, $total, self::MONEY_SCALE);
             $sheet_groups[] = [
                 'group' => $bucket['group'],
@@ -326,16 +405,11 @@ final class project_boq_service
                 'rows' => $rows,
                 'total' => $total,
                 'job_count' => count($rows),
-                'progress' => $this->weighted_progress(collect($rows)->pluck('job')),
+                'weight' => bccomp($weight, '0', 4) > 0 ? $this->round($weight, 2) : null,
+                'progress' => $this->rollup->combine($rollup, $root_ids),
+                'weighted' => $root_ids->reduce(fn (string $carry, int $id): string => bcadd($carry, $rollup[$id]['weighted'], 4), '0'),
             ];
         }
-
-        foreach ($sheet_groups as &$group) {
-            $group['weight'] = bccomp($grand_total, '0', self::MONEY_SCALE) > 0
-                ? $this->round(bcdiv(bcmul($group['total'], '100', 8), $grand_total, 8), 2)
-                : null;
-        }
-        unset($group);
 
         return [
             'features' => $document->features(),
@@ -343,67 +417,168 @@ final class project_boq_service
             'grand_total' => $grand_total,
             'job_count' => $jobs->count(),
             'material_count' => $jobs->sum(fn (ProjectDocumentJob $job): int => $job->materials->count()),
-            'progress' => $this->weighted_progress($jobs),
+            'progress' => $this->rollup->combine($rollup, $roots->pluck('id')),
+            'minimums' => $document->features()['prices'] ? $this->minimum_summary($document, $jobs) : [],
+            'last_safety_factor' => $jobs->filter(fn (ProjectDocumentJob $job): bool => ($job->calculation['type'] ?? null) === 'plate')
+                ->sortByDesc('id')->first()?->calculation['safety_factor'],
         ];
     }
 
-    // Plate/pipe geometry in millimetres; density in kg/m³. Pipe pieces are billed at a minimum
-    // of 0.5 m and then 1 m, the per-piece rule carried over from the previous system.
-    public function calculate(array $input): array
+    // Rules with a calculator derive the volume from the calculator; the calculator type must match
+    // the rule so a later price-book rule change cannot be bypassed by a stale form.
+    private function calculated_volume(?string $rule, array $data): array
     {
-        $type = $input['type'] ?? null;
-        if (! array_key_exists((string) $type, self::CALCULATION_TYPES)) {
-            return ['calculation' => null, 'volume' => null, 'unit' => null];
+        if (! $this->rules->has_calculator($rule)) {
+            return [
+                'calculation' => null,
+                'job_volume_estimated' => $this->decimal_or_null($data['job_volume_estimated'] ?? null),
+            ];
         }
 
-        $basis = $input['basis'] ?? array_key_first(self::CALCULATION_BASES[$type]);
-        $quantity = max(1, (int) ($input['quantity'] ?? 1));
-        $density = (float) ($input['density'] ?? 0) > 0 ? (float) $input['density'] : self::DEFAULT_DENSITY;
-        $safety_factor = (float) ($input['safety_factor'] ?? 0) >= 1 ? (float) $input['safety_factor'] : self::DEFAULT_SAFETY_FACTOR;
-        $result = ['type' => $type, 'basis' => $basis, 'quantity' => $quantity, 'density' => $density, 'safety_factor' => $safety_factor];
-
-        if ($type === 'plate') {
-            $length = (float) $input['length'];
-            $width = (float) $input['width'];
-            $thickness = (float) $input['thickness'];
-            $result += [
-                'length' => $length,
-                'width' => $width,
-                'thickness' => $thickness,
-                'weight_kg' => round($length * $width * $thickness * 1e-9 * $density * $quantity * $safety_factor, 4),
-                'area_m2' => round($length * $width * 1e-6 * $quantity, 4),
-            ];
-            $volume = $basis === 'm2' ? $result['area_m2'] : $result['weight_kg'];
-        } else {
-            $diameter = (float) $input['diameter'];
-            $wall_thickness = (float) $input['wall_thickness'];
-            $pipe_length = (float) $input['pipe_length'];
-            $billed_length = match (true) {
-                $pipe_length < 500 => 500.0,
-                $pipe_length < 1000 => 1000.0,
-                default => $pipe_length,
-            };
-            $inner = $diameter - 2 * $wall_thickness;
-            $section_m2 = M_PI / 4 * ($diameter ** 2 - $inner ** 2) * 1e-6;
-            $result += [
-                'diameter' => $diameter,
-                'wall_thickness' => $wall_thickness,
-                'pipe_length' => $pipe_length,
-                'billed_length_mm' => $billed_length,
-                'length_m' => round($billed_length / 1000 * $quantity, 4),
-                'weight_kg' => round($section_m2 * $billed_length / 1000 * $quantity * $density * $safety_factor, 4),
-            ];
-            $volume = $basis === 'm' ? $result['length_m'] : $result['weight_kg'];
+        $input = $data['calculation'] ?? null;
+        if (! is_array($input) || ($input['type'] ?? null) !== $rule) {
+            throw ValidationException::withMessages([
+                'calculation' => 'Kalkulator '.boq_rule_service::RULES[$rule]['label'].' wajib diisi untuk item ini.',
+            ]);
         }
+
+        $result = $this->rules->calculate($rule, $input);
+
+        return ['calculation' => $result['calculation'], 'job_volume_estimated' => $result['volume']];
+    }
+
+    /**
+     * @return array{lines: list<array>, minimums: array<int, array>}
+     */
+    private function price_lines(ProjectJobDocument $document, EloquentCollection $jobs): array
+    {
+        $overrides = $this->override_minimums($document);
+        $lines = [];
+
+        foreach ($jobs as $job) {
+            $lines[] = $this->price_line($job, $job->calculation, $job->job_volume_estimated, $overrides);
+            foreach ($job->materials as $material) {
+                $lines[] = $this->price_line($material, null, $material->volume, $overrides);
+            }
+        }
+
+        $minimums = [];
+        foreach ($lines as $index => $line) {
+            if ($line['item_id'] === null || $line['minimum'] === null) {
+                continue;
+            }
+
+            $minimums[$line['item_id']] ??= ['scope' => $line['scope'], 'minimum' => $line['minimum'], 'used' => '0', 'indexes' => []];
+            $minimums[$line['item_id']]['used'] = bcadd($minimums[$line['item_id']]['used'], $line['base'] ?? '0', 4);
+            $minimums[$line['item_id']]['indexes'][] = $index;
+        }
+
+        // The shortfall lands on the line with the largest usage so the project total meets the minimum.
+        foreach ($minimums as &$minimum) {
+            $minimum['shortfall'] = '0';
+            if ($minimum['scope'] !== 'project' || bccomp($minimum['used'], '0', 4) <= 0 || bccomp($minimum['used'], $minimum['minimum'], 4) >= 0) {
+                continue;
+            }
+
+            $target = collect($minimum['indexes'])->sortByDesc(fn (int $index): float => (float) $lines[$index]['base'])->first();
+            $minimum['shortfall'] = bcsub($minimum['minimum'], $minimum['used'], 4);
+            $lines[$target]['billed'] = bcadd($lines[$target]['billed'], $minimum['shortfall'], 4);
+            $lines[$target]['shortfall'] = $minimum['shortfall'];
+        }
+        unset($minimum);
+
+        return ['lines' => $lines, 'minimums' => $minimums];
+    }
+
+    private function price_line(ProjectDocumentJob|ProjectDocumentJobMaterial $model, ?array $calculation, mixed $volume, array $overrides): array
+    {
+        $item_id = $model->price_book_item_id;
+        $minimum = $item_id !== null && array_key_exists($item_id, $overrides)
+            ? $overrides[$item_id]
+            : ($model->minimum_quantity === null ? null : (string) $model->minimum_quantity);
+        $minimum = $minimum !== null && bccomp($minimum, '0', 4) > 0 ? $minimum : null;
+        $scope = $this->rules->minimum_scope($model->calculation_rule, $calculation);
+        $base = $this->rules->billed_base($model->calculation_rule, $calculation, $volume, $scope === 'piece' ? $minimum : null);
 
         return [
-            'calculation' => $result,
-            'volume' => number_format($volume, 4, '.', ''),
-            'unit' => self::BASIS_UNITS[$basis],
+            'model' => $model,
+            'item_id' => $item_id,
+            'minimum' => $scope === null ? null : $minimum,
+            'scope' => $scope,
+            'base' => $base,
+            'billed' => $base,
+            'shortfall' => null,
         ];
     }
 
-    private function flatten(ProjectDocumentJob $job, string $number, int $depth, Collection $children, array &$rows): string
+    /** @return array<int, string> price item id => negotiated minimum (0 waives it) */
+    private function override_minimums(ProjectJobDocument $document): array
+    {
+        $overrides = $document->minimum_overrides ?? [];
+        if ($overrides === []) {
+            return [];
+        }
+
+        return PriceBookItem::query()->whereIn('unique_id', array_keys($overrides))->pluck('id', 'unique_id')
+            ->mapWithKeys(fn (int $id, string $unique_id): array => [$id => (string) $overrides[$unique_id]['minimum']])
+            ->all();
+    }
+
+    // Weight = job line total / sum of all job line totals.
+    private function apply_weights(EloquentCollection $jobs, array $job_totals): void
+    {
+        $total = array_reduce($job_totals, fn (string $carry, string $line): string => bcadd($carry, $line, self::MONEY_SCALE), '0');
+        $has_total = bccomp($total, '0', self::MONEY_SCALE) > 0;
+
+        foreach ($jobs as $job) {
+            $weight = $has_total ? $this->round(bcdiv(bcmul($job_totals[$job->id] ?? '0', '100', 8), $total, 8), 2) : null;
+            $current = $job->job_weight_percent === null ? null : $this->round((string) $job->job_weight_percent, 2);
+
+            if ($weight !== $current) {
+                ProjectDocumentJob::query()->whereKey($job->id)->update(['job_weight_percent' => $weight]);
+            }
+        }
+    }
+
+    // Internal summary of every minimum in play, including negotiated overrides.
+    private function minimum_summary(ProjectJobDocument $document, EloquentCollection $jobs): array
+    {
+        $overrides = $document->minimum_overrides ?? [];
+        $items = $jobs->pluck('price_book_item')->merge($jobs->flatMap->materials->pluck('price_book_item'))->filter()->keyBy('id');
+        $computed = $this->price_lines($document, $jobs);
+        $used_item_ids = collect($computed['lines'])->pluck('item_id')->filter()->unique();
+        $users = User::query()->whereIn('id', collect($overrides)->pluck('user_id')->filter()->unique())->pluck('name', 'id');
+        $summary = [];
+
+        foreach ($used_item_ids as $item_id) {
+            $item = $items->get($item_id);
+            $minimum = $computed['minimums'][$item_id] ?? null;
+            $override = $item === null ? null : ($overrides[$item->unique_id] ?? null);
+            $lines = collect($computed['lines'])->where('item_id', $item_id);
+            $original = $lines->map(fn (array $line): ?string => $line['model']->minimum_quantity === null ? null : (string) $line['model']->minimum_quantity)->filter()->first();
+
+            if ($item === null || $lines->first()['scope'] === null || ($minimum === null && $override === null && $original === null)) {
+                continue;
+            }
+
+            $summary[] = [
+                'item' => $item,
+                'unit' => $lines->first()['model']->unit ?? $item->unit,
+                'scope' => $minimum['scope'] ?? $lines->first()['scope'],
+                'original' => $original,
+                'minimum' => $minimum['minimum'] ?? null,
+                'used' => $minimum['used'] ?? $lines->reduce(fn (string $carry, array $line): string => bcadd($carry, $line['base'] ?? '0', 4), '0'),
+                'billed' => $lines->reduce(fn (string $carry, array $line): string => bcadd($carry, $line['billed'] ?? '0', 4), '0'),
+                'shortfall' => $minimum['shortfall'] ?? '0',
+                'line_count' => $lines->count(),
+                'override' => $override === null ? null : [...$override, 'user_name' => $users[$override['user_id'] ?? 0] ?? null],
+            ];
+        }
+
+        return $summary;
+    }
+
+    private function flatten(ProjectDocumentJob $job, string $number, int $depth, Collection $children, array $rollup, array &$rows): string
     {
         $materials_total = $job->materials->reduce(fn (string $carry, ProjectDocumentJobMaterial $material): string => bcadd($carry, $this->money($material->price), self::MONEY_SCALE), '0');
         $index = count($rows);
@@ -412,12 +587,15 @@ final class project_boq_service
             'number' => $number,
             'depth' => $depth,
             'line_total' => $this->money($job->est_price),
+            'calculation_text' => $this->rules->describe($job->calculation, true),
+            'calculation_text_customer' => $this->rules->describe($job->calculation, false),
             'materials_total' => $materials_total,
             'materials' => $job->materials->values()->map(fn (ProjectDocumentJobMaterial $material, int $position): array => [
                 'material' => $material,
                 'letter' => $this->letter($position),
             ])->all(),
             'has_children' => false,
+            'progress' => $rollup[$job->id] ?? null,
         ];
 
         $subtotal = bcadd($rows[$index]['line_total'], $materials_total, self::MONEY_SCALE);
@@ -425,29 +603,12 @@ final class project_boq_service
 
         foreach ($children->get($job->id, collect())->sortBy('sort_order') as $child) {
             $rows[$index]['has_children'] = true;
-            $subtotal = bcadd($subtotal, $this->flatten($child, $number.'.'.++$position, $depth + 1, $children, $rows), self::MONEY_SCALE);
+            $subtotal = bcadd($subtotal, $this->flatten($child, $number.'.'.++$position, $depth + 1, $children, $rollup, $rows), self::MONEY_SCALE);
         }
 
         $rows[$index]['subtotal'] = $subtotal;
 
         return $subtotal;
-    }
-
-    private function weighted_progress(Collection $jobs): ?string
-    {
-        $weighted = $jobs->filter(fn (ProjectDocumentJob $job): bool => (float) $job->job_weight_percent > 0);
-        if ($weighted->isEmpty()) {
-            return null;
-        }
-
-        $weight_sum = '0';
-        $score = '0';
-        foreach ($weighted as $job) {
-            $weight_sum = bcadd($weight_sum, (string) $job->job_weight_percent, 4);
-            $score = bcadd($score, bcmul((string) $job->job_weight_percent, $this->money($job->progress_percent), 6), 6);
-        }
-
-        return $this->round(bcdiv($score, $weight_sum, 6), 2);
     }
 
     private function find_parent(ProjectJobDocument $document, string $parent_id): ProjectDocumentJob
@@ -502,25 +663,6 @@ final class project_boq_service
         }
 
         return $item->has_minimum_charge && $item->minimum_quantity !== null ? (string) $item->minimum_quantity : null;
-    }
-
-    private function apply_line_total(ProjectDocumentJob|ProjectDocumentJobMaterial $line, string $volume_field, string $total_field, string $currency_field, bool $prices): void
-    {
-        if ($line->unit_price === null) {
-            if ($prices) {
-                $line->{$total_field} = null;
-            }
-
-            return;
-        }
-
-        $volume = $this->money($line->{$volume_field}, 4);
-        $billable = bccomp($volume, '0', 4) > 0 && $line->minimum_quantity !== null && bccomp($volume, (string) $line->minimum_quantity, 4) < 0
-            ? (string) $line->minimum_quantity
-            : $volume;
-
-        $line->{$total_field} = $this->round(bcmul($billable, (string) $line->unit_price, 6), self::MONEY_SCALE);
-        $line->{$currency_field} = 'IDR';
     }
 
     private function next_job_sort_order(ProjectJobDocument $document, ?int $group_id, ?int $parent_id): int
