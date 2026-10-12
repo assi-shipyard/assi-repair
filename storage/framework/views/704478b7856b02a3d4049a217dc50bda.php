@@ -170,6 +170,7 @@
                                     <div class="dropdown-menu-column">
                                             <h6 class="dropdown-header">Entitas Utama</h6>
                                             <a href="<?php echo e(route('company.index')); ?>" class="dropdown-item">Data Perusahaan</a>
+                                            <a href="<?php echo e(route('subcontractor.index')); ?>" class="dropdown-item <?php echo e(request()->routeIs('subcontractor.*') ? 'active' : ''); ?>">Data Subkontraktor</a>
                                             <a href="<?php echo e(route('ship.index')); ?>" class="dropdown-item">Data Kapal</a>
                                             <a href="<?php echo e(route('docking-space.index')); ?>" class="dropdown-item <?php echo e(request()->routeIs('docking-space.index') ? 'active' : ''); ?>">Data Dok</a>
 

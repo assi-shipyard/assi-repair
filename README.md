@@ -47,11 +47,20 @@ Vendors default to active. Use the `active()` query scope for future assignment
 selectors; deactivate vendors rather than deleting historical references.
 Run `php artisan migrate` to install the table.
 
-This stage adds database/model support only, with no management screens or
-mutation endpoints. Job-level subcontractor assignments and assisting internal
-employees will be added when users fill the Satisfaction Notes report.
+Internal users can open **Database > Data Subkontraktor** to view a paginated
+vendor list, including active and inactive vendors. Administrators can add/edit
+vendors and activate/deactivate them using the Status field; deletion is not
+offered. Guests and customer accounts cannot access these pages.
+Mutations use server-side Form Request validation, jQuery form validation,
+UUID URLs, and transactional before/after database audit records.
+
+This is vendor master data only. For example, a rampdoor repair job can have
+**Bengkel Konstruksi dan Pipa** as its internal PIC unit and **CV. Berjaya Las**
+as its subcontractor; the subcontractor does not replace the internal PIC.
+Job-level vendor and internal PIC/employee assignments are deferred until
+users fill the Satisfaction Notes report.
 Existing free-text job responsibility fields remain unchanged and are not
-automatically linked to vendors. The future management/assignment workflow must
+automatically linked to vendors. The future assignment workflow must
 validate input, authorize access, and persist database audit records transactionally.
 Payments, bank details, and other finance workflows are deferred.
 

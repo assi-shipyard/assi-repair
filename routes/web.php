@@ -24,6 +24,7 @@ use App\Http\Controllers\RepairTypeController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ShipController;
 use App\Http\Controllers\ShipDocumentController;
+use App\Http\Controllers\subcontractor_controller;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -68,6 +69,13 @@ Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): v
     Route::put('/customer-management/feedback/{feedback}', [account_management_controller::class, 'respond'])->whereUuid('feedback')->name('accounts.respond');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/docking-dashboard', [DockingDashboardController::class, 'index'])->name('docking-dashboard');
+    Route::get('/subcontractor', [subcontractor_controller::class, 'index'])->name('subcontractor.index');
+    Route::middleware('role:admin')->group(function (): void {
+        Route::get('/subcontractor/create', [subcontractor_controller::class, 'create'])->name('subcontractor.create');
+        Route::post('/subcontractor', [subcontractor_controller::class, 'store'])->name('subcontractor.store');
+        Route::get('/subcontractor/{subcontractor}/edit', [subcontractor_controller::class, 'edit'])->whereUuid('subcontractor')->name('subcontractor.edit');
+        Route::put('/subcontractor/{subcontractor}', [subcontractor_controller::class, 'update'])->whereUuid('subcontractor')->name('subcontractor.update');
+    });
 
     Route::middleware('role:admin')->prefix('audit-log')->name('audit-log.')->group(function (): void {
         Route::get('/', [AuditLogController::class, 'index'])->name('index');

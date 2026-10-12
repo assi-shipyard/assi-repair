@@ -198,6 +198,7 @@
                                     <div class="dropdown-menu-column">
                                             <h6 class="dropdown-header">Entitas Utama</h6>
                                             <a href="{{ route('company.index') }}" class="dropdown-item">Data Perusahaan</a>
+                                            <a href="{{ route('subcontractor.index') }}" class="dropdown-item {{ request()->routeIs('subcontractor.*') ? 'active' : '' }}">Data Subkontraktor</a>
                                             <a href="{{ route('ship.index') }}" class="dropdown-item">Data Kapal</a>
                                             <a href="{{ route('docking-space.index') }}" class="dropdown-item {{ request()->routeIs('docking-space.index') ? 'active' : '' }}">Data Dok</a>
 
