@@ -28,7 +28,7 @@
                             <?php else: ?>
                                 <span class="avatar avatar-lg bg-primary-lt flex-shrink-0" role="img" aria-label="Foto profil belum tersedia"><i class="ti ti-user fs-2" aria-hidden="true"></i></span>
                             <?php endif; ?>
-                            <div class="min-w-0"><h3 class="card-title mb-1 text-break"><?php echo e($employee->name); ?></h3><div class="text-secondary small font-monospace">NIK <?php echo e($employee->employee_id); ?></div></div>
+                            <div class="min-w-0"><h3 class="card-title mb-1 text-break fw-bold"><?php echo e($employee->name); ?></h3><div class="text-secondary small font-monospace">NIK <?php echo e($employee->employee_id); ?></div></div>
                         </div>
                         <span class="badge <?php echo e($employee->status === 'active' ? 'bg-green-lt' : 'bg-secondary-lt'); ?>"><?php echo e($employee->status === 'active' ? 'Aktif' : 'Tidak Aktif'); ?></span>
                         <?php if($employee->user && ! $employee->user->is_active): ?><span class="badge bg-red-lt">Akun Dinonaktifkan</span><?php endif; ?>

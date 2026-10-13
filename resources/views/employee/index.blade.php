@@ -29,7 +29,7 @@
                             @else
                                 <span class="avatar avatar-lg bg-primary-lt flex-shrink-0" role="img" aria-label="Foto profil belum tersedia"><i class="ti ti-user fs-2" aria-hidden="true"></i></span>
                             @endif
-                            <div class="min-w-0"><h3 class="card-title mb-1 text-break">{{ $employee->name }}</h3><div class="text-secondary small font-monospace">NIK {{ $employee->employee_id }}</div></div>
+                            <div class="min-w-0"><h3 class="card-title mb-1 text-break fw-bold">{{ $employee->name }}</h3><div class="text-secondary small font-monospace">NIK {{ $employee->employee_id }}</div></div>
                         </div>
                         <span class="badge {{ $employee->status === 'active' ? 'bg-green-lt' : 'bg-secondary-lt' }}">{{ $employee->status === 'active' ? 'Aktif' : 'Tidak Aktif' }}</span>
                         @if ($employee->user && ! $employee->user->is_active)<span class="badge bg-red-lt">Akun Dinonaktifkan</span>@endif

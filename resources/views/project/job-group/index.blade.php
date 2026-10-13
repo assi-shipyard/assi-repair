@@ -144,7 +144,7 @@
 
 @push('scripts')
     <script>
-        (function ($) {
+        jQuery(function ($) {
             const modal = new bootstrap.Modal(document.getElementById('modal-job-group'));
             const form = $('#form-job-group');
             const store_url = @js(route('job-group.store'));
@@ -213,6 +213,6 @@
                 $('#modal-job-group-title').text(@js(old('_method') === 'PUT' ? 'Ubah Kelompok' : 'Tambah Kelompok'));
                 modal.show();
             @endif
-        })(jQuery);
+        });
     </script>
 @endpush
