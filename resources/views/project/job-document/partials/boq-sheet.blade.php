@@ -259,6 +259,22 @@
                             $job = $row['job'];
                             $calculation = $job->calculation;
                             $job_route = [...$job_base, $job->unique_id];
+                            $job_photos_payload = $job->photos->map(fn ($p): array => [
+                                'id' => $p->unique_id,
+                                'category' => $p->photo_category,
+                                'category_label' => match ($p->photo_category) {
+                                    'quotation' => 'Penawaran',
+                                    'progress' => 'Progres',
+                                    'result_before' => 'Sebelum Perbaikan',
+                                    'result_after' => 'Sesudah Perbaikan',
+                                    default => $p->photo_category ? ucfirst($p->photo_category) : 'Umum',
+                                },
+                                'caption' => $p->caption,
+                                'taken_at' => $p->taken_at ? $p->taken_at->timezone('Asia/Jakarta')->tanggal_waktu_indonesia().' WIB' : null,
+                                'created_at' => $p->created_at ? $p->created_at->timezone('Asia/Jakarta')->tanggal_waktu_indonesia().' WIB' : null,
+                                'url' => route('project.job-document.workflow.job.photo.show', [...$job_route, $p->unique_id]),
+                                'delete_url' => route('project.job-document.workflow.job.photo.destroy', [...$job_route, $p->unique_id]),
+                            ])->values()->all();
                             $job_payload = [
                                 'id' => $job->unique_id,
                                 'action' => route('project.job-document.workflow.job.update', $job_route),
@@ -284,7 +300,7 @@
                                 'actual_volume' => $job->actual_volume,
                             ];
                         @endphp
-                        <tr class="boq-job-row {{ $row['depth'] === 0 ? 'boq-root' : '' }}" data-search="{{ mb_strtolower($job->job_name.' '.$job->materials->pluck('material_name')->implode(' ')) }}">
+                        <tr class="boq-job-row {{ $row['depth'] === 0 ? 'boq-root' : '' }}" data-job-id="{{ $job->unique_id }}" data-search="{{ mb_strtolower($job->job_name.' '.$job->materials->pluck('material_name')->implode(' ')) }}">
                             <td class="text-secondary text-nowrap">{{ $row['number'] }}</td>
                             <td>
                                 <div style="padding-left: {{ $row['depth'] * 1.25 }}rem">
@@ -298,7 +314,17 @@
                                         @if ($row['calculation_text'])<span><i class="ti ti-calculator me-1"></i>{{ $row['calculation_text'] }}</span>@endif
                                         @if ($job->responsible_name)<span><i class="ti ti-user me-1"></i>{{ $job->responsible_name }}</span>@endif
                                         @if ($job->est_start_date || $job->est_finish_date)<span><i class="ti ti-calendar me-1"></i>{{ $fmt_date($job->est_start_date) ?? '-' }} – {{ $fmt_date($job->est_finish_date) ?? '-' }}</span>@endif
-                                        @if ($job->photos->isNotEmpty())<span><i class="ti ti-photo me-1"></i>{{ $job->photos->count() }} foto</span>@endif
+                                        <span class="boq-job-photo-badge-wrapper" data-job-id="{{ $job->unique_id }}">
+                                            <button type="button" class="btn btn-sm btn-ghost-secondary p-0 border-0 text-secondary boq-job-photos-btn {{ $job->photos->isEmpty() ? 'd-none' : '' }}"
+                                                data-job-id="{{ $job->unique_id }}"
+                                                data-job-name="{{ $row['number'].' '.$job->job_name }}"
+                                                data-upload-url="{{ route('project.job-document.workflow.job.photo.store', $job_route) }}"
+                                                data-photos-url="{{ route('project.job-document.workflow.job.photos', $job_route) }}"
+                                                data-photos="{{ json_encode($job_photos_payload) }}"
+                                                title="Lihat foto pekerjaan">
+                                                <i class="ti ti-photo me-1"></i><span class="boq-job-photo-count">{{ $job->photos->count() }}</span> foto
+                                            </button>
+                                        </span>
                                     </div>
                                     @if ($job->notes)<div class="small text-secondary fst-italic">{{ $job->notes }}</div>@endif
                                 </div>
@@ -337,7 +363,14 @@
                                                 <button type="button" class="dropdown-item boq-add-child" data-parent-id="{{ $job->unique_id }}" data-parent-name="{{ $row['number'].' '.$job->job_name }}"><i class="ti ti-subtask me-2"></i>Tambah Sub Pekerjaan</button>
                                             @endif
                                             <button type="button" class="dropdown-item boq-add-material" data-action="{{ route('project.job-document.workflow.material.store', $job_route) }}" data-job-name="{{ $row['number'].' '.$job->job_name }}"><i class="ti ti-package me-2"></i>Tambah Material</button>
-                                            <a class="dropdown-item" href="{{ route('project.job-document.workflow.job.photos', $job_route) }}"><i class="ti ti-photo me-2"></i>Foto</a>
+                                            <button type="button" class="dropdown-item boq-job-photos-btn"
+                                                data-job-id="{{ $job->unique_id }}"
+                                                data-job-name="{{ $row['number'].' '.$job->job_name }}"
+                                                data-upload-url="{{ route('project.job-document.workflow.job.photo.store', $job_route) }}"
+                                                data-photos-url="{{ route('project.job-document.workflow.job.photos', $job_route) }}"
+                                                data-photos="{{ json_encode($job_photos_payload) }}">
+                                                <i class="ti ti-photo me-2"></i>Foto
+                                            </button>
                                             <div class="dropdown-divider"></div>
                                             <button type="button" class="dropdown-item text-danger boq-delete" data-action="{{ route('project.job-document.workflow.job.destroy', $job_route) }}" data-title="Hapus pekerjaan?" data-text="{{ $row['has_children'] ? 'Sub pekerjaan dan material di bawahnya ikut terhapus.' : 'Material di bawahnya ikut terhapus.' }}"><i class="ti ti-trash me-2"></i>Hapus</button>
                                         </div>
@@ -419,6 +452,8 @@
 @if ($can_edit)
     @include('project.job-document.partials.boq-modals')
 @endif
+
+@include('project.job-document.partials.photo-modal')
 
 @if ($can_edit && $show_prices && count($sheet['minimums']) > 0)
     <div class="modal modal-blur fade" id="boq-minimum-modal" tabindex="-1" aria-hidden="true">

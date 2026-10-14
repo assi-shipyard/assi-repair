@@ -6,8 +6,8 @@ namespace App\Services;
 
 use App\Models\Employee;
 use App\Models\Project;
-use App\Models\project_progress_entry;
-use App\Models\project_progress_report;
+use App\Models\ProjectProgressEntry;
+use App\Models\ProjectProgressReport;
 use App\Models\ProjectDocumentJob;
 use App\Models\ProjectJobDocument;
 use App\Models\User;
@@ -36,7 +36,7 @@ final class project_progress_service
 
     public function reports(Project $project): EloquentCollection
     {
-        return project_progress_report::query()
+        return ProjectProgressReport::query()
             ->where('project_id', $project->id)
             ->with(['leader_approved_by:id,name', 'ppc_approved_by:id,name'])
             ->withCount('entries')
@@ -44,9 +44,9 @@ final class project_progress_service
             ->get();
     }
 
-    public function open_report(Project $project): ?project_progress_report
+    public function open_report(Project $project): ?ProjectProgressReport
     {
-        return project_progress_report::query()->where('project_id', $project->id)->where('status', '!=', 'approved')->first();
+        return ProjectProgressReport::query()->where('project_id', $project->id)->where('status', '!=', 'approved')->first();
     }
 
     public function can_report(?User $user, Project $project): bool
@@ -69,9 +69,9 @@ final class project_progress_service
         ];
     }
 
-    public function create_report(Project $project, string $report_date, ?string $notes, ?int $actor_id): project_progress_report
+    public function create_report(Project $project, string $report_date, ?string $notes, ?int $actor_id): ProjectProgressReport
     {
-        return DB::transaction(function () use ($project, $report_date, $notes, $actor_id): project_progress_report {
+        return DB::transaction(function () use ($project, $report_date, $notes, $actor_id): ProjectProgressReport {
             Project::query()->whereKey($project->id)->lockForUpdate()->first();
             $document = $this->current_document($project)
                 ?? throw ValidationException::withMessages(['report_date' => 'Satisfaction Notes proyek ini belum dibuat.']);
@@ -80,14 +80,14 @@ final class project_progress_service
                 throw ValidationException::withMessages(['report_date' => 'Masih ada laporan progres yang belum disetujui. Selesaikan laporan tersebut terlebih dahulu.']);
             }
 
-            $last_date = project_progress_report::query()->where('project_id', $project->id)->max('report_date');
+            $last_date = ProjectProgressReport::query()->where('project_id', $project->id)->max('report_date');
             if ($last_date !== null && $report_date <= substr((string) $last_date, 0, 10)) {
                 throw ValidationException::withMessages([
                     'report_date' => 'Tanggal laporan harus setelah laporan terakhir ('.CarbonImmutable::parse($last_date)->tanggal_indonesia().').',
                 ]);
             }
 
-            $report = project_progress_report::query()->create([
+            $report = ProjectProgressReport::query()->create([
                 'project_id' => $project->id,
                 'project_job_document_id' => $document->id,
                 'report_date' => $report_date,
@@ -136,10 +136,10 @@ final class project_progress_service
     }
 
     /** @param array<string, array{progress_percent?: mixed, notes?: ?string}> $entries keyed by job lineage */
-    public function save_entries(project_progress_report $report, array $entries, ?string $notes, ?int $actor_id): void
+    public function save_entries(ProjectProgressReport $report, array $entries, ?string $notes, ?int $actor_id): void
     {
         DB::transaction(function () use ($report, $entries, $notes, $actor_id): void {
-            $report = project_progress_report::query()->lockForUpdate()->findOrFail($report->id);
+            $report = ProjectProgressReport::query()->lockForUpdate()->findOrFail($report->id);
             $this->ensure_editable($report);
             $document = $this->current_document(Project::query()->findOrFail($report->project_id));
             $leaves = collect($this->leaf_rows($document))->keyBy(fn (array $row): string => $row['job']->lineage_uuid);
@@ -196,10 +196,10 @@ final class project_progress_service
         });
     }
 
-    public function submit(project_progress_report $report, ?int $actor_id): void
+    public function submit(ProjectProgressReport $report, ?int $actor_id): void
     {
         DB::transaction(function () use ($report, $actor_id): void {
-            $report = project_progress_report::query()->lockForUpdate()->findOrFail($report->id);
+            $report = ProjectProgressReport::query()->lockForUpdate()->findOrFail($report->id);
             $this->ensure_editable($report);
 
             if (! $report->entries()->exists()) {
@@ -221,10 +221,10 @@ final class project_progress_service
     }
 
     // PIMPRO and PPC sign separately; the report only counts once both slots are filled.
-    public function approve(project_progress_report $report, User $user): bool
+    public function approve(ProjectProgressReport $report, User $user): bool
     {
         return DB::transaction(function () use ($report, $user): bool {
-            $report = project_progress_report::query()->lockForUpdate()->findOrFail($report->id);
+            $report = ProjectProgressReport::query()->lockForUpdate()->findOrFail($report->id);
             $project = Project::query()->lockForUpdate()->findOrFail($report->project_id);
             $slots = $this->approver_slots($user, $project);
 
@@ -263,10 +263,10 @@ final class project_progress_service
         });
     }
 
-    public function return_report(project_progress_report $report, User $user, string $reason): void
+    public function return_report(ProjectProgressReport $report, User $user, string $reason): void
     {
         DB::transaction(function () use ($report, $user, $reason): void {
-            $report = project_progress_report::query()->lockForUpdate()->findOrFail($report->id);
+            $report = ProjectProgressReport::query()->lockForUpdate()->findOrFail($report->id);
             $project = Project::query()->findOrFail($report->project_id);
 
             if (! in_array(true, $this->approver_slots($user, $project), true)) {
@@ -292,10 +292,10 @@ final class project_progress_service
         });
     }
 
-    public function delete_report(project_progress_report $report, ?int $actor_id): void
+    public function delete_report(ProjectProgressReport $report, ?int $actor_id): void
     {
         DB::transaction(function () use ($report, $actor_id): void {
-            $report = project_progress_report::query()->lockForUpdate()->findOrFail($report->id);
+            $report = ProjectProgressReport::query()->lockForUpdate()->findOrFail($report->id);
             $this->ensure_editable($report);
 
             $this->record($report->document, 'progress_report_deleted', $report, [], $actor_id);
@@ -305,7 +305,7 @@ final class project_progress_service
 
     // Approved values land on the latest Satisfaction Notes revision, matched by lineage so a revision
     // created while the report was pending still receives the progress.
-    private function apply(project_progress_report $report, Project $project, int $actor_id): void
+    private function apply(ProjectProgressReport $report, Project $project, int $actor_id): void
     {
         $document = $this->current_document($project);
         $report_date = $report->report_date->toDateString();
@@ -344,14 +344,14 @@ final class project_progress_service
         $this->record($document, 'progress_report_approved', $report, ['reported_progress' => $progress], $actor_id);
     }
 
-    private function ensure_editable(project_progress_report $report): void
+    private function ensure_editable(ProjectProgressReport $report): void
     {
         if (! $report->is_editable()) {
             throw ValidationException::withMessages(['report' => 'Laporan yang sudah diajukan atau disetujui tidak dapat diubah.']);
         }
     }
 
-    private function record(?ProjectJobDocument $document, string $action, project_progress_report $report, array $payload, ?int $actor_id): void
+    private function record(?ProjectJobDocument $document, string $action, ProjectProgressReport $report, array $payload, ?int $actor_id): void
     {
         $document?->histories()->create([
             'action' => $action,

@@ -100,6 +100,6 @@ class User extends Authenticatable
 
     public function customer_access(): HasMany
     {
-        return $this->hasMany(customer_project_access::class);
+        return $this->hasMany(CustomerProjectAccess::class);
     }
 }

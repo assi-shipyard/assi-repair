@@ -23,8 +23,16 @@
             <form action="{{ route('project.job-document.workflow.job.photo.store', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id]) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <div class="row g-3">
-                    <div class="col-md-4"><input class="form-control" type="file" name="job_photo" required></div>
-                    <div class="col-md-3"><input class="form-control" name="photo_category" placeholder="Kategori foto"></div>
+                    <div class="col-md-4"><input class="form-control" type="file" name="job_photo" accept="image/jpeg,image/png,image/webp" required></div>
+                    <div class="col-md-3">
+                        <select class="form-select" name="photo_category">
+                            <option value="">Pilih Kategori (Opsional)</option>
+                            <option value="quotation">Penawaran / Pra-Pekerjaan</option>
+                            <option value="progress">Progres Pengerjaan</option>
+                            <option value="result_before">Kondisi Sebelum (Before)</option>
+                            <option value="result_after">Kondisi Sesudah (After)</option>
+                        </select>
+                    </div>
                     <div class="col-md-3"><input class="form-control" name="caption" placeholder="Keterangan"></div>
                     <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Unggah</button></div>
                 </div>
@@ -44,9 +52,9 @@
                                     <img src="{{ route('project.job-document.workflow.job.photo.show', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id, $photo->unique_id ?? $photo->id]) }}" alt="Foto pekerjaan" loading="lazy" class="rounded object-fit-cover" style="width: 5rem; height: 4rem">
                                 </a>
                             </td>
-                            <td>{{ $photo->photo_category ?? '-' }}</td>
+                            <td>{{ match($photo->photo_category) { 'quotation' => 'Penawaran', 'progress' => 'Progres', 'result_before' => 'Sebelum Perbaikan', 'result_after' => 'Sesudah Perbaikan', default => $photo->photo_category ? ucfirst($photo->photo_category) : '-' } }}</td>
                             <td>{{ $photo->caption ?? '-' }}</td>
-                            <td>{{ optional($photo->taken_at)->tanggal_waktu_indonesia() ?? '-' }}</td>
+                            <td>{{ $photo->taken_at ? $photo->taken_at->timezone('Asia/Jakarta')->tanggal_waktu_indonesia().' WIB' : '-' }}</td>
                             <td>
                                 <form action="{{ route('project.job-document.workflow.job.photo.destroy', [$project->unique_id, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id, $photo->unique_id ?? $photo->id]) }}" method="POST" onsubmit="return confirm('Hapus foto ini?')">
                                     @csrf

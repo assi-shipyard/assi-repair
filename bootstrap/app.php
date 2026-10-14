@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Middleware\account_access;
+use App\Http\Middleware\AccountAccess;
 use App\Http\Middleware\AuditLogMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'audit_log' => AuditLogMiddleware::class,
-            'account_access' => account_access::class,
+            'account_access' => AccountAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

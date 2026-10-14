@@ -9,7 +9,7 @@
     <div class="card mb-3"><div class="card-body">
         <div class="d-flex flex-wrap justify-content-between gap-2">
             <strong>{{ $project->project_code }} &middot; {{ $project->ship?->name ?? '-' }}</strong>
-            <span class="badge bg-blue-lt">{{ \App\Models\customer_document::STATUS_LABELS[$document_data['status']] }}</span>
+            <span class="badge bg-blue-lt">{{ \App\Models\CustomerDocument::STATUS_LABELS[$document_data['status']] }}</span>
         </div>
         <p class="text-secondary mt-2 mb-0">Dokumen ini merupakan salinan revisi yang diterbitkan oleh ASSI. Persetujuan Anda tidak menggantikan persetujuan internal.</p>
     </div></div>

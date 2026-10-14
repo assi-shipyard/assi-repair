@@ -7,10 +7,10 @@ namespace App\Services;
 use App\Models\PriceBook;
 use App\Models\PriceBookItem;
 use App\Models\Project;
-use App\Models\project_job_group;
 use App\Models\ProjectDocumentJob;
 use App\Models\ProjectDocumentJobMaterial;
 use App\Models\ProjectJobDocument;
+use App\Models\ProjectJobGroup;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -62,7 +62,7 @@ final class project_boq_service
 
     public function active_groups(): EloquentCollection
     {
-        return project_job_group::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
+        return ProjectJobGroup::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
     }
 
     public function save_job(ProjectJobDocument $document, ?ProjectDocumentJob $job, array $data, ?int $actor_id): ProjectDocumentJob
@@ -83,7 +83,7 @@ final class project_boq_service
                 $attributes['parent_job_id'] = $parent->id;
                 $attributes['project_job_group_id'] = $parent->project_job_group_id;
             } elseif ($job->parent_job_id === null) {
-                $attributes['project_job_group_id'] = project_job_group::query()->where('unique_id', $data['project_job_group_id'] ?? null)->value('id')
+                $attributes['project_job_group_id'] = ProjectJobGroup::query()->where('unique_id', $data['project_job_group_id'] ?? null)->value('id')
                     ?? throw ValidationException::withMessages(['project_job_group_id' => 'Kelompok pekerjaan wajib dipilih.']);
             }
 
@@ -366,19 +366,19 @@ final class project_boq_service
     // Builds the grouped, numbered job tree with totals so the views never run queries or arithmetic.
     public function build_sheet(ProjectJobDocument $document): array
     {
-        $document->loadMissing(['jobs.materials.price_book_item', 'jobs.price_book_item']);
+        $document->loadMissing(['jobs.materials.price_book_item', 'jobs.price_book_item', 'jobs.photos']);
         $jobs = $document->jobs;
         $children = $jobs->whereNotNull('parent_job_id')->groupBy('parent_job_id');
         $roots = $this->rollup->roots($jobs);
         $rollup = $this->rollup->rollup($jobs);
 
         $group_ids = $jobs->pluck('project_job_group_id')->filter()->unique();
-        $groups = project_job_group::query()
+        $groups = ProjectJobGroup::query()
             ->where(fn ($query) => $query->where('is_active', true)->orWhereIn('id', $group_ids))
             ->orderBy('sort_order')->orderBy('name')
             ->get();
 
-        $buckets = $groups->map(fn (project_job_group $group): array => ['group' => $group, 'label' => $group->name, 'roots' => $roots->where('project_job_group_id', $group->id)])
+        $buckets = $groups->map(fn (ProjectJobGroup $group): array => ['group' => $group, 'label' => $group->name, 'roots' => $roots->where('project_job_group_id', $group->id)])
             ->push(['group' => null, 'label' => 'Tanpa Kelompok', 'roots' => $roots->filter(fn ($job): bool => ! $groups->contains('id', $job->project_job_group_id))])
             ->filter(fn (array $bucket): bool => $bucket['roots']->isNotEmpty())
             ->values();

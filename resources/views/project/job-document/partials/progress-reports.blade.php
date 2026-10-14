@@ -70,7 +70,7 @@
                 @forelse ($progress_reports as $report)
                     <tr>
                         <td class="text-nowrap">{{ $report->report_date->tanggal_indonesia() }}</td>
-                        <td><span class="badge {{ $report_status_classes[$report->status] ?? 'bg-secondary-lt' }}">{{ \App\Models\project_progress_report::STATUS_LABELS[$report->status] ?? $report->status }}</span></td>
+                        <td><span class="badge {{ $report_status_classes[$report->status] ?? 'bg-secondary-lt' }}">{{ \App\Models\ProjectProgressReport::STATUS_LABELS[$report->status] ?? $report->status }}</span></td>
                         <td class="text-end">{{ $report->entries_count }}</td>
                         <td class="text-end">{{ $report->reported_progress !== null ? number_format((float) $report->reported_progress, 2, ',', '.').'%' : '-' }}</td>
                         <td class="small">

@@ -7,7 +7,7 @@ namespace Database\Seeders;
 use App\Models\PriceBook;
 use App\Models\PriceBookItem;
 use App\Models\Project;
-use App\Models\project_job_group;
+use App\Models\ProjectJobGroup;
 use App\Models\ProjectDocumentJob;
 use App\Models\ProjectJobDocument;
 use App\Models\User;
@@ -182,7 +182,7 @@ class demo_boq_seeder extends Seeder
 
     private function build_jobs(ProjectJobDocument $document, ?int $actor_id): void
     {
-        $groups = project_job_group::query()->pluck('unique_id', 'name');
+        $groups = ProjectJobGroup::query()->pluck('unique_id', 'name');
 
         foreach ($this->job_plan() as [$group_name, $spec, $children, $materials]) {
             $root = $this->boq->save_job($document, null, [...$this->job_data($spec), 'project_job_group_id' => $groups[$group_name]], $actor_id);
@@ -206,7 +206,7 @@ class demo_boq_seeder extends Seeder
             }
         }
 
-        $groups = project_job_group::query()->pluck('unique_id', 'name');
+        $groups = ProjectJobGroup::query()->pluck('unique_id', 'name');
         $jobs = ProjectDocumentJob::query()->where('project_job_document_id', $document->id)->with('materials')->orderBy('id')->get();
 
         foreach ($jobs as $job) {

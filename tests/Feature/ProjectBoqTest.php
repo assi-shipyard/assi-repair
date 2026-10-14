@@ -11,7 +11,7 @@ use App\Models\Position;
 use App\Models\PriceBook;
 use App\Models\PriceBookItem;
 use App\Models\Project;
-use App\Models\project_job_group;
+use App\Models\ProjectJobGroup;
 use App\Models\ProjectDocumentJob;
 use App\Models\ProjectJobDocument;
 use App\Models\Ship;
@@ -63,9 +63,9 @@ class ProjectBoqTest extends TestCase
         return ProjectJobDocument::create(['project_id' => $this->project->id, 'document_type' => $type, 'status' => $status, 'revision_no' => 1]);
     }
 
-    private function group(string $name = 'Lambung & Konstruksi'): project_job_group
+    private function group(string $name = 'Lambung & Konstruksi'): ProjectJobGroup
     {
-        return project_job_group::query()->whereIn('name', [$name, 'Pekerjaan '.$name])->firstOrFail();
+        return ProjectJobGroup::query()->whereIn('name', [$name, 'Pekerjaan '.$name])->firstOrFail();
     }
 
     private function item(array $attributes = []): PriceBookItem
@@ -336,6 +336,32 @@ class ProjectBoqTest extends TestCase
         $revision = ProjectJobDocument::cloneWithChildren($boq, ['revision_no' => 2, 'status' => 'draft']);
         $revision_root = $revision->jobs()->where('job_name', 'Induk')->firstOrFail();
         $this->assertSame($revision_root->id, $revision->jobs()->where('job_name', 'Anak')->value('parent_job_id'));
+    }
+
+    public function test_final_boq_requires_at_least_one_completed_satisfaction_note_job(): void
+    {
+        $satisfaction_notes = $this->document('satisfaction_notes');
+        $incomplete_job = $this->store_job($satisfaction_notes, [
+            'job_name' => 'Pekerjaan belum selesai',
+            'project_job_group_id' => $this->group()->unique_id,
+        ]);
+        $incomplete_job->update(['progress_percent' => '99']);
+
+        $payload = ['document_type' => 'final_boq', 'copy_previous' => '1'];
+        $this->post(route('project.job-document.workflow.store', $this->project->unique_id), $payload)
+            ->assertSessionHas('error', 'Tahap SOP belum terpenuhi untuk membuat dokumen ini.');
+        $this->assertDatabaseMissing('project_job_documents', ['document_type' => 'final_boq']);
+
+        $completed_job = $this->store_job($satisfaction_notes, [
+            'job_name' => 'Pekerjaan selesai',
+            'project_job_group_id' => $this->group()->unique_id,
+        ]);
+        $completed_job->update(['progress_percent' => '100']);
+        $this->assertSame('100.00', $completed_job->fresh()->progress_percent);
+
+        $this->post(route('project.job-document.workflow.store', $this->project->unique_id), $payload)
+            ->assertSessionHas('success', 'Dokumen dibuat dan daftar pekerjaan disalin dari tahap sebelumnya.');
+        $this->assertDatabaseHas('project_job_documents', ['document_type' => 'final_boq', 'status' => 'draft']);
     }
 
     public function test_export_downloads_pdf(): void

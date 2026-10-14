@@ -6,9 +6,9 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Company;
-use App\Models\customer_document;
-use App\Models\customer_feedback;
-use App\Models\customer_project_access;
+use App\Models\CustomerDocument;
+use App\Models\CustomerFeedback;
+use App\Models\CustomerProjectAccess;
 use App\Models\Employee;
 use App\Models\OrganizationalUnit;
 use App\Models\Position;
@@ -63,9 +63,9 @@ class CustomerPortalTest extends TestCase
         ]);
     }
 
-    private function access(User $user, Project $project, bool $financial = false): customer_project_access
+    private function access(User $user, Project $project, bool $financial = false): CustomerProjectAccess
     {
-        return customer_project_access::create([
+        return CustomerProjectAccess::create([
             'user_id' => $user->id, 'project_id' => $project->id, 'access_version' => (string) Str::uuid(),
             'view_prices' => $financial, 'approve_initial_boq' => $financial,
             'approve_final_boq' => $financial, 'approve_satisfaction_notes' => true,
@@ -92,13 +92,13 @@ class CustomerPortalTest extends TestCase
         return $source;
     }
 
-    private function publish(User $customer, Project $project, string $type = 'initial_boq', int $revision = 1): customer_document
+    private function publish(User $customer, Project $project, string $type = 'initial_boq', int $revision = 1): CustomerDocument
     {
         $source = $this->source($project, $type, $revision);
         $admin = $this->admin();
         app(customer_management_service::class)->publish($admin, ['document_id' => $source->unique_id, 'approver_id' => $customer->unique_id]);
 
-        return customer_document::where('project_job_document_id', $source->id)->firstOrFail();
+        return CustomerDocument::where('project_job_document_id', $source->id)->firstOrFail();
     }
 
     public function test_customer_login_is_email_based_and_never_uses_employee_context(): void
@@ -323,7 +323,7 @@ class CustomerPortalTest extends TestCase
         $this->access($customer, $project);
         $this->access($other, $project);
         $this->actingAs($customer)->post(route('customer.feedback', $project->unique_id), ['kind' => 'complaint', 'message' => 'KOMPLAIN PRIBADI'])->assertSessionHasNoErrors();
-        $entry = customer_feedback::firstOrFail();
+        $entry = CustomerFeedback::firstOrFail();
         $this->actingAs($other)->get(route('customer.project', $project->unique_id))->assertDontSee('KOMPLAIN PRIBADI');
         $this->actingAs($customer)->put(route('accounts.respond', $entry), ['status' => 'resolved', 'response' => 'Tidak sah'])->assertForbidden();
         $handler = User::create(['employee_id' => '444444444', 'password' => 'SecretPassword123']);
@@ -484,7 +484,7 @@ class CustomerPortalTest extends TestCase
         $source = $this->source($project, 'final_boq');
         $admin = User::where('username', 'administrator')->firstOrFail();
         app(customer_management_service::class)->publish($admin, ['document_id' => $source->unique_id, 'approver_id' => $first->unique_id]);
-        $final = customer_document::where('project_job_document_id', $source->id)->firstOrFail();
+        $final = CustomerDocument::where('project_job_document_id', $source->id)->firstOrFail();
         $this->actingAs($first)->post(route('customer.unlock', $initial), ['current_password' => 'SecretPassword123'])->assertSessionHasNoErrors();
         $this->getJson(route('customer.document.data', $final))->assertJsonMissingPath('data.prices');
         $this->actingAs($second)->getJson(route('customer.document.data', $initial))->assertJsonMissingPath('data.prices');

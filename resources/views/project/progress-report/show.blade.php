@@ -28,7 +28,7 @@
                 <div>
                     <div class="text-secondary">{{ $project->project_code }} &middot; {{ $project->ship?->name ?? '-' }}</div>
                     <h2 class="mb-1">{{ $report->report_date->tanggal_indonesia() }}
-                        <span class="badge {{ $report_status_classes[$report->status] ?? 'bg-secondary-lt' }} ms-1">{{ \App\Models\project_progress_report::STATUS_LABELS[$report->status] ?? $report->status }}</span>
+                        <span class="badge {{ $report_status_classes[$report->status] ?? 'bg-secondary-lt' }} ms-1">{{ \App\Models\ProjectProgressReport::STATUS_LABELS[$report->status] ?? $report->status }}</span>
                     </h2>
                     <div class="text-secondary small">Dibuat oleh {{ $report->created_by?->name ?? '-' }} &middot; Satisfaction Notes Rev. {{ $document->revision_no }}</div>
                 </div>

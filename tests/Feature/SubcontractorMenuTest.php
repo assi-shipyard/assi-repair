@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\AuditLog;
-use App\Models\subcontractor;
+use App\Models\Subcontractor;
 use App\Models\User;
 use App\Services\subcontractor_service;
 use Illuminate\Database\QueryException;
@@ -31,12 +31,12 @@ class SubcontractorMenuTest extends TestCase
 
     public function test_listing_displays_active_and_inactive_vendors_and_escapes_names(): void
     {
-        subcontractor::create([
+        Subcontractor::create([
             'code' => 'SUB-001', 'name' => '<script>alert(1)</script>',
             'contact_name' => 'Kontak Uji', 'contact_phone' => '+62 812 0000 0000',
             'contact_email' => 'vendor@example.test', 'notes' => 'Catatan internal rahasia',
         ]);
-        subcontractor::create([
+        Subcontractor::create([
             'code' => 'SUB-002', 'name' => 'Vendor Nonaktif', 'contact_name' => 'Kontak Lain', 'is_active' => false,
         ]);
 
@@ -51,7 +51,7 @@ class SubcontractorMenuTest extends TestCase
     public function test_listing_is_paginated(): void
     {
         for ($index = 1; $index <= 21; $index++) {
-            subcontractor::create([
+            Subcontractor::create([
                 'code' => sprintf('SUB-%03d', $index),
                 'name' => sprintf('Vendor %03d', $index),
                 'contact_name' => 'Kontak Uji',
@@ -88,7 +88,7 @@ class SubcontractorMenuTest extends TestCase
         $payload = $this->vendor_payload();
         $this->post(route('subcontractor.store'), $payload)->assertSessionHasNoErrors()
             ->assertRedirect(route('subcontractor.index'))->assertSessionHas('success');
-        $vendor = subcontractor::query()->firstOrFail();
+        $vendor = Subcontractor::query()->firstOrFail();
         $this->assertSame('CV. Berjaya Las', $vendor->name);
         $this->assertSame('Kontak Vendor', $vendor->contact_name);
         $this->assertTrue($vendor->is_active);
@@ -116,7 +116,7 @@ class SubcontractorMenuTest extends TestCase
 
     public function test_non_admin_cannot_manage_vendors_or_see_management_buttons(): void
     {
-        $vendor = subcontractor::create($this->vendor_payload());
+        $vendor = Subcontractor::create($this->vendor_payload());
         $this->actingAs($this->internal_user())->get(route('subcontractor.index'))
             ->assertOk()->assertDontSee('Tambah Subkontraktor')
             ->assertDontSee(route('subcontractor.edit', $vendor));
@@ -130,7 +130,7 @@ class SubcontractorMenuTest extends TestCase
 
     public function test_customer_and_guest_cannot_manage_vendors(): void
     {
-        $vendor = subcontractor::create($this->vendor_payload());
+        $vendor = Subcontractor::create($this->vendor_payload());
         $this->get(route('subcontractor.create'))->assertRedirect(route('login'));
         $this->post(route('subcontractor.store'), $this->vendor_payload())->assertRedirect(route('login'));
         $this->put(route('subcontractor.update', $vendor), $this->vendor_payload())->assertRedirect(route('login'));
@@ -174,8 +174,8 @@ class SubcontractorMenuTest extends TestCase
     {
         $admin = $this->internal_user();
         $admin->assignRole(Role::findOrCreate('admin'));
-        $vendor = subcontractor::create($this->vendor_payload());
-        $other_vendor = subcontractor::create([...$this->vendor_payload(), 'code' => 'SUB-002']);
+        $vendor = Subcontractor::create($this->vendor_payload());
+        $other_vendor = Subcontractor::create([...$this->vendor_payload(), 'code' => 'SUB-002']);
         $this->actingAs($admin)->post(route('subcontractor.store'), $this->vendor_payload())
             ->assertSessionHasErrors('code');
         $this->put(route('subcontractor.update', $other_vendor), $this->vendor_payload())
@@ -193,7 +193,7 @@ class SubcontractorMenuTest extends TestCase
     public function test_failed_audit_rolls_back_vendor_creation_and_update(): void
     {
         $user = $this->internal_user();
-        $vendor = subcontractor::create($this->vendor_payload());
+        $vendor = Subcontractor::create($this->vendor_payload());
         $service = app(subcontractor_service::class);
         DB::statement("CREATE TRIGGER reject_subcontractor_audit BEFORE INSERT ON audit_logs BEGIN SELECT RAISE(ABORT, 'Audit write failed'); END");
 

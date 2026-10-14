@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Models\subcontractor;
+use App\Models\Subcontractor;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -18,7 +18,7 @@ class SubcontractorTest extends TestCase
 
     public function test_vendor_details_are_persisted_without_employee_or_customer_records(): void
     {
-        $vendor = subcontractor::create([
+        $vendor = Subcontractor::create([
             'code' => 'SUB-001',
             'name' => 'Vendor Reparasi Uji',
             'contact_name' => 'Kontak Uji',
@@ -72,7 +72,7 @@ class SubcontractorTest extends TestCase
         $inactive_vendor->update(['is_active' => false]);
 
         $this->assertFalse($inactive_vendor->fresh()->is_active);
-        $this->assertSame([$active_vendor->id], subcontractor::query()->active()->pluck('id')->all());
+        $this->assertSame([$active_vendor->id], Subcontractor::query()->active()->pluck('id')->all());
         $this->assertDatabaseCount('subcontractors', 2);
     }
 
@@ -110,9 +110,9 @@ class SubcontractorTest extends TestCase
         $this->assertDatabaseCount('subcontractors', 1);
     }
 
-    private function create_vendor(string $code): subcontractor
+    private function create_vendor(string $code): Subcontractor
     {
-        return subcontractor::create([
+        return Subcontractor::create([
             'code' => $code,
             'name' => 'Vendor Reparasi Uji',
             'contact_name' => 'Kontak Uji',

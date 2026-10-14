@@ -12,7 +12,7 @@
             <div class="card-header"><h3 class="card-title">Menunggu Persetujuan Anda ({{ $pending_documents->total() }})</h3></div>
             <div class="list-group list-group-flush">
                 @foreach ($pending_documents as $pending_document)
-                    <a class="list-group-item list-group-item-action" href="{{ route('customer.document', $pending_document) }}">{{ $pending_document->project->project_code }} &middot; {{ \App\Models\customer_document::TYPE_LABELS[$pending_document->document_type] }} &middot; Revisi {{ $pending_document->revision_no }}</a>
+                    <a class="list-group-item list-group-item-action" href="{{ route('customer.document', $pending_document) }}">{{ $pending_document->project->project_code }} &middot; {{ \App\Models\CustomerDocument::TYPE_LABELS[$pending_document->document_type] }} &middot; Revisi {{ $pending_document->revision_no }}</a>
                 @endforeach
             </div>
             <div class="card-footer">{{ $pending_documents->links() }}</div>

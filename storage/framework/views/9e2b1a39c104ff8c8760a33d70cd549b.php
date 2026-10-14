@@ -70,7 +70,7 @@
                 <?php $__empty_1 = true; $__currentLoopData = $progress_reports; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $report): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                     <tr>
                         <td class="text-nowrap"><?php echo e($report->report_date->tanggal_indonesia()); ?></td>
-                        <td><span class="badge <?php echo e($report_status_classes[$report->status] ?? 'bg-secondary-lt'); ?>"><?php echo e(\App\Models\project_progress_report::STATUS_LABELS[$report->status] ?? $report->status); ?></span></td>
+                        <td><span class="badge <?php echo e($report_status_classes[$report->status] ?? 'bg-secondary-lt'); ?>"><?php echo e(\App\Models\ProjectProgressReport::STATUS_LABELS[$report->status] ?? $report->status); ?></span></td>
                         <td class="text-end"><?php echo e($report->entries_count); ?></td>
                         <td class="text-end"><?php echo e($report->reported_progress !== null ? number_format((float) $report->reported_progress, 2, ',', '.').'%' : '-'); ?></td>
                         <td class="small">

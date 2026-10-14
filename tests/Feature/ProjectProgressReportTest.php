@@ -10,8 +10,8 @@ use App\Models\OrganizationalUnit;
 use App\Models\Position;
 use App\Models\PriceBook;
 use App\Models\Project;
-use App\Models\project_job_group;
-use App\Models\project_progress_report;
+use App\Models\ProjectJobGroup;
+use App\Models\ProjectProgressReport;
 use App\Models\ProjectDocumentJob;
 use App\Models\ProjectJobDocument;
 use App\Models\Ship;
@@ -82,9 +82,9 @@ class ProjectProgressReportTest extends TestCase
         ])->assertSessionHasNoErrors();
     }
 
-    private function group(string $name = 'Lambung & Konstruksi'): project_job_group
+    private function group(string $name = 'Lambung & Konstruksi'): ProjectJobGroup
     {
-        return project_job_group::query()->whereIn('name', [$name, 'Pekerjaan '.$name])->firstOrFail();
+        return ProjectJobGroup::query()->whereIn('name', [$name, 'Pekerjaan '.$name])->firstOrFail();
     }
 
     private function store_job(array $data): ProjectDocumentJob
@@ -95,14 +95,14 @@ class ProjectProgressReportTest extends TestCase
         return ProjectDocumentJob::query()->latest('id')->firstOrFail();
     }
 
-    private function create_report(string $date): project_progress_report
+    private function create_report(string $date): ProjectProgressReport
     {
         $this->post(route('project.progress-report.store', $this->project->unique_id), ['report_date' => $date])->assertSessionHasNoErrors();
 
-        return project_progress_report::query()->latest('id')->firstOrFail();
+        return ProjectProgressReport::query()->latest('id')->firstOrFail();
     }
 
-    private function save(project_progress_report $report, array $values, string $action = 'save'): TestResponse
+    private function save(ProjectProgressReport $report, array $values, string $action = 'save'): TestResponse
     {
         $entries = [];
         foreach ($values as $key => $value) {
@@ -112,7 +112,7 @@ class ProjectProgressReportTest extends TestCase
         return $this->put(route('project.progress-report.update', [$this->project->unique_id, $report->unique_id]), ['entries' => $entries, 'action' => $action]);
     }
 
-    private function approve_as(User $user, project_progress_report $report): TestResponse
+    private function approve_as(User $user, ProjectProgressReport $report): TestResponse
     {
         return $this->actingAs($user)->post(route('project.progress-report.approve', [$this->project->unique_id, $report->unique_id]));
     }

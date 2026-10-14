@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\account_directory_request;
+use App\Http\Requests\AccountDirectoryRequest;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\User;
@@ -27,7 +27,7 @@ class EmployeeController extends Controller
 
     private const PROFILE_PHOTO_MAX_DIMENSION = 1600;
 
-    public function index(account_directory_request $request): View
+    public function index(AccountDirectoryRequest $request): View
     {
         $filters = $request->validated();
         $base_query = Employee::query()->where(function ($query): void {

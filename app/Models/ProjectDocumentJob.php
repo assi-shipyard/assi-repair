@@ -98,7 +98,7 @@ class ProjectDocumentJob extends Model
 
     public function job_group(): BelongsTo
     {
-        return $this->belongsTo(project_job_group::class, 'project_job_group_id');
+        return $this->belongsTo(ProjectJobGroup::class, 'project_job_group_id');
     }
 
     public function parent_job(): BelongsTo

@@ -20,8 +20,8 @@
             @forelse ($documents as $document)
                 <a class="list-group-item list-group-item-action" href="{{ route('customer.document', $document) }}">
                     <div class="d-flex flex-wrap justify-content-between gap-2">
-                        <span>{{ \App\Models\customer_document::TYPE_LABELS[$document->document_type] }} &middot; Revisi {{ $document->revision_no }}</span>
-                        <span class="badge bg-blue-lt">{{ \App\Models\customer_document::STATUS_LABELS[$document->status] }}</span>
+                        <span>{{ \App\Models\CustomerDocument::TYPE_LABELS[$document->document_type] }} &middot; Revisi {{ $document->revision_no }}</span>
+                        <span class="badge bg-blue-lt">{{ \App\Models\CustomerDocument::STATUS_LABELS[$document->status] }}</span>
                     </div>
                     @if ($document->approver_id === auth()->id() && $document->status === 'pending')
                         <div class="text-secondary small mt-1">Ditugaskan kepada Anda untuk memberikan keputusan.</div>

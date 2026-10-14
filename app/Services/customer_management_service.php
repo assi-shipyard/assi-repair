@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Company;
-use App\Models\customer_document;
-use App\Models\customer_feedback;
-use App\Models\customer_project_access;
+use App\Models\CustomerDocument;
+use App\Models\CustomerFeedback;
+use App\Models\CustomerProjectAccess;
 use App\Models\Project;
 use App\Models\ProjectJobDocument;
 use App\Models\User;
@@ -88,14 +88,14 @@ class customer_management_service
         return [
             'customers' => User::query()->where('account_type', User::TYPE_CUSTOMER)->where('is_active', true)->orderBy('id')->lazy(100),
             'projects' => Project::query()->with('ship')->orderByDesc('id')->lazy(100),
-            'access_entries' => customer_project_access::query()->with(['project', 'user'])->latest('id')->paginate(15, ['*'], 'access_page'),
+            'access_entries' => CustomerProjectAccess::query()->with(['project', 'user'])->latest('id')->paginate(15, ['*'], 'access_page'),
             'documents' => ProjectJobDocument::query()->with('project')
-                ->whereIn('document_type', array_keys(customer_document::TYPE_LABELS))
+                ->whereIn('document_type', array_keys(CustomerDocument::TYPE_LABELS))
                 ->whereIn('status', ['approved', 'locked'])
-                ->whereNotIn('id', customer_document::query()->select('project_job_document_id'))
+                ->whereNotIn('id', CustomerDocument::query()->select('project_job_document_id'))
                 ->orderByDesc('id')->lazy(100),
-            'publications' => customer_document::query()->with(['project', 'approver'])->latest('id')->paginate(15, ['*'], 'publication_page'),
-            'feedback' => customer_feedback::query()->with(['project', 'user'])->latest('id')->paginate(15, ['*'], 'feedback_page'),
+            'publications' => CustomerDocument::query()->with(['project', 'approver'])->latest('id')->paginate(15, ['*'], 'publication_page'),
+            'feedback' => CustomerFeedback::query()->with(['project', 'user'])->latest('id')->paginate(15, ['*'], 'feedback_page'),
         ];
     }
 
@@ -151,7 +151,7 @@ class customer_management_service
         DB::transaction(function () use ($actor, $data): void {
             $project = Project::query()->where('unique_id', $data['project_id'])->lockForUpdate()->firstOrFail();
             $user = User::query()->where('unique_id', $data['user_id'])->where('account_type', User::TYPE_CUSTOMER)->lockForUpdate()->firstOrFail();
-            $access = customer_project_access::query()->updateOrCreate(
+            $access = CustomerProjectAccess::query()->updateOrCreate(
                 ['user_id' => $user->id, 'project_id' => $project->id],
                 [...array_diff_key($data, array_flip(['user_id', 'project_id'])), 'access_version' => (string) Str::uuid()],
             );
@@ -174,14 +174,14 @@ class customer_management_service
             $access = $this->portal->project_access($approver, $source->project()->firstOrFail(), true);
             $source = ProjectJobDocument::query()->whereKey($source->id)->lockForUpdate()->firstOrFail();
             $source->load('jobs.materials');
-            if (! array_key_exists($source->document_type, customer_document::TYPE_LABELS)
+            if (! array_key_exists($source->document_type, CustomerDocument::TYPE_LABELS)
                 || ! in_array($source->status, ['approved', 'locked'], true)) {
                 throw ValidationException::withMessages(['document_id' => 'Hanya RAB atau Catatan Kepuasan yang telah disetujui internal dapat diterbitkan.']);
             }
             if (! $access->can_approve($source->document_type)) {
                 throw ValidationException::withMessages(['approver_id' => 'Pelanggan tidak memiliki wewenang persetujuan untuk jenis dokumen ini.']);
             }
-            if (customer_document::query()->where('project_job_document_id', $source->id)->exists()
+            if (CustomerDocument::query()->where('project_job_document_id', $source->id)->exists()
                 || ProjectJobDocument::query()->where('project_id', $source->project_id)->where('document_type', $source->document_type)
                     ->where('revision_no', '>', $source->revision_no)->exists()) {
                 throw ValidationException::withMessages(['document_id' => 'Dokumen sudah diterbitkan atau bukan revisi terbaru.']);
@@ -217,12 +217,12 @@ class customer_management_service
                 $financial_snapshot['totals'] = $this->comparison->document_totals($source);
             }
 
-            customer_document::query()->where('project_id', $source->project_id)->where('document_type', $source->document_type)
-                ->where('status', 'pending')->lazyById(100)->each(function (customer_document $old) use ($actor): void {
+            CustomerDocument::query()->where('project_id', $source->project_id)->where('document_type', $source->document_type)
+                ->where('status', 'pending')->lazyById(100)->each(function (CustomerDocument $old) use ($actor): void {
                     $old->update(['status' => 'superseded']);
                     $this->portal->audit($actor, 'customer.publication_superseded', $old->unique_id);
                 });
-            $publication = customer_document::query()->create([
+            $publication = CustomerDocument::query()->create([
                 'project_id' => $source->project_id,
                 'project_job_document_id' => $source->id,
                 'document_type' => $source->document_type,
@@ -236,10 +236,10 @@ class customer_management_service
         });
     }
 
-    public function respond(User $actor, customer_feedback $feedback, array $data): void
+    public function respond(User $actor, CustomerFeedback $feedback, array $data): void
     {
         DB::transaction(function () use ($actor, $feedback, $data): void {
-            $feedback = customer_feedback::query()->lockForUpdate()->findOrFail($feedback->id);
+            $feedback = CustomerFeedback::query()->lockForUpdate()->findOrFail($feedback->id);
             $old_status = $feedback->status;
             $old_response = $feedback->response;
             $feedback->update([
@@ -253,13 +253,13 @@ class customer_management_service
         });
     }
 
-    public function reassign(User $actor, customer_document $document, string $approver_id): void
+    public function reassign(User $actor, CustomerDocument $document, string $approver_id): void
     {
         DB::transaction(function () use ($actor, $document, $approver_id): void {
             $project = Project::query()->lockForUpdate()->findOrFail($document->project_id);
             $approver = User::query()->where('unique_id', $approver_id)->lockForUpdate()->firstOrFail();
             $access = $this->portal->project_access($approver, $project, true);
-            $document = customer_document::query()->lockForUpdate()->findOrFail($document->id);
+            $document = CustomerDocument::query()->lockForUpdate()->findOrFail($document->id);
             if ($document->status !== 'pending' || ! $access->can_approve($document->document_type)) {
                 throw ValidationException::withMessages(['approver_id' => 'Hanya permintaan yang belum diputuskan dapat dialihkan kepada pelanggan berwenang.']);
             }

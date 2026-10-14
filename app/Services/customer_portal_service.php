@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AuditLog;
-use App\Models\customer_document;
-use App\Models\customer_feedback;
-use App\Models\customer_project_access;
+use App\Models\CustomerDocument;
+use App\Models\CustomerFeedback;
+use App\Models\CustomerProjectAccess;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -49,24 +49,24 @@ class customer_portal_service
         }
 
         $projects = Project::query()->with('ship')
-            ->whereIn('id', customer_project_access::query()->select('project_id')
+            ->whereIn('id', CustomerProjectAccess::query()->select('project_id')
                 ->where('user_id', $request->user()->id)->where('is_active', true))
             ->when($status, fn ($query) => $query->where('status', $status))
             ->orderByDesc('created_at')->paginate(15)->withQueryString();
 
-        $pending_documents = customer_document::query()->with('project')
+        $pending_documents = CustomerDocument::query()->with('project')
             ->where('approver_id', $request->user()->id)->where('status', 'pending')
-            ->whereIn('project_id', customer_project_access::query()->select('project_id')
+            ->whereIn('project_id', CustomerProjectAccess::query()->select('project_id')
                 ->where('user_id', $request->user()->id)->where('is_active', true))
             ->latest('id')->paginate(10, ['*'], 'approval_page');
 
         return compact('projects', 'status_labels', 'status', 'pending_documents');
     }
 
-    public function project_access(User $user, Project $project, bool $lock = false): customer_project_access
+    public function project_access(User $user, Project $project, bool $lock = false): CustomerProjectAccess
     {
         abort_unless($user->is_customer() && $user->is_active, 403, 'Akses tidak diizinkan.');
-        $query = customer_project_access::query()
+        $query = CustomerProjectAccess::query()
             ->where('user_id', $user->id)->where('project_id', $project->id)->where('is_active', true);
 
         return ($lock ? $query->lockForUpdate() : $query)->firstOrFail();
@@ -76,21 +76,21 @@ class customer_portal_service
     {
         $project = Project::query()->with('ship')->where('unique_id', $project_id)->firstOrFail();
         $access = $this->project_access($request->user(), $project);
-        $documents = customer_document::query()->where('project_id', $project->id)->latest('id')->paginate(15, ['*'], 'documents_page');
-        $feedback = customer_feedback::query()->where('project_id', $project->id)
+        $documents = CustomerDocument::query()->where('project_id', $project->id)->latest('id')->paginate(15, ['*'], 'documents_page');
+        $feedback = CustomerFeedback::query()->where('project_id', $project->id)
             ->where('user_id', $request->user()->id)->latest('id')->paginate(10, ['*'], 'feedback_page');
 
         return compact('project', 'access', 'documents', 'feedback');
     }
 
-    public function document_data(Request $request, customer_document $document): array
+    public function document_data(Request $request, CustomerDocument $document): array
     {
         $document->load('project.ship');
         $access = $this->project_access($request->user(), $document->project);
         $prices_unlocked = $this->prices_unlocked($request, $document, $access);
         $data = [
             'unique_id' => $document->unique_id,
-            'title' => customer_document::TYPE_LABELS[$document->document_type],
+            'title' => CustomerDocument::TYPE_LABELS[$document->document_type],
             'document_type' => $document->document_type,
             'revision_no' => $document->revision_no,
             'status' => $document->status,
@@ -114,7 +114,7 @@ class customer_portal_service
         return $data;
     }
 
-    public function prices_unlocked(Request $request, customer_document $document, customer_project_access $access, ?User $user = null): bool
+    public function prices_unlocked(Request $request, CustomerDocument $document, CustomerProjectAccess $access, ?User $user = null): bool
     {
         if (! $document->is_financial() || ! $access->is_active || ! $access->view_prices) {
             return false;
@@ -130,7 +130,7 @@ class customer_portal_service
             && hash_equals(hash('sha256', $user->password), $unlock['password_fingerprint'] ?? '');
     }
 
-    public function unlock_prices(Request $request, customer_document $document): void
+    public function unlock_prices(Request $request, CustomerDocument $document): void
     {
         $document->load('project');
         $access = $this->project_access($request->user(), $document->project);
@@ -144,7 +144,7 @@ class customer_portal_service
         ]);
     }
 
-    public function lock_prices(Request $request, customer_document $document): void
+    public function lock_prices(Request $request, CustomerDocument $document): void
     {
         $document->load('project');
         $this->project_access($request->user(), $document->project);
@@ -152,13 +152,13 @@ class customer_portal_service
         $request->session()->forget('customer_price_unlocks.'.$document->unique_id);
     }
 
-    public function decide(Request $request, customer_document $document, array $data): void
+    public function decide(Request $request, CustomerDocument $document, array $data): void
     {
         DB::transaction(function () use ($request, $document, $data): void {
             $project = Project::query()->lockForUpdate()->findOrFail($document->project_id);
             $user = User::query()->lockForUpdate()->findOrFail($request->user()->id);
             $access = $this->project_access($user, $project, true);
-            $document = customer_document::query()->lockForUpdate()->findOrFail($document->id);
+            $document = CustomerDocument::query()->lockForUpdate()->findOrFail($document->id);
             abort_unless($document->approver_id === $user->id && $access->can_approve($document->document_type), 403, 'Anda bukan pemberi persetujuan untuk dokumen ini.');
 
             if ($document->status !== 'pending') {
@@ -189,10 +189,10 @@ class customer_portal_service
                 throw ValidationException::withMessages(['kind' => 'Penilaian kepuasan tersedia setelah proyek selesai.']);
             }
             if ($data['kind'] === 'satisfaction'
-                && customer_feedback::query()->where('project_id', $project->id)->where('user_id', $user->id)->where('kind', 'satisfaction')->exists()) {
+                && CustomerFeedback::query()->where('project_id', $project->id)->where('user_id', $user->id)->where('kind', 'satisfaction')->exists()) {
                 throw ValidationException::withMessages(['kind' => 'Anda sudah mengirim penilaian kepuasan untuk proyek ini.']);
             }
-            $feedback = customer_feedback::query()->create([
+            $feedback = CustomerFeedback::query()->create([
                 'project_id' => $project->id,
                 'user_id' => $user->id,
                 'kind' => $data['kind'],

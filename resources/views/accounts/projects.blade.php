@@ -45,7 +45,7 @@
             <form class="customer_form" method="POST" action="{{ route('accounts.publish') }}">
                 @csrf
                 <div class="row g-3">
-                    <div class="col-md-7"><label for="document_id" class="form-label">Dokumen yang Disetujui Internal</label><select id="document_id" name="document_id" class="form-select" required><option value="">Pilih revisi terbaru</option>@foreach ($documents as $document)<option value="{{ $document->unique_id }}" @selected(old('document_id') === $document->unique_id)>{{ $document->project->project_code }} - {{ \App\Models\customer_document::TYPE_LABELS[$document->document_type] }} - Revisi {{ $document->revision_no }}</option>@endforeach</select></div>
+                    <div class="col-md-7"><label for="document_id" class="form-label">Dokumen yang Disetujui Internal</label><select id="document_id" name="document_id" class="form-select" required><option value="">Pilih revisi terbaru</option>@foreach ($documents as $document)<option value="{{ $document->unique_id }}" @selected(old('document_id') === $document->unique_id)>{{ $document->project->project_code }} - {{ \App\Models\CustomerDocument::TYPE_LABELS[$document->document_type] }} - Revisi {{ $document->revision_no }}</option>@endforeach</select></div>
                     <div class="col-md-5"><label for="approver_id" class="form-label">Pemberi Persetujuan</label><select id="approver_id" name="approver_id" class="form-select" required><option value="">Pilih pelanggan berwenang</option>@foreach ($customers as $customer)<option value="{{ $customer->unique_id }}" @selected(old('approver_id') === $customer->unique_id)>{{ $customer->name }} - {{ $customer->email }}</option>@endforeach</select></div>
                 </div>
                 <p class="text-secondary mt-3">Pelanggan harus memiliki akses dan wewenang untuk proyek ini. Revisi baru menggantikan permintaan persetujuan lama yang belum diputuskan.</p>
@@ -57,7 +57,7 @@
         <div class="card-header"><h3 class="card-title">Riwayat Persetujuan Pelanggan</h3></div>
         <div class="table-responsive"><table class="table table-vcenter card-table">
             <thead><tr><th>Proyek / Dokumen</th><th>Pemberi Persetujuan</th><th>Status</th><th>Keputusan</th></tr></thead>
-            <tbody>@forelse ($publications as $publication)<tr><td>{{ $publication->project->project_code }}<div class="small text-secondary">{{ \App\Models\customer_document::TYPE_LABELS[$publication->document_type] }} - Revisi {{ $publication->revision_no }}</div></td><td>{{ $publication->approver->name }}
+            <tbody>@forelse ($publications as $publication)<tr><td>{{ $publication->project->project_code }}<div class="small text-secondary">{{ \App\Models\CustomerDocument::TYPE_LABELS[$publication->document_type] }} - Revisi {{ $publication->revision_no }}</div></td><td>{{ $publication->approver->name }}
                 @if ($publication->status === 'pending')
                     <form class="customer_form mt-2" method="POST" action="{{ route('accounts.reassign', $publication) }}">
                         @csrf @method('PUT')
@@ -66,7 +66,7 @@
                         <button class="btn btn-sm btn-outline-secondary mt-1" type="submit">Alihkan</button>
                     </form>
                 @endif
-            </td><td>{{ \App\Models\customer_document::STATUS_LABELS[$publication->status] }}</td><td>{{ $publication->decided_at?->timezone('Asia/Jakarta')->tanggal_waktu_indonesia() }}@if ($publication->decided_at) WIB @endif<div class="small text-secondary text-break">{{ $publication->decision_comment }}</div></td></tr>@empty<tr><td>Belum ada dokumen yang diterbitkan.</td></tr>@endforelse</tbody>
+            </td><td>{{ \App\Models\CustomerDocument::STATUS_LABELS[$publication->status] }}</td><td>{{ $publication->decided_at?->timezone('Asia/Jakarta')->tanggal_waktu_indonesia() }}@if ($publication->decided_at) WIB @endif<div class="small text-secondary text-break">{{ $publication->decision_comment }}</div></td></tr>@empty<tr><td>Belum ada dokumen yang diterbitkan.</td></tr>@endforelse</tbody>
         </table></div>
         <div class="card-footer">{{ $publications->links() }}</div>
     </div>

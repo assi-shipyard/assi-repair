@@ -11,6 +11,7 @@ use App\Services\project_boq_service;
 use App\Services\project_progress_service;
 use App\Services\ProjectDocumentComparisonService;
 use App\Services\ProjectJobDocumentService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -119,23 +120,48 @@ class ProjectJobDocumentPageController extends Controller
     }
 
     // The following methods handle the management of photos associated with a job document. They include validation, error handling, and appropriate redirects to ensure a smooth user experience.
-    public function photos(string $projectId, string $documentId, string $jobId): View|RedirectResponse
+    public function photos(Request $request, string $projectId, string $documentId, string $jobId): View|RedirectResponse|JsonResponse
     {
         // Find the project by its unique ID
         $project = $this->findProject($projectId);
         if (! $project) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Proyek tidak ditemukan.'], 404);
+            }
+
             return redirect()->route('project.index')->with('error', 'Proyek tidak ditemukan.');
         }
 
         $document = $this->find_document_by_public_id($project->id, $documentId);
         if (! $document) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Dokumen pekerjaan tidak ditemukan.'], 404);
+            }
+
             return redirect()->route('project.job-document.workflow.index', $project->unique_id)->with('error', 'Dokumen pekerjaan tidak ditemukan.');
         }
 
         $job = $this->findJob($document->id, $jobId, ['photos']);
 
         if (! $job) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Pekerjaan tidak ditemukan.'], 404);
+            }
+
             return redirect()->route('project.job-document.workflow.show', [$project->unique_id, $document->unique_id ?? $document->id])->with('error', 'Pekerjaan tidak ditemukan.');
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'count' => $job->photos->count(),
+                'job' => [
+                    'id' => $job->unique_id,
+                    'unique_id' => $job->unique_id,
+                    'job_name' => $job->job_name,
+                ],
+                'photos' => $job->photos->map(fn (ProjectDocumentJobPhoto $photo): array => $this->format_photo_data($project, $document, $job, $photo)),
+            ]);
         }
 
         return view('project.job-document.photos', [
@@ -147,15 +173,23 @@ class ProjectJobDocumentPageController extends Controller
         ]);
     }
 
-    public function storePhoto(Request $request, string $projectId, string $documentId, string $jobId): RedirectResponse
+    public function storePhoto(Request $request, string $projectId, string $documentId, string $jobId): RedirectResponse|JsonResponse
     {
         $document = $this->findDocumentForMutation($projectId, $documentId);
         if ($document instanceof RedirectResponse) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Dokumen tidak dapat diubah.'], 403);
+            }
+
             return $document;
         }
 
         $job = $this->findJob($document->id, $jobId);
         if (! $job) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Pekerjaan tidak ditemukan.'], 404);
+            }
+
             return back()->with('error', 'Pekerjaan tidak ditemukan.');
         }
 
@@ -164,8 +198,24 @@ class ProjectJobDocumentPageController extends Controller
             'photo_category' => 'nullable|in:quotation,progress,result_before,result_after',
             'caption' => 'nullable|string|max:191',
             'taken_at' => 'nullable|date',
+        ], [
+            'job_photo.required' => 'File foto wajib dipilih.',
+            'job_photo.image' => 'File harus berupa gambar.',
+            'job_photo.mimes' => 'Format foto harus berupa JPG, PNG, atau WebP.',
+            'job_photo.max' => 'Ukuran foto maksimal 4 MB.',
+            'photo_category.in' => 'Kategori foto tidak valid.',
+            'caption.max' => 'Keterangan maksimal 191 karakter.',
+            'taken_at.date' => 'Format tanggal pengambilan tidak valid.',
         ]);
+
         if ($validator->fails()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $validator->errors()->first(),
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
             return back()->withErrors($validator)->withInput();
         }
 
@@ -177,7 +227,7 @@ class ProjectJobDocumentPageController extends Controller
         );
 
         $data = $validator->validated();
-        $this->service->createPhoto($job, [
+        $photo = $this->service->createPhoto($job, [
             'photo_category' => $data['photo_category'] ?? null,
             'photo_path' => $path,
             'caption' => $data['caption'] ?? null,
@@ -185,7 +235,16 @@ class ProjectJobDocumentPageController extends Controller
             'uploaded_by' => auth()->id(),
         ], auth()->id());
 
-        return redirect()->route('project.job-document.workflow.job.photos', [$projectId, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id])
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Foto berhasil diunggah.',
+                'count' => $job->photos()->count(),
+                'photo' => $this->format_photo_data($project, $document, $job, $photo),
+            ], 201);
+        }
+
+        return redirect()->route('project.job-document.workflow.show', [$projectId, $document->unique_id ?? $document->id])
             ->with('success', 'Foto berhasil diunggah.');
     }
 
@@ -209,20 +268,32 @@ class ProjectJobDocumentPageController extends Controller
         return Storage::disk($disk)->response($photo->photo_path);
     }
 
-    public function destroyPhoto(string $projectId, string $documentId, string $jobId, string $photoId): RedirectResponse
+    public function destroyPhoto(Request $request, string $projectId, string $documentId, string $jobId, string $photoId): RedirectResponse|JsonResponse
     {
         $document = $this->findDocumentForMutation($projectId, $documentId);
         if ($document instanceof RedirectResponse) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Dokumen tidak dapat diubah.'], 403);
+            }
+
             return $document;
         }
 
         $job = $this->findJob($document->id, $jobId);
         if (! $job) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Pekerjaan tidak ditemukan.'], 404);
+            }
+
             return back()->with('error', 'Pekerjaan tidak ditemukan.');
         }
 
         $photo = $this->find_photo($job->id, $photoId);
         if (! $photo) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Foto tidak ditemukan.'], 404);
+            }
+
             return back()->with('error', 'Foto tidak ditemukan.');
         }
 
@@ -234,7 +305,15 @@ class ProjectJobDocumentPageController extends Controller
             Storage::disk('public')->delete($photo->photo_path);
         }
 
-        return redirect()->route('project.job-document.workflow.job.photos', [$projectId, $document->unique_id ?? $document->id, $job->unique_id ?? $job->id])
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'count' => $job->photos()->count(),
+                'message' => 'Foto berhasil dihapus.',
+            ]);
+        }
+
+        return redirect()->route('project.job-document.workflow.show', [$projectId, $document->unique_id ?? $document->id])
             ->with('success', 'Foto berhasil dihapus.');
     }
 
@@ -600,9 +679,12 @@ class ProjectJobDocumentPageController extends Controller
 
         $satisfactionNotes = $documentsByType->get(ProjectJobDocument::TYPE_SATISFACTION_NOTES, collect());
 
-        $finalizedSatisfactionReady = $satisfactionNotes->contains(function (ProjectJobDocument $doc): bool {
-            return in_array($doc->status, ['approved', 'locked'], true);
-        });
+        $latestSatisfaction = $satisfactionNotes->sortByDesc('revision_no')->first();
+        $hasCompletedSatisfactionJob = $latestSatisfaction !== null
+            && ProjectDocumentJob::query()
+                ->where('project_job_document_id', $latestSatisfaction->id)
+                ->where('progress_percent', '>=', 100)
+                ->exists();
 
         return [
             'repair_list' => [
@@ -626,9 +708,9 @@ class ProjectJobDocumentPageController extends Controller
                 'description' => 'Laporan harian docking selama proyek.',
             ],
             'final_boq' => [
-                'ready' => $finalizedSatisfactionReady,
+                'ready' => $hasCompletedSatisfactionJob,
                 'label' => 'RAB Akhir',
-                'description' => 'RAB akhir setelah Satisfaction Notes difinalisasi.',
+                'description' => 'RAB Akhir tersedia setelah minimal satu pekerjaan pada Satisfaction Notes mencapai 100%.',
             ],
         ];
     }
@@ -641,5 +723,48 @@ class ProjectJobDocumentPageController extends Controller
     private function documentTypeLabels(): array
     {
         return ProjectJobDocument::TYPE_LABELS;
+    }
+
+    private function photo_category_label(?string $category): string
+    {
+        return match ($category) {
+            'quotation' => 'Penawaran',
+            'progress' => 'Progres',
+            'result_before' => 'Sebelum Perbaikan',
+            'result_after' => 'Sesudah Perbaikan',
+            default => $category ? ucfirst($category) : 'Umum',
+        };
+    }
+
+    private function format_photo_data(Project $project, ProjectJobDocument $document, ProjectDocumentJob $job, ProjectDocumentJobPhoto $photo): array
+    {
+        $taken_at_text = $photo->taken_at
+            ? $photo->taken_at->timezone('Asia/Jakarta')->tanggal_waktu_indonesia().' WIB'
+            : null;
+        $created_at_text = $photo->created_at
+            ? $photo->created_at->timezone('Asia/Jakarta')->tanggal_waktu_indonesia().' WIB'
+            : null;
+
+        return [
+            'id' => $photo->unique_id,
+            'unique_id' => $photo->unique_id,
+            'category' => $photo->photo_category,
+            'category_label' => $this->photo_category_label($photo->photo_category),
+            'caption' => $photo->caption,
+            'taken_at' => $taken_at_text,
+            'created_at' => $created_at_text,
+            'url' => route('project.job-document.workflow.job.photo.show', [
+                $project->unique_id,
+                $document->unique_id ?? $document->id,
+                $job->unique_id ?? $job->id,
+                $photo->unique_id ?? $photo->id,
+            ]),
+            'delete_url' => route('project.job-document.workflow.job.photo.destroy', [
+                $project->unique_id,
+                $document->unique_id ?? $document->id,
+                $job->unique_id ?? $job->id,
+                $photo->unique_id ?? $photo->id,
+            ]),
+        ];
     }
 }

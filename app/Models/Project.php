@@ -127,16 +127,16 @@ class Project extends Model
 
 	public function customer_access(): HasMany
 	{
-		return $this->hasMany(customer_project_access::class, 'project_id');
+		return $this->hasMany(CustomerProjectAccess::class, 'project_id');
 	}
 
 	public function customer_documents(): HasMany
 	{
-		return $this->hasMany(customer_document::class, 'project_id');
+		return $this->hasMany(CustomerDocument::class, 'project_id');
 	}
 
 	public function customer_feedback(): HasMany
 	{
-		return $this->hasMany(customer_feedback::class, 'project_id');
+		return $this->hasMany(CustomerFeedback::class, 'project_id');
 	}
 }

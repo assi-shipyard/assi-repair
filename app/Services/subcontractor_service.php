@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AuditLog;
-use App\Models\subcontractor;
+use App\Models\Subcontractor;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class subcontractor_service
 {
-    public function save_vendor(array $data, User $user, ?subcontractor $vendor = null): subcontractor
+    public function save_vendor(array $data, User $user, ?Subcontractor $vendor = null): Subcontractor
     {
-        return DB::transaction(function () use ($data, $user, $vendor): subcontractor {
+        return DB::transaction(function () use ($data, $user, $vendor): Subcontractor {
             $is_new = $vendor === null;
-            $vendor = $is_new ? new subcontractor : subcontractor::query()->lockForUpdate()->findOrFail($vendor->id);
+            $vendor = $is_new ? new Subcontractor : Subcontractor::query()->lockForUpdate()->findOrFail($vendor->id);
             $before = $vendor->getAttributes();
             $vendor->fill($data);
             $vendor->save();
