@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Docking\CompleteFloatingRepairRequest;
@@ -7,6 +9,7 @@ use App\Http\Requests\Docking\EvaluateDockingRequest;
 use App\Http\Requests\Docking\MarketingRecommendationResponseRequest;
 use App\Http\Requests\Docking\PostponeDockingRequest;
 use App\Http\Requests\Docking\ReviewDockingStageRequest;
+use App\Http\Requests\Docking\SaveDockingSpaceRequest;
 use App\Http\Requests\Docking\StartDockingOccupancyRequest;
 use App\Http\Requests\Docking\StoreProjectDockingRequest;
 use App\Http\Requests\Docking\UndockToFloatingRepairRequest;
@@ -43,22 +46,9 @@ class DockingManagementController extends Controller
         ]);
     }
 
-    public function store_docking_space(Request $request): RedirectResponse
+    public function store_docking_space(SaveDockingSpaceRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'in:active,maintenance,inactive'],
-            'max_draft' => ['nullable', 'numeric'],
-            'max_length' => ['nullable', 'numeric'],
-            'max_breadth' => ['nullable', 'numeric'],
-            'max_width' => ['nullable', 'numeric'],
-            'max_weight' => ['nullable', 'numeric'],
-            'max_capacity' => ['nullable', 'numeric'],
-            'notes' => ['nullable', 'string'],
-        ]);
-
-        DockingSpace::create($data);
+        DockingSpace::create($request->validated());
 
         return redirect()->route('docking-space.index')->with('success', 'Docking space berhasil ditambahkan.');
     }
@@ -77,23 +67,10 @@ class DockingManagementController extends Controller
         ]);
     }
 
-    public function update_docking_space(Request $request, string $docking_space): RedirectResponse
+    public function update_docking_space(SaveDockingSpaceRequest $request, string $docking_space): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'in:active,maintenance,inactive'],
-            'max_draft' => ['nullable', 'numeric'],
-            'max_length' => ['nullable', 'numeric'],
-            'max_breadth' => ['nullable', 'numeric'],
-            'max_width' => ['nullable', 'numeric'],
-            'max_weight' => ['nullable', 'numeric'],
-            'max_capacity' => ['nullable', 'numeric'],
-            'notes' => ['nullable', 'string'],
-        ]);
-
         $docking_space = $this->find_docking_space($docking_space);
-        $docking_space->update($data);
+        $docking_space->update($request->validated());
 
         return redirect()->route('docking-space.index')->with('success', 'Docking space berhasil diperbarui.');
     }

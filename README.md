@@ -35,6 +35,24 @@ Run `php artisan migrate` to install the price-book tables.
 This menu manages the price catalog only; it does not change existing project
 document pricing or apply minimum quantities to project totals yet.
 
+## Docking-space capacity
+
+Creating or updating a docking space requires a positive maximum draft,
+maximum vessel breadth, maximum tonnage (GT), and a whole-number vessel
+capacity of at least one. Maximum tonnage is stored in `max_tonnage`;
+the optional `max_weight` field remains separate. Length, width, weight,
+and location remain optional. Both forms use shared server-side Form Request
+validation and Indonesian jQuery validation messages. Missing required capacity
+values return validation errors rather than failing a database insert.
+No schema change or database defaults are needed for this validation fix.
+
+The **Data Dock** page shows status totals and responsive specification cards,
+with local name/location search and status filtering. Totals always cover all
+docks; the result count reflects the current filters. The grouped create/edit
+form retains invalid input and displays field-level errors. Operational status
+does not represent schedule availability, and vessel capacity is not current
+occupancy.
+
 ## Subcontractor master data
 
 The `subcontractors` table and `App\Models\subcontractor` represent external
