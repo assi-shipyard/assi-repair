@@ -13,10 +13,13 @@ class ProjectDocumentComparisonService
         'job_volume_estimated' => 'Volume',
         'unit' => 'Satuan',
         'unit_price' => 'Harga satuan',
+        'responsible_kind' => 'Pelaksana',
+        'owner_vendor_approval_status' => 'Persetujuan vendor pemilik',
         'responsible_name' => 'Penanggung jawab',
         'est_start_date' => 'Mulai',
         'est_finish_date' => 'Selesai',
         'est_price' => 'Harga',
+        'owner_vendor_surcharge' => 'Surcharge vendor pemilik',
         'est_currency' => 'Mata uang',
         'job_weight_percent' => 'Bobot (%)',
     ];
@@ -28,6 +31,7 @@ class ProjectDocumentComparisonService
         'price' => 'Harga',
         'currency' => 'Mata uang',
         'dimension' => 'Dimensi',
+        'owner_supplied' => 'Disediakan pemilik',
     ];
 
     public function compare(ProjectJobDocument $base, ProjectJobDocument $target): array

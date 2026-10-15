@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\project_boq_service;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Database\Seeders\RolePermissionSeeder;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -317,6 +318,171 @@ class ProjectBoqTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertDatabaseCount('project_document_jobs', 0);
         $this->assertDatabaseCount('project_document_job_materials', 0);
+    }
+
+    public function test_owner_vendor_job_requires_director_approval_and_adds_surcharge_only_to_job_price(): void
+    {
+        $document = $this->document('final_boq');
+        $job = $this->store_job($document, [
+            'job_name' => 'Perbaikan oleh vendor pemilik',
+            'project_job_group_id' => $this->group()->unique_id,
+            'job_volume_estimated' => '2',
+            'unit' => 'ls',
+            'unit_price' => '100',
+            'responsible_kind' => 'owner',
+        ]);
+        $job_route = [$this->project->unique_id, $document->unique_id, $job->unique_id];
+        $this->assertSame('pending', $job->owner_vendor_approval_status);
+        $this->assertSame('0.00', $job->owner_vendor_surcharge);
+        $this->assertSame('200.00', $job->est_price);
+
+        $this->post(route('project.job-document.workflow.submit', [$this->project->unique_id, $document->unique_id]))
+            ->assertSessionHas('error', 'Setiap pekerjaan vendor pemilik harus disetujui Direksi sebelum RAB Akhir diajukan.');
+
+        $non_approver = User::create(['employee_id' => '800000013', 'email' => 'boq-observer@example.test', 'password' => 'secret-pass']);
+        $this->actingAs($non_approver)
+            ->post(route('project.job-document.workflow.job.owner-vendor-decision', $job_route), ['decision' => 'approved'])
+            ->assertForbidden();
+
+        $this->actingAs($this->admin)
+            ->post(route('project.job-document.workflow.job.owner-vendor-decision', $job_route), ['decision' => 'rejected'])
+            ->assertRedirect();
+        $this->assertSame('rejected', $job->fresh()->owner_vendor_approval_status);
+        $this->post(route('project.job-document.workflow.submit', [$this->project->unique_id, $document->unique_id]))
+            ->assertSessionHas('error', 'Setiap pekerjaan vendor pemilik harus disetujui Direksi sebelum RAB Akhir diajukan.');
+
+        $this->actingAs($this->admin)
+            ->post(route('project.job-document.workflow.job.owner-vendor-decision', $job_route), ['decision' => 'approved'])
+            ->assertRedirect();
+
+        $job->refresh();
+        $this->assertSame('approved', $job->owner_vendor_approval_status);
+        $this->assertSame($this->admin->id, $job->owner_vendor_decided_by_user_id);
+        $this->assertSame('40.00', $job->owner_vendor_surcharge);
+        $this->assertSame('240.00', $job->est_price);
+        $this->get(route('project.job-document.workflow.show', [$this->project->unique_id, $document->unique_id]))
+            ->assertOk()
+            ->assertSee(route('project.job-document.workflow.job.owner-vendor-decision', $job_route), false)
+            ->assertSee('Surcharge 20%: 40,00');
+
+        $this->put(route('project.job-document.workflow.job.update', $job_route), [
+            'job_name' => 'Perbaikan oleh vendor pemilik',
+            'project_job_group_id' => $this->group()->unique_id,
+            'job_volume_estimated' => '2',
+            'unit' => 'ls',
+            'unit_price' => '110',
+            'responsible_kind' => 'owner',
+        ])->assertSessionHasNoErrors();
+        $job->refresh();
+        $this->assertSame('pending', $job->owner_vendor_approval_status);
+        $this->assertSame('0.00', $job->owner_vendor_surcharge);
+
+        $this->post(route('project.job-document.workflow.job.owner-vendor-decision', $job_route), ['decision' => 'approved'])
+            ->assertRedirect();
+        $job->refresh();
+        $this->assertSame('44.00', $job->owner_vendor_surcharge);
+        $this->assertSame('264.00', $job->est_price);
+
+        $this->post(route('project.job-document.workflow.material.store', $job_route), [
+            'material_name' => 'Material dari galangan',
+            'volume' => '3',
+            'unit' => 'kg',
+            'unit_price' => '50',
+        ])->assertSessionHasNoErrors();
+        $this->post(route('project.job-document.workflow.material.store', $job_route), [
+            'material_name' => 'Material disediakan pemilik',
+            'volume' => '1',
+            'unit' => 'kg',
+            'unit_price' => '500',
+            'owner_supplied' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $materials = $job->materials()->orderBy('id')->get();
+        $this->assertSame(['150.00', '0.00'], $materials->pluck('price')->all());
+        $this->assertSame('414.00', app(project_boq_service::class)->build_sheet($document->fresh())['grand_total']);
+        $this->assertDatabaseHas('project_job_document_histories', [
+            'project_job_document_id' => $document->id,
+            'action' => 'owner_vendor_job_approved',
+            'actor_id' => $this->admin->id,
+        ]);
+        $this->assertDatabaseHas('project_job_document_histories', [
+            'project_job_document_id' => $document->id,
+            'action' => 'owner_vendor_job_rejected',
+            'actor_id' => $this->admin->id,
+        ]);
+    }
+
+    public function test_c_suite_roles_receive_owner_vendor_approval_permission(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        foreach (['ceo', 'chrga', 'cpo', 'cfo'] as $role_name) {
+            $role = Role::findByName($role_name);
+            $this->assertTrue($role->hasPermissionTo('approve-owner-vendor-job'));
+            $this->assertTrue($role->hasPermissionTo('view-project-realization'));
+            $this->assertFalse($role->hasPermissionTo('edit-project-realization'));
+        }
+    }
+
+    public function test_owner_supplied_materials_are_not_charged_on_initial_or_final_boq(): void
+    {
+        foreach (['initial_boq', 'final_boq'] as $type) {
+            $document = $this->document($type);
+            $job = $this->store_job($document, [
+                'job_name' => 'Pekerjaan '.$type,
+                'project_job_group_id' => $this->group()->unique_id,
+                'job_volume_estimated' => '1',
+                'unit_price' => '100',
+            ]);
+            $item = $this->item([
+                'group' => 'material',
+                'code' => 'MAT-'.strtoupper($type),
+                'name' => 'Pelat dari pemilik',
+                'unit' => 'kg',
+                'unit_price' => '200',
+                'has_minimum_charge' => true,
+                'minimum_quantity' => '10',
+            ]);
+            $job_route = [$this->project->unique_id, $document->unique_id, $job->unique_id];
+
+            $this->post(route('project.job-document.workflow.material.store', $job_route), [
+                'material_name' => 'Pelat dari pemilik',
+                'price_book_item_id' => $item->unique_id,
+                'volume' => '3',
+                'unit' => 'kg',
+                'unit_price' => '200',
+                'owner_supplied' => '1',
+            ])->assertSessionHasNoErrors();
+
+            $material = $job->materials()->firstOrFail();
+            $sheet = app(project_boq_service::class)->build_sheet($document->fresh());
+            $this->assertTrue($material->owner_supplied);
+            $this->assertSame('0.0000', $material->billed_quantity);
+            $this->assertSame('0.00', $material->price);
+            $this->assertSame('100.00', $sheet['grand_total']);
+            $this->assertSame([], $sheet['minimums']);
+
+            $this->get(route('project.job-document.workflow.show', [$this->project->unique_id, $document->unique_id]))
+                ->assertOk()
+                ->assertSee('Disediakan Pemilik')
+                ->assertSee('tidak ditagihkan');
+
+            if ($type === 'initial_boq') {
+                $satisfaction_notes = ProjectJobDocument::cloneWithChildren($document->fresh(), [
+                    'document_type' => 'satisfaction_notes',
+                    'revision_no' => 1,
+                ]);
+                $final_boq = ProjectJobDocument::cloneWithChildren($satisfaction_notes, [
+                    'document_type' => 'final_boq',
+                    'revision_no' => 2,
+                ]);
+                app(project_boq_service::class)->recalculate_document($final_boq);
+
+                $copied_material = $final_boq->jobs()->firstOrFail()->materials()->firstOrFail();
+                $this->assertTrue($copied_material->owner_supplied);
+                $this->assertSame('0.00', $copied_material->price);
+            }
+        }
     }
 
     public function test_next_phase_copies_tree_and_revision_remaps_parents(): void

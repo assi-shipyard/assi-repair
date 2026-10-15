@@ -106,6 +106,10 @@
                         <td class="nowrap">{{ $row['number'] }}</td>
                         <td style="padding-left: {{ 4 + $row['depth'] * 12 }}px">
                             {{ $job->job_name }}
+                            @if ($job->responsible_kind === 'owner')
+                                <div class="small muted">Vendor Pemilik · {{ $job->owner_vendor_approval_status === 'approved' ? 'Disetujui Direksi' : 'Belum disetujui Direksi' }}</div>
+                                @if ($job->owner_vendor_surcharge > 0)<div class="small muted">Surcharge vendor pemilik {{ \App\Services\project_boq_service::OWNER_VENDOR_SURCHARGE_PERCENT }}%: {{ $money($job->owner_vendor_surcharge) }}</div>@endif
+                            @endif
                             @if ($row['calculation_text_customer'])<div class="small muted">{{ $row['calculation_text_customer'] }}</div>@endif
                             @if ($job->notes)<div class="small muted">{{ $job->notes }}</div>@endif
                         </td>
@@ -129,11 +133,12 @@
                             <td></td>
                             <td style="padding-left: {{ 16 + $row['depth'] * 12 }}px">
                                 {{ $material_row['letter'] }}. {{ $material->material_name }}@if ($material->dimension) · {{ $material->dimension }}@endif
+                                @if ($material->owner_supplied)<div class="small muted">Disediakan Pemilik — tidak ditagihkan</div>@endif
                             </td>
-                            <td class="right">{{ $qty($show_prices ? ($material->billed_quantity ?? $material->volume) : $material->volume) }}</td>
+                            <td class="right">{{ $qty($show_prices && ! $material->owner_supplied ? ($material->billed_quantity ?? $material->volume) : $material->volume) }}</td>
                             <td class="center">{{ $material->unit ?? '-' }}</td>
                             @if ($show_prices)
-                                <td class="right nowrap">{{ $money($material->unit_price) }}</td>
+                                <td class="right nowrap">{{ $material->owner_supplied ? '-' : $money($material->unit_price) }}</td>
                                 <td class="right nowrap">{{ $money($material->price) }}</td>
                                 <td></td>
                             @endif

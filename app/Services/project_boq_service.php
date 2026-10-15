@@ -22,6 +22,8 @@ final class project_boq_service
 {
     public const MAX_DEPTH = 3;
 
+    public const OWNER_VENDOR_SURCHARGE_PERCENT = 20;
+
     private const MONEY_SCALE = 2;
 
     private const PROGRESS_FIELDS = ['progress_percent', 'status', 'actual_start_date', 'actual_finish_date', 'actual_volume'];
@@ -108,6 +110,35 @@ final class project_boq_service
 
             $job->fill($attributes);
 
+            if ($job->responsible_kind === 'owner') {
+                if ($is_new || $job->getOriginal('responsible_kind') !== 'owner') {
+                    $job->owner_vendor_approval_status = 'pending';
+                    $job->owner_vendor_decided_by_user_id = null;
+                    $job->owner_vendor_decided_at = null;
+                    $job->owner_vendor_decision_note = null;
+                } elseif ($job->owner_vendor_approval_status !== 'pending' && $job->isDirty([
+                    'job_name',
+                    'responsible_name',
+                    'price_book_item_id',
+                    'calculation_rule',
+                    'job_volume_estimated',
+                    'unit',
+                    'unit_price',
+                    'minimum_quantity',
+                    'calculation',
+                ])) {
+                    $job->owner_vendor_approval_status = 'pending';
+                    $job->owner_vendor_decided_by_user_id = null;
+                    $job->owner_vendor_decided_at = null;
+                    $job->owner_vendor_decision_note = null;
+                }
+            } else {
+                $job->owner_vendor_approval_status = 'not_required';
+                $job->owner_vendor_decided_by_user_id = null;
+                $job->owner_vendor_decided_at = null;
+                $job->owner_vendor_decision_note = null;
+            }
+
             if ($is_new) {
                 $job->sort_order = $this->next_job_sort_order($document, $job->project_job_group_id, $job->parent_job_id);
             }
@@ -148,6 +179,46 @@ final class project_boq_service
         });
     }
 
+    public function decide_owner_vendor_job(
+        ProjectJobDocument $document,
+        ProjectDocumentJob $job,
+        string $decision,
+        ?string $note,
+        ?int $actor_id,
+    ): void {
+        DB::transaction(function () use ($document, $job, $decision, $note, $actor_id): void {
+            ProjectJobDocument::query()->whereKey($document->id)->lockForUpdate()->first();
+            $job = ProjectDocumentJob::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
+
+            if ($document->document_type !== ProjectJobDocument::TYPE_FINAL_BOQ
+                || ! $document->is_editable()
+                || $job->project_job_document_id !== $document->id
+                || $job->responsible_kind !== 'owner') {
+                throw ValidationException::withMessages([
+                    'decision' => 'Keputusan hanya dapat diberikan untuk pekerjaan vendor pemilik pada RAB Akhir berstatus Draft.',
+                ]);
+            }
+
+            $previous_status = $job->owner_vendor_approval_status;
+            $job->update([
+                'owner_vendor_approval_status' => $decision,
+                'owner_vendor_decided_by_user_id' => $actor_id,
+                'owner_vendor_decided_at' => now(),
+                'owner_vendor_decision_note' => $note,
+            ]);
+
+            $this->record_history($document, 'owner_vendor_job_'.$decision, [
+                'job_id' => $job->unique_id,
+                'job_name' => $job->job_name,
+                'previous_status' => $previous_status,
+                'decision' => $decision,
+                'note' => $note,
+            ], $actor_id);
+
+            $this->recalculate_document($document);
+        });
+    }
+
     public function save_material(ProjectJobDocument $document, ProjectDocumentJob $job, ?ProjectDocumentJobMaterial $material, array $data, ?int $actor_id): ProjectDocumentJobMaterial
     {
         return DB::transaction(function () use ($document, $job, $material, $data, $actor_id): ProjectDocumentJobMaterial {
@@ -168,6 +239,10 @@ final class project_boq_service
                 'notes' => $data['notes'] ?? null,
                 'minimum_quantity' => $this->minimum_for($item, $material->price_book_item_id, $material->minimum_quantity),
             ];
+
+            if (in_array($document->document_type, [ProjectJobDocument::TYPE_INITIAL_BOQ, ProjectJobDocument::TYPE_FINAL_BOQ], true)) {
+                $attributes['owner_supplied'] = (bool) ($data['owner_supplied'] ?? false);
+            }
 
             if ($prices) {
                 $attributes['unit_price'] = $this->decimal_or_null($data['unit_price'] ?? null) ?? $item?->unit_price;
@@ -223,9 +298,26 @@ final class project_boq_service
         foreach ($lines as $line) {
             $model = $line['model'];
             [$total_field, $currency_field] = $model instanceof ProjectDocumentJob ? ['est_price', 'est_currency'] : ['price', 'currency'];
-            $total = $line['billed'] === null || $model->unit_price === null
-                ? null
-                : $this->round(bcmul($line['billed'], (string) $model->unit_price, 6), self::MONEY_SCALE);
+            $owner_supplied = $model instanceof ProjectDocumentJobMaterial && $model->owner_supplied;
+            $total = $owner_supplied
+                ? '0.00'
+                : ($line['billed'] === null || $model->unit_price === null
+                    ? null
+                    : $this->round(bcmul($line['billed'], (string) $model->unit_price, 6), self::MONEY_SCALE));
+
+            if ($model instanceof ProjectDocumentJob) {
+                $has_surcharge = $document->document_type === ProjectJobDocument::TYPE_FINAL_BOQ
+                    && $model->responsible_kind === 'owner'
+                    && $model->owner_vendor_approval_status === 'approved'
+                    && $total !== null;
+                $surcharge = $has_surcharge
+                    ? $this->round(bcdiv(bcmul($total, (string) self::OWNER_VENDOR_SURCHARGE_PERCENT, 6), '100', 6), self::MONEY_SCALE)
+                    : '0.00';
+                $model->owner_vendor_surcharge = $surcharge;
+                if ($total !== null) {
+                    $total = bcadd($total, $surcharge, self::MONEY_SCALE);
+                }
+            }
 
             $model->billed_quantity = $line['billed'];
             $model->{$total_field} = $total;
@@ -492,6 +584,18 @@ final class project_boq_service
 
     private function price_line(ProjectDocumentJob|ProjectDocumentJobMaterial $model, ?array $calculation, mixed $volume, array $overrides): array
     {
+        if ($model instanceof ProjectDocumentJobMaterial && $model->owner_supplied) {
+            return [
+                'model' => $model,
+                'item_id' => null,
+                'minimum' => null,
+                'scope' => null,
+                'base' => '0',
+                'billed' => '0',
+                'shortfall' => null,
+            ];
+        }
+
         $item_id = $model->price_book_item_id;
         $minimum = $item_id !== null && array_key_exists($item_id, $overrides)
             ? $overrides[$item_id]

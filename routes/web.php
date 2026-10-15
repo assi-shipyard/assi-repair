@@ -216,6 +216,7 @@ Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): v
             Route::post('/{document}/jobs', 'store_job')->name('job.store');
             Route::put('/{document}/jobs/{job}', 'update_job')->name('job.update');
             Route::delete('/{document}/jobs/{job}', 'destroy_job')->name('job.destroy');
+            Route::post('/{document}/jobs/{job}/owner-vendor-decision', 'decide_owner_vendor_job')->name('job.owner-vendor-decision');
             Route::post('/{document}/jobs/{job}/materials', 'store_material')->name('material.store');
             Route::put('/{document}/jobs/{job}/materials/{material}', 'update_material')->name('material.update');
             Route::delete('/{document}/jobs/{job}/materials/{material}', 'destroy_material')->name('material.destroy');

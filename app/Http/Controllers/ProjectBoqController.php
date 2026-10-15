@@ -8,6 +8,7 @@ use App\Http\Requests\Project\SaveDocumentJobMaterialRequest;
 use App\Http\Requests\Project\SaveDocumentJobRequest;
 use App\Http\Requests\Project\SaveMinimumOverrideRequest;
 use App\Http\Requests\Project\SearchPriceItemsRequest;
+use App\Http\Requests\Project\DecideOwnerVendorJobRequest;
 use App\Http\Resources\price_book_item_option_resource;
 use App\Models\Project;
 use App\Models\ProjectDocumentJob;
@@ -39,6 +40,30 @@ class ProjectBoqController extends Controller
         $this->boq->save_job($document, $this->job($document, $job_id), $request->validated(), $this->auth->id());
 
         return $this->back_to($document, 'Pekerjaan berhasil diperbarui.');
+    }
+
+    public function decide_owner_vendor_job(DecideOwnerVendorJobRequest $request, string $project_id, string $document_id, string $job_id): RedirectResponse
+    {
+        $document = $this->document($this->project($project_id), $document_id);
+        abort_unless($document->document_type === ProjectJobDocument::TYPE_FINAL_BOQ, 404);
+
+        if (! $document->is_editable()) {
+            abort(redirect()->route('project.job-document.workflow.show', [$project_id, $document->unique_id])
+                ->with('error', 'Persetujuan vendor pemilik hanya dapat diubah selama RAB Akhir berstatus Draft.'));
+        }
+
+        $decision = $request->validated();
+        $this->boq->decide_owner_vendor_job(
+            $document,
+            $this->job($document, $job_id),
+            $decision['decision'],
+            $decision['note'] ?? null,
+            $this->auth->id(),
+        );
+
+        return $this->back_to($document, $decision['decision'] === 'approved'
+            ? 'Penggunaan vendor pemilik disetujui.'
+            : 'Penggunaan vendor pemilik ditolak.');
     }
 
     public function destroy_job(string $project_id, string $document_id, string $job_id): RedirectResponse

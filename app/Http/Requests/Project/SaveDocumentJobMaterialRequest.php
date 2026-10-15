@@ -22,6 +22,7 @@ class SaveDocumentJobMaterialRequest extends FormRequest
     {
         return [
             'material_name' => ['required', 'string', 'max:191'],
+            'owner_supplied' => ['sometimes', 'boolean'],
             'price_book_item_id' => ['nullable', 'uuid'],
             'volume' => ['nullable', 'numeric', 'min:0', 'max:99999999999999'],
             'unit' => ['nullable', 'string', 'max:30'],

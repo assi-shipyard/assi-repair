@@ -10,7 +10,7 @@
             'input' => \Illuminate\Support\Arr::except(session()->getOldInput(), ['_token', '_method', 'form_action', 'form_kind', 'form_title']),
         ]
         : null;
-    $responsible_kinds = ['internal_unit' => 'Unit Internal', 'subcontractor' => 'Subkontraktor'];
+    $responsible_kinds = ['internal_unit' => 'Unit Internal', 'subcontractor' => 'Subkontraktor', 'owner' => 'Vendor Pemilik'];
     $calc_rules = \App\Services\boq_rule_service::RULES;
     $plate_materials = \App\Services\boq_rule_service::PLATE_MATERIALS;
     $default_safety_factor = $sheet['last_safety_factor'] ?? 1.1;
@@ -136,6 +136,9 @@
                                 <option value="{{ $kind_key }}">{{ $kind_label }}</option>
                             @endforeach
                         </select>
+                        @if ($document->document_type === \App\Models\ProjectJobDocument::TYPE_FINAL_BOQ)
+                            <div class="form-hint">Vendor pemilik memerlukan persetujuan Direksi. Setelah disetujui, RAB Akhir menambahkan surcharge 20% pada biaya pekerjaan.</div>
+                        @endif
                     </div>
                     <div class="col-md-8">
                         <label class="form-label" for="boq-job-responsible-name">Nama Pelaksana</label>
@@ -236,6 +239,15 @@
                         <label class="form-label" for="boq-material-unit">Satuan</label>
                         <input type="text" class="form-control" name="unit" id="boq-material-unit" maxlength="30">
                     </div>
+                    @if ($can_mark_owner_supplied)
+                        <div class="col-12">
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" name="owner_supplied" value="1">
+                                <span class="form-check-label">Material disediakan pemilik kapal</span>
+                            </label>
+                            <div class="form-hint">Material ini tetap tercantum di RAB, tetapi biayanya tidak ditagihkan.</div>
+                        </div>
+                    @endif
                     @if ($show_prices)
                         <div class="col-12">
                             <label class="form-label" for="boq-material-unit-price">Harga Satuan (IDR)</label>
@@ -387,7 +399,11 @@
                     }
                     const $field = $form.find('[name="' + name + '"]');
                     if ($field.length && !$field.is('[type=hidden]')) {
-                        $field.val(value ?? '');
+                        if ($field.is(':checkbox')) {
+                            $field.prop('checked', value === true || value === 1 || value === '1');
+                        } else {
+                            $field.val(value ?? '');
+                        }
                     }
                 });
             }

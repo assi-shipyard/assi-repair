@@ -42,7 +42,7 @@ class SaveDocumentJobRequest extends FormRequest
             'unit' => ['nullable', 'string', 'max:30'],
             'unit_price' => ['nullable', 'numeric', 'min:0', 'max:9999999999999999'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'responsible_kind' => ['nullable', Rule::in(['internal_unit', 'subcontractor'])],
+            'responsible_kind' => ['nullable', Rule::in(['internal_unit', 'subcontractor', 'owner'])],
             'responsible_name' => ['nullable', 'string', 'max:191'],
             'est_start_date' => ['nullable', 'date'],
             'est_finish_date' => ['nullable', 'date', 'after_or_equal:est_start_date'],

@@ -9,6 +9,7 @@
     $fmt_qty = fn ($value): string => $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 4, ',', '.'), '0'), ',');
     $fmt_date = fn ($date): ?string => $date?->locale('id')->translatedFormat('j F Y');
     $uses_reports = $features['progress_reports'] ?? false;
+    $can_mark_owner_supplied = in_array($document->document_type, [\App\Models\ProjectJobDocument::TYPE_INITIAL_BOQ, \App\Models\ProjectJobDocument::TYPE_FINAL_BOQ], true);
     $progress_weight_column = $show_progress && ! $show_prices;
     $fmt_pct = fn ($value): string => $value === null ? '-' : number_format((float) $value, 2, ',', '.').'%';
     $column_count = 4 + ($show_prices ? 3 : 0) + ($show_progress ? 3 + ($progress_weight_column ? 1 : 0) : 0) + ($can_edit ? 1 : 0);
@@ -310,6 +311,27 @@
                                     <div class="small text-secondary d-flex flex-wrap column-gap-2">
                                         @if ($job->price_book_item)<span><i class="ti ti-book me-1"></i>{{ $job->price_book_item->code }}</span>@endif
                                         @if ($job->calculation_rule)<span class="badge bg-azure-lt">{{ $rule_labels[$job->calculation_rule] ?? $job->calculation_rule }}</span>@endif
+                                        @if ($job->responsible_kind === 'owner')
+                                            <span class="badge bg-purple-lt">Vendor Pemilik</span>
+                                            @php($owner_approval_labels = ['pending' => 'Menunggu Persetujuan Direksi', 'approved' => 'Disetujui Direksi', 'rejected' => 'Ditolak Direksi'])
+                                            <span class="badge {{ $job->owner_vendor_approval_status === 'approved' ? 'bg-success-lt' : ($job->owner_vendor_approval_status === 'rejected' ? 'bg-danger-lt' : 'bg-warning-lt') }}">{{ $owner_approval_labels[$job->owner_vendor_approval_status] ?? $job->owner_vendor_approval_status }}</span>
+                                            @if ($document->document_type === \App\Models\ProjectJobDocument::TYPE_FINAL_BOQ && $job->owner_vendor_surcharge > 0)
+                                                <span class="badge bg-orange-lt">Surcharge {{ \App\Services\project_boq_service::OWNER_VENDOR_SURCHARGE_PERCENT }}%: {{ $fmt_money($job->owner_vendor_surcharge) }}</span>
+                                            @endif
+                                            @if ($job->owner_vendor_decision_note)<span class="text-secondary">Catatan keputusan: {{ $job->owner_vendor_decision_note }}</span>@endif
+                                            @if ($document->document_type === \App\Models\ProjectJobDocument::TYPE_FINAL_BOQ && $can_approve_owner_vendor_job && $document->is_editable())
+                                                <span class="d-inline-flex flex-wrap gap-1">
+                                                    <form method="POST" action="{{ route('project.job-document.workflow.job.owner-vendor-decision', $job_route) }}" onsubmit="return confirm('Setujui penggunaan vendor pemilik untuk pekerjaan ini?')">
+                                                        @csrf<input type="hidden" name="decision" value="approved">
+                                                        <button type="submit" class="btn btn-sm btn-success">Setujui vendor pemilik</button>
+                                                    </form>
+                                                    <form method="POST" action="{{ route('project.job-document.workflow.job.owner-vendor-decision', $job_route) }}" onsubmit="return confirm('Tolak penggunaan vendor pemilik untuk pekerjaan ini?')">
+                                                        @csrf<input type="hidden" name="decision" value="rejected">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">Tolak</button>
+                                                    </form>
+                                                </span>
+                                            @endif
+                                        @endif
                                         @if ($show_prices && $job->minimum_quantity !== null)<span class="text-warning">Min. {{ $fmt_qty($job->minimum_quantity) }} {{ $job->unit }}</span>@endif
                                         @if ($row['calculation_text'])<span><i class="ti ti-calculator me-1"></i>{{ $row['calculation_text'] }}</span>@endif
                                         @if ($job->responsible_name)<span><i class="ti ti-user me-1"></i>{{ $job->responsible_name }}</span>@endif
@@ -386,18 +408,19 @@
                                     <div class="small" style="padding-left: {{ $row['depth'] * 1.25 + 1.25 }}rem">
                                         <span class="text-secondary">{{ $material_row['letter'] }}.</span> {{ $material->material_name }}
                                         @if ($material->dimension)<span class="text-secondary">· {{ $material->dimension }}</span>@endif
-                                        @if ($show_prices && $material->minimum_quantity !== null)<span class="text-warning">· Min. {{ $fmt_qty($material->minimum_quantity) }} {{ $material->unit }}</span>@endif
+                                        @if ($material->owner_supplied)<span class="badge bg-azure-lt ms-1">Disediakan Pemilik · tidak ditagihkan</span>@endif
+                                        @if ($show_prices && ! $material->owner_supplied && $material->minimum_quantity !== null)<span class="text-warning">· Min. {{ $fmt_qty($material->minimum_quantity) }} {{ $material->unit }}</span>@endif
                                     </div>
                                 </td>
                                 <td class="text-end small text-nowrap">
                                     {{ $fmt_qty($material->volume) }}
-                                    @if ($show_prices && $billed_differs($material->billed_quantity, $material->volume))
+                                    @if ($show_prices && ! $material->owner_supplied && $billed_differs($material->billed_quantity, $material->volume))
                                         <div class="text-warning">Tagih {{ $fmt_qty($material->billed_quantity) }}</div>
                                     @endif
                                 </td>
                                 <td class="small">{{ $material->unit ?? '-' }}</td>
                                 @if ($show_prices)
-                                    <td class="text-end small text-nowrap">{{ $material->unit_price !== null ? $fmt_money($material->unit_price) : '-' }}</td>
+                                    <td class="text-end small text-nowrap">{{ ! $material->owner_supplied && $material->unit_price !== null ? $fmt_money($material->unit_price) : '-' }}</td>
                                     <td class="text-end small text-nowrap">{{ $material->price !== null ? $fmt_money($material->price) : '-' }}</td>
                                     <td></td>
                                 @endif
@@ -414,6 +437,7 @@
                                                 'volume' => $material->volume,
                                                 'unit' => $material->unit,
                                                 'unit_price' => $material->unit_price,
+                                                'owner_supplied' => $material->owner_supplied,
                                                 'dimension' => $material->dimension,
                                                 'notes' => $material->notes,
                                             ]) }}"><i class="ti ti-edit"></i></button>

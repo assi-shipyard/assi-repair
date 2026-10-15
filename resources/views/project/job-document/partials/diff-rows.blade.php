@@ -6,10 +6,17 @@
         'unchanged' => ['label' => 'Tetap', 'class' => 'bg-secondary-lt text-secondary', 'icon' => 'ti-equal'],
     ];
     $money_fields = ['est_price', 'price'];
+    $value_labels = [
+        'responsible_kind' => ['internal_unit' => 'Unit Internal', 'subcontractor' => 'Subkontraktor', 'owner' => 'Vendor Pemilik'],
+        'owner_vendor_approval_status' => ['not_required' => 'Tidak diperlukan', 'pending' => 'Menunggu persetujuan', 'approved' => 'Disetujui', 'rejected' => 'Ditolak'],
+    ];
     $show_unchanged = $show_unchanged ?? false;
-    $format_value = function ($field, $value) use ($money_fields) {
+    $format_value = function ($field, $value) use ($money_fields, $value_labels) {
         if ($value === null) {
             return '—';
+        }
+        if (isset($value_labels[$field][$value])) {
+            return $value_labels[$field][$value];
         }
         return in_array($field, $money_fields, true) && is_numeric($value) ? number_format((float) $value, 0, ',', '.') : $value;
     };

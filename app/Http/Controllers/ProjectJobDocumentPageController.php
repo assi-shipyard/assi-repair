@@ -108,6 +108,7 @@ class ProjectJobDocumentPageController extends Controller
             'histories' => $histories,
             'actor_names' => $actor_names,
             'can_approve' => $this->can_approve_document($document),
+            'can_approve_owner_vendor_job' => auth()->user()?->hasRole('admin') || auth()->user()?->can('approve-owner-vendor-job'),
             'can_edit' => $document->is_editable() && $document->can_be_edited_by(auth()->user()),
             'is_latest' => $revisions->first()?->id === $document->id,
             'sheet' => $this->boq->build_sheet($document),
@@ -418,6 +419,15 @@ class ProjectJobDocumentPageController extends Controller
 
         if ($document->jobs_count === 0) {
             return redirect()->route(...$route)->with('error', 'Dokumen belum memiliki pekerjaan.');
+        }
+
+        if ($document->document_type === ProjectJobDocument::TYPE_FINAL_BOQ
+            && ProjectDocumentJob::query()
+                ->where('project_job_document_id', $document->id)
+                ->where('responsible_kind', 'owner')
+                ->where('owner_vendor_approval_status', '!=', 'approved')
+                ->exists()) {
+            return redirect()->route(...$route)->with('error', 'Setiap pekerjaan vendor pemilik harus disetujui Direksi sebelum RAB Akhir diajukan.');
         }
 
         $this->service->submit($document, auth()->id());

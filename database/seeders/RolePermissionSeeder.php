@@ -39,13 +39,13 @@ class RolePermissionSeeder extends Seeder
             'create-new-project', 'edit-project', 'delete-project', 'view-project', 'view-project-data', 'export-project-data',
 
             // RAB Awal (Initial Budget)
-            'edit-project-quotation', 'view-project-quotation', 'export-project-quotation',
+            'edit-project-quotation', 'view-project-quotation', 'export-project-quotation', 'approve-owner-vendor-job',
 
             // Satisfaction Notes
             'edit-project-satisfaction-note', 'view-project-satisfaction-note', 'export-project-satisfaction-note',
 
             // RAB Akhir (Realization)
-            'edit-project-realization', 'view-project-realization', 'export-project-realization',
+            'edit-project-realization', 'view-project-realization', 'export-project-realization', 'approve-owner-vendor-job',
 
             // User & Role Management
             'add-user', 'edit-user', 'delete-user', 'view-user',
@@ -97,7 +97,11 @@ class RolePermissionSeeder extends Seeder
                 ['name' => $name, 'guard_name' => 'web'],
                 ['role_name' => $label]
             );
-            $role->syncPermissions($name === 'staf-it' ? $permissions : []);
+            $role->syncPermissions($name === 'staf-it'
+                ? $permissions
+                : (in_array($name, ['ceo', 'chrga', 'cpo', 'cfo'], true)
+                    ? ['view-project', 'view-project-data', 'view-project-realization', 'approve-owner-vendor-job']
+                    : []));
         }
 
         // Role: director (limited permissions, only view and export)
@@ -112,6 +116,7 @@ class RolePermissionSeeder extends Seeder
             'view-project-satisfaction-note',
             'view-project-realization',
             'view-user',
+            'approve-owner-vendor-job',
             'view-role',
             'view-permission'
         ];

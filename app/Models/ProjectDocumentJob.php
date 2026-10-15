@@ -32,12 +32,17 @@ class ProjectDocumentJob extends Model
         'calculation',
         'notes',
         'responsible_kind',
+        'owner_vendor_approval_status',
+        'owner_vendor_decided_by_user_id',
+        'owner_vendor_decided_at',
+        'owner_vendor_decision_note',
         'responsible_name',
         'est_start_date',
         'est_finish_date',
         'est_duration_days',
         'progress_percent',
         'est_price',
+        'owner_vendor_surcharge',
         'est_currency',
         'job_weight_percent',
         'actual_start_date',
@@ -76,6 +81,9 @@ class ProjectDocumentJob extends Model
             'est_duration_days' => 'integer',
             'progress_percent' => 'decimal:2',
             'est_price' => 'decimal:2',
+            'owner_vendor_decided_by_user_id' => 'integer',
+            'owner_vendor_decided_at' => 'datetime',
+            'owner_vendor_surcharge' => 'decimal:2',
             'job_weight_percent' => 'decimal:2',
             'actual_start_date' => 'date',
             'actual_finish_date' => 'date',
@@ -114,6 +122,11 @@ class ProjectDocumentJob extends Model
     public function price_book_item(): BelongsTo
     {
         return $this->belongsTo(PriceBookItem::class);
+    }
+
+    public function owner_vendor_decided_by(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_vendor_decided_by_user_id');
     }
 
     public function materials(): HasMany
