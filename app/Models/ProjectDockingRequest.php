@@ -43,6 +43,19 @@ class ProjectDockingRequest extends Model
         'marketing_responded_at',
         'marketing_response',
         'marketing_notes',
+        'cancelled_by',
+        'cancelled_at',
+        'cancellation_reason',
+        'visit_stage',
+        'arrived_at',
+        'arrived_recorded_by',
+        'arrival_notes',
+        'administration_completed_at',
+        'administration_completed_by',
+        'administration_notes',
+        'departed_at',
+        'departed_recorded_by',
+        'departure_notes',
     ];
 
     protected $casts = [
@@ -56,9 +69,81 @@ class ProjectDockingRequest extends Model
         'recommended_start_at' => 'datetime',
         'recommended_end_at' => 'datetime',
         'marketing_responded_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'arrived_at' => 'datetime',
+        'administration_completed_at' => 'datetime',
+        'departed_at' => 'datetime',
     ];
 
     public const PENDING_STATUSES = ['submitted', 'engineering_approved', 'awaiting_marketing'];
+
+    public const STATUS_LABELS = [
+        'submitted' => 'Menunggu Engineering',
+        'engineering_approved' => 'Menunggu Produksi',
+        'awaiting_marketing' => 'Menunggu Konfirmasi Marketing',
+        'approved' => 'Disetujui',
+        'completed' => 'Selesai',
+        'rejected' => 'Ditolak',
+        'cancelled' => 'Dibatalkan',
+    ];
+
+    public const VISIT_STAGE_LABELS = [
+        'awaiting_arrival' => 'Menunggu kedatangan',
+        'arrived' => 'Tiba di galangan',
+        'docked' => 'Di dalam dock',
+        'floating' => 'Pekerjaan atas air',
+        'ready_to_depart' => 'Siap keluar galangan',
+        'departed' => 'Keluar galangan',
+    ];
+
+    public const IN_YARD_STAGES = ['arrived', 'docked', 'floating', 'ready_to_depart'];
+
+    public function status_label(): string
+    {
+        if ($this->request_status === 'approved' && $this->visit_stage !== null) {
+            return self::VISIT_STAGE_LABELS[$this->visit_stage] ?? self::STATUS_LABELS['approved'];
+        }
+
+        return self::STATUS_LABELS[$this->request_status] ?? $this->request_status;
+    }
+
+    public function is_in_yard(): bool
+    {
+        return $this->request_status === 'approved' && in_array($this->visit_stage, self::IN_YARD_STAGES, true);
+    }
+
+    // Before the ship enters the dock, the request can still be cancelled or rescheduled.
+    public function is_before_docking(): bool
+    {
+        return $this->request_status === 'approved' && in_array($this->visit_stage, [null, 'awaiting_arrival', 'arrived'], true);
+    }
+
+    public function is_cancellable(): bool
+    {
+        return in_array($this->request_status, self::PENDING_STATUSES, true) || $this->is_before_docking();
+    }
+
+    public function is_managed_by(User $user): bool
+    {
+        return (int) $this->requested_by === (int) $user->id || $user->hasRole('admin');
+    }
+
+    /**
+     * Position in the 7-step journey: request, engineering, production, arrival, dock, undock/floating, departure.
+     */
+    public function progress_step(): int
+    {
+        return match (true) {
+            $this->request_status === 'completed' => 7,
+            $this->request_status === 'submitted' => 1,
+            in_array($this->request_status, ['engineering_approved', 'awaiting_marketing'], true) => 2,
+            $this->request_status !== 'approved' => 0,
+            $this->visit_stage === 'arrived' => 4,
+            $this->visit_stage === 'docked' => 5,
+            in_array($this->visit_stage, ['floating', 'ready_to_depart'], true) => 6,
+            default => 3,
+        };
+    }
 
     public function project(): BelongsTo
     {
@@ -94,6 +179,26 @@ class ProjectDockingRequest extends Model
     public function marketing_responder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'marketing_responded_by');
+    }
+
+    public function canceller(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function arrival_recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'arrived_recorded_by');
+    }
+
+    public function administration_confirmer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'administration_completed_by');
+    }
+
+    public function departure_recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'departed_recorded_by');
     }
 
     public function postponements(): HasMany

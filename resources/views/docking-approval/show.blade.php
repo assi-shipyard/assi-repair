@@ -13,14 +13,6 @@
     @php
         $ship = $docking_request->ship;
         $space = $effective_space;
-        $status_labels = [
-            'submitted' => 'Menunggu Engineering',
-            'engineering_approved' => 'Menunggu Produksi',
-            'awaiting_marketing' => 'Menunggu Konfirmasi Marketing',
-            'approved' => 'Disetujui / menunggu kedatangan',
-            'rejected' => 'Ditolak',
-            'cancelled' => 'Dibatalkan',
-        ];
         $fit_rows = [
             ['Panjang (LOA)', 'length_overall', 'max_length', 'length', 'm'],
             ['Lebar (Breadth)', 'breadth', 'max_breadth', 'breadth', 'm'],
@@ -34,7 +26,7 @@
             <div class="card mb-3">
                 <div class="card-header">
                     <h3 class="card-title">Kapal dan jadwal</h3>
-                    <div class="card-actions"><span class="badge bg-blue-lt text-blue">{{ $status_labels[$docking_request->request_status] ?? $docking_request->request_status }}</span></div>
+                    <div class="card-actions"><span class="badge bg-blue-lt text-blue">{{ $docking_request->status_label() }}</span></div>
                 </div>
                 <div class="card-body">
                     <div class="datagrid">

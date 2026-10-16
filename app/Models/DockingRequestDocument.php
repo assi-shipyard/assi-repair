@@ -17,6 +17,7 @@ class DockingRequestDocument extends Model
         'general_arrangement' => 'General Arrangement',
         'docking_plan' => 'Docking Plan',
         'stability_booklet' => 'Stability Booklet',
+        'owner_repair_list' => 'Repair List dari Owner',
         'other' => 'Dokumen Lainnya',
     ];
 

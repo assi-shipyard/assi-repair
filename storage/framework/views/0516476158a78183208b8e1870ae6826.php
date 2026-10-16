@@ -30,7 +30,7 @@
                         <div class="list-group-item bg-transparent px-0 py-2">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge bg-primary-subtle text-primary">1</span>
-                                <span class="fw-medium">Pilih proyek dan kapal</span>
+                                <span class="fw-medium">Pilih kapal atau proyek yang sudah ada</span>
                             </div>
                         </div>
                         <div class="list-group-item bg-transparent px-0 py-2">
@@ -101,10 +101,10 @@
                                 <div class="alert alert-light border rounded-3 mb-0">
                                     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                                         <div>
-                                            <div class="fw-semibold text-dark">Ringkasan proyek terpilih</div>
-                                            <div id="project-summary" class="text-secondary mt-1">Belum ada proyek dipilih.</div>
+                                            <div class="fw-semibold text-dark">Ringkasan permohonan</div>
+                                            <div id="project-summary" class="text-secondary mt-1">Belum ada kapal dipilih.</div>
                                         </div>
-                                        <span class="badge bg-secondary-lt text-secondary">Auto summary</span>
+                                        <span class="badge bg-secondary-lt text-secondary">Ringkasan otomatis</span>
                                     </div>
                                 </div>
                             </div>
@@ -112,11 +112,11 @@
                             <div class="col-12">
                                 <label class="form-label">Permohonan untuk</label>
                                 <div class="btn-group w-100" role="group" aria-label="Pilihan jenis permohonan">
-                                    <input type="radio" class="btn-check" name="request_scope" id="request_scope_project" value="project" checked>
-                                    <label class="btn btn-outline-primary" for="request_scope_project">Proyek yang sudah ada</label>
-
-                                    <input type="radio" class="btn-check" name="request_scope" id="request_scope_ship" value="ship">
+                                    <input type="radio" class="btn-check" name="request_scope" id="request_scope_ship" value="ship" <?php if(old('request_scope', old('project_id') ? 'project' : 'ship') === 'ship'): echo 'checked'; endif; ?>>
                                     <label class="btn btn-outline-primary" for="request_scope_ship">Kapal (Vessel)</label>
+
+                                    <input type="radio" class="btn-check" name="request_scope" id="request_scope_project" value="project" <?php if(old('request_scope', old('project_id') ? 'project' : 'ship') === 'project'): echo 'checked'; endif; ?>>
+                                    <label class="btn btn-outline-primary" for="request_scope_project">Proyek yang sudah ada</label>
                                 </div>
                             </div>
 
@@ -125,7 +125,7 @@
                                 <select class="form-select" name="project_id">
                                     <option value="">Pilih proyek</option>
                                     <?php $__currentLoopData = $projects; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $project): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                        <option value="<?php echo e($project->id); ?>" <?php if(old('project_id') == $project->id): echo 'selected'; endif; ?>>
+                                        <option value="<?php echo e($project->id); ?>" data-ship-id="<?php echo e($project->ship_id); ?>" <?php if(old('project_id') == $project->id): echo 'selected'; endif; ?>>
                                             <?php echo e($project->project_code); ?> - <?php echo e($project->ship?->name ?? '-'); ?>
 
                                         </option>
@@ -151,23 +151,25 @@
                                 <select class="form-select" name="requested_docking_space_id">
                                     <option value="">Sistem akan mengevaluasi otomatis</option>
                                     <?php $__currentLoopData = $docking_spaces; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $docking_space): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                        <option value="<?php echo e($docking_space->id); ?>" <?php if(old('requested_docking_space_id') == $docking_space->id): echo 'selected'; endif; ?>>
+                                        <option value="<?php echo e($docking_space->id); ?>" data-label="<?php echo e($docking_space->name); ?>" <?php if(old('requested_docking_space_id') == $docking_space->id): echo 'selected'; endif; ?>>
                                             <?php echo e($docking_space->name); ?>
 
                                         </option>
                                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 </select>
                                 <div class="form-hint mt-1">Kosongkan bila Anda ingin sistem memilih ruang docking terbaik berdasarkan ketersediaan.</div>
+                                <div id="dock-compatibility-hint" class="form-hint mt-1" role="status"></div>
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Jadwal mulai docking</label>
-                                <input type="datetime-local" class="form-control" name="requested_start_at" value="<?php echo e(old('requested_start_at')); ?>" required>
+                                <label class="form-label" for="requested_start_at">Jadwal mulai docking</label>
+                                <input type="datetime-local" class="form-control" id="requested_start_at" name="requested_start_at" value="<?php echo e(old('requested_start_at')); ?>" data-date-display="long" placeholder="Pilih tanggal dan waktu" required>
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Jadwal selesai docking (estimasi)</label>
-                                <input type="datetime-local" class="form-control" name="requested_end_at" value="<?php echo e(old('requested_end_at')); ?>">
+                                <label class="form-label" for="requested_end_at">Jadwal selesai docking (estimasi)</label>
+                                <input type="datetime-local" class="form-control" id="requested_end_at" name="requested_end_at" value="<?php echo e(old('requested_end_at')); ?>" data-date-display="long" placeholder="Pilih tanggal dan waktu">
+                                <div class="form-hint">Waktu Indonesia Barat (WIB).</div>
                             </div>
 
                             <div class="col-12">
@@ -223,6 +225,41 @@ unset($__errorArgs, $__bag); ?>
 <?php $__env->startPush('scripts'); ?>
     <script>
         $(function () {
+            const dock_options_by_ship = <?php echo json_encode($dock_options_by_ship, 15, 512) ?>;
+
+            function update_dock_options() {
+                const is_project = $('input[name="request_scope"]:checked').val() === 'project';
+                const ship_id = is_project
+                    ? $('select[name="project_id"] option:selected').data('ship-id')
+                    : $('select[name="ship_id"]').val();
+                const options = dock_options_by_ship[ship_id] || {};
+                const select = $('select[name="requested_docking_space_id"]');
+                let compatible_count = 0;
+                let cleared = false;
+
+                select.find('option[value!=""]').each(function () {
+                    const result = options[this.value];
+                    const compatible = !!result && result.is_compatible;
+                    this.disabled = !compatible;
+                    this.textContent = $(this).data('label') + (result && !compatible ? ' - ' + result.reason : '');
+                    if (compatible) {
+                        compatible_count++;
+                    }
+                    if (this.selected && !compatible) {
+                        cleared = true;
+                    }
+                });
+
+                if (cleared) {
+                    select.val('');
+                }
+
+                $('#dock-compatibility-hint').text(!ship_id
+                    ? 'Pilih kapal terlebih dahulu untuk melihat dok yang sesuai.'
+                    : (cleared ? 'Preferensi sebelumnya tidak sesuai untuk kapal ini dan telah dikosongkan. ' : '')
+                        + compatible_count + ' dok sesuai spesifikasi. Ketersediaan jadwal diperiksa kembali saat permohonan dikirim.');
+            }
+
             function formatDuration(startDate, endDate) {
                 if (!startDate || !endDate) {
                     return null;
@@ -319,11 +356,36 @@ unset($__errorArgs, $__bag); ?>
                 updateSummary();
             });
 
-            $('select[name="project_id"], select[name="ship_id"], select[name="requested_docking_space_id"], input[name="requested_start_at"], input[name="requested_end_at"]').on('change input', updateSummary);
+            $('select[name="project_id"], select[name="ship_id"]').on('change', function () {
+                update_dock_options();
+                updateSummary();
+            });
+            $('input[name="request_scope"]').on('change', function () {
+                update_dock_options();
+                updateSummary();
+            });
+            $('select[name="requested_docking_space_id"]').on('change', function () {
+                updateSummary();
+            });
+            // Delegated: Vanilla Calendar Pro swaps these inputs after this script runs.
+            $('#docking-request-form').on('change', 'input[name="requested_start_at"], input[name="requested_end_at"]', function () {
+                updateSummary();
+                docking_request_validator.element(this);
+            });
             toggleRequestScope();
+            update_dock_options();
             updateSummary();
 
-            $('#docking-request-form').validate({
+            $('#docking-request-form').on('reset', function () {
+                setTimeout(function () {
+                    toggleRequestScope();
+                    update_dock_options();
+                    updateSummary();
+                }, 0);
+            });
+
+            const docking_request_validator = $('#docking-request-form').validate({
+                ignore: ':hidden:not(.js-date-value)',
                 errorClass: 'is-invalid',
                 validClass: 'is-valid',
                 errorElement: 'div',
@@ -333,9 +395,11 @@ unset($__errorArgs, $__bag); ?>
                 },
                 highlight: function (element) {
                     $(element).addClass('is-invalid').removeClass('is-valid');
+                    $(element).siblings('.js-date-display').addClass('is-invalid');
                 },
                 unhighlight: function (element) {
                     $(element).removeClass('is-invalid').addClass('is-valid');
+                    $(element).siblings('.js-date-display').removeClass('is-invalid');
                 },
                 rules: {
                     project_id: { required: true },

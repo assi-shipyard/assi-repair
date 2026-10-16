@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DockingApprovalController;
 use App\Http\Controllers\DockingDashboardController;
 use App\Http\Controllers\DockingManagementController;
+use App\Http\Controllers\DockingVisitController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\NotificationFlagController;
@@ -314,7 +315,6 @@ Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): v
         Route::post('/docking-space-request/{docking_request}/postpone', 'postpone_docking')->name('docking-space-request.postpone.store');
         Route::post('/docking-space-request/{docking_request}/cancel', 'cancel_request')->name('docking-space-request.cancel');
         Route::get('/docking-space-request/{docking_request}/documents/{document}', 'download_request_document')->name('docking-space-request.documents.download');
-        Route::post('/docking-space-request/{docking_request}/start-docking', 'start_docking')->name('docking-space-request.start-docking');
 
         Route::get('/docking-space-availability', 'docking_space_availability')->name('docking-space-availability');
 
@@ -322,6 +322,16 @@ Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): v
         Route::get('/ship-docking/history', 'docking_history')->name('ship-docking.history');
         Route::post('/ship-docking/occupancy/{occupancy}/undock-to-floating', 'undock_to_floating')->name('ship-docking.undock-to-floating');
         Route::post('/ship-docking/occupancy/{occupancy}/complete-floating', 'complete_floating')->name('ship-docking.complete-floating');
+    });
+
+    Route::controller(DockingVisitController::class)->prefix('docking-space-request/{docking_request}')->whereUuid('docking_request')->name('docking-space-request.')->group(function (): void {
+        Route::get('/', 'show')->name('show');
+        Route::post('/arrival', 'record_arrival')->name('arrival');
+        Route::post('/start-docking', 'dock_in')->name('start-docking');
+        Route::post('/undock', 'undock')->name('undock');
+        Route::post('/complete-floating', 'complete_floating')->name('complete-floating');
+        Route::post('/administration', 'confirm_administration')->name('administration');
+        Route::post('/depart', 'depart')->name('depart');
     });
 
     Route::view('/division', 'examples.placeholder', [

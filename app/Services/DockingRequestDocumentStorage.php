@@ -17,6 +17,8 @@ class DockingRequestDocumentStorage
 
     private const REJECTED_ROOT = 'docking-request/rejected';
 
+    private const CANCELLED_ROOT = 'docking-request/cancelled';
+
     public function store_pending(ProjectDockingRequest $docking_request, UploadedFile $file): string
     {
         // Random stored name; the client file name is never used on disk.
@@ -31,6 +33,18 @@ class DockingRequestDocumentStorage
     public function move_to_rejected(ProjectDockingRequest $docking_request): void
     {
         $this->move_documents($docking_request, self::REJECTED_ROOT.'/'.$docking_request->unique_id);
+    }
+
+    /**
+     * Only files still in the pending folder are archived; files already moved to a project folder stay with the project.
+     */
+    public function move_to_cancelled(ProjectDockingRequest $docking_request): void
+    {
+        $pending_prefix = self::PENDING_ROOT.'/'.$docking_request->unique_id.'/';
+        $pending_documents = $docking_request->documents
+            ->filter(fn (DockingRequestDocument $document): bool => str_starts_with($document->document_path, $pending_prefix));
+
+        $this->move_documents($docking_request->setRelation('documents', $pending_documents), self::CANCELLED_ROOT.'/'.$docking_request->unique_id);
     }
 
     /**

@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Company;
 use App\Models\DockingOccupancy;
 use App\Models\DockingSpace;
+use App\Models\FloatingRepairHistory;
+use App\Models\Project;
 use App\Models\ProjectDockingRequest;
 use App\Models\Ship;
 use App\Models\User;
@@ -69,6 +71,45 @@ class DockingRequestApprovalTest extends TestCase
         $this->assertSame('submitted', $request->request_status);
         $this->assertSame($space->id, $request->requested_docking_space_id);
         $this->assertCount(1, $request->documents);
+    }
+
+    public function test_request_form_defaults_to_ship_and_provides_ship_specific_dock_options(): void
+    {
+        $space = $this->make_space();
+        $small_ship = $this->make_ship();
+        $large_ship = $this->make_ship(['name' => 'KM Besar', 'length_overall' => 150]);
+
+        $this->actingAs($this->make_user('111111111'))
+            ->get(route('docking-space-request.create'))
+            ->assertOk()
+            ->assertSeeInOrder(['Kapal (Vessel)', 'Proyek yang sudah ada'])
+            ->assertSee('id="request_scope_ship" value="ship" checked', false)
+            ->assertSee('Repair List dari Owner', false)
+            ->assertSee('data-date-display="long"', false)
+            ->assertViewHas('dock_options_by_ship', function ($options) use ($small_ship, $large_ship, $space): bool {
+                return $options[$small_ship->id][$space->id]['is_compatible']
+                    && ! $options[$large_ship->id][$space->id]['is_compatible'];
+            });
+    }
+
+    public function test_owner_repair_list_is_stored_with_ship_particular(): void
+    {
+        Storage::fake('ship');
+        $this->make_space();
+
+        $this->actingAs($this->make_user('111111111'))
+            ->post(route('docking-space-request.store'), $this->payload($this->make_ship(), [
+                'documents' => [
+                    ['type' => 'ship_particular', 'file' => UploadedFile::fake()->create('particular.pdf', 10, 'application/pdf')],
+                    ['type' => 'owner_repair_list', 'file' => UploadedFile::fake()->create('repair-list.xlsx', 10, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+                ],
+            ]))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('docking_request_documents', [
+            'document_type' => 'owner_repair_list',
+            'document_name' => 'Repair List dari Owner',
+        ]);
     }
 
     public function test_schedule_conflict_is_rejected(): void
@@ -178,7 +219,7 @@ class DockingRequestApprovalTest extends TestCase
         $user = $this->make_user('222222222', 'approve-docking-engineering');
         $this->actingAs($user)->post(route('docking-space-request.store'), $this->payload($this->make_ship()));
 
-        $this->actingAs($user)->get(route('docking-space-request.index'))->assertOk()->assertSee('Tinjau detail')->assertDontSee('Setujui (Engineering)');
+        $this->actingAs($user)->get(route('docking-space-request.index'))->assertOk()->assertSee('Tinjau Engineering')->assertDontSee('Setujui (Engineering)');
         $this->actingAs($user)->get(route('docking-space-request.create'))->assertOk();
     }
 
@@ -453,5 +494,203 @@ class DockingRequestApprovalTest extends TestCase
             ->post(route('docking-space-request.postpone.store', $request->unique_id), [
                 'new_start_at' => '2027-03-01 08:00', 'new_end_at' => '2027-03-11 08:00', 'reason' => 'Uji.',
             ])->assertSessionHas('error');
+    }
+
+    public function test_pending_request_cancel_requires_reason_and_archives_files(): void
+    {
+        [$request, $marketing, $producer] = $this->request_awaiting_production();
+        $old_path = $request->documents()->first()->document_path;
+
+        $this->actingAs($marketing)->get(route('docking-space-request.index'))
+            ->assertOk()->assertSee('cancel-request-modal', false)->assertSee('Batalkan permohonan');
+
+        $this->actingAs($marketing)
+            ->post(route('docking-space-request.cancel', $request->unique_id), ['cancellation_reason' => ''])
+            ->assertSessionHasErrors('cancellation_reason');
+
+        $this->actingAs($producer)
+            ->post(route('docking-space-request.cancel', $request->unique_id), ['cancellation_reason' => 'Bukan pemohon.'])
+            ->assertSessionHas('error');
+        $this->assertSame('engineering_approved', $request->fresh()->request_status);
+
+        $this->actingAs($marketing)
+            ->post(route('docking-space-request.cancel', $request->unique_id), ['cancellation_reason' => 'Owner batal docking.'])
+            ->assertSessionHas('success');
+
+        $fresh = $request->fresh();
+        $this->assertSame('cancelled', $fresh->request_status);
+        $this->assertSame('Owner batal docking.', $fresh->cancellation_reason);
+        $this->assertSame($marketing->id, $fresh->cancelled_by);
+        $this->assertNotNull($fresh->cancelled_at);
+
+        $new_path = $fresh->documents()->first()->document_path;
+        $this->assertStringStartsWith('docking-request/cancelled/'.$request->unique_id.'/', $new_path);
+        Storage::disk('ship')->assertExists($new_path);
+        Storage::disk('ship')->assertMissing($old_path);
+
+        $this->actingAs($marketing)->get(route('docking-space-request.index', ['tab' => 'selesai']))
+            ->assertOk()->assertSee('Owner batal docking.');
+    }
+
+    public function test_approved_request_cancel_releases_scheduled_slot(): void
+    {
+        [$request, $marketing] = $this->approved_request();
+        $this->assertSame(1, DockingOccupancy::where('occupancy_status', 'scheduled')->count());
+
+        $this->actingAs($marketing)
+            ->post(route('docking-space-request.cancel', $request->unique_id), ['cancellation_reason' => 'Owner pindah galangan.'])
+            ->assertSessionHas('success');
+
+        $this->assertSame('cancelled', $request->fresh()->request_status);
+        $this->assertSame(0, DockingOccupancy::where('occupancy_status', 'scheduled')->count());
+        $this->assertSame(1, DockingOccupancy::where('occupancy_status', 'cancelled')->count());
+    }
+
+    public function test_docked_request_cannot_be_cancelled(): void
+    {
+        [$request, $marketing] = $this->approved_request();
+        DockingOccupancy::query()->update(['occupancy_status' => 'occupied']);
+
+        $this->actingAs($marketing)
+            ->post(route('docking-space-request.cancel', $request->unique_id), ['cancellation_reason' => 'Coba batal.'])
+            ->assertSessionHas('error');
+
+        $this->assertSame('approved', $request->fresh()->request_status);
+        $this->actingAs($marketing)->get(route('docking-space-request.index'))
+            ->assertOk()->assertDontSee('data-bs-target="#cancel-request-modal"', false);
+    }
+
+    private function at(string $modifier): string
+    {
+        return now()->modify($modifier)->format('Y-m-d H:i');
+    }
+
+    public function test_full_visit_lifecycle_with_floating_repair_and_departure_rules(): void
+    {
+        [$request, $marketing] = $this->approved_request();
+        $operator = $this->make_user('444444444', 'docking.manage');
+        $this->assertSame('awaiting_arrival', $request->visit_stage);
+
+        $this->actingAs($operator)->post(route('docking-space-request.start-docking', $request->unique_id), ['docked_at' => $this->at('-5 hours')])
+            ->assertSessionHas('error');
+
+        $this->actingAs($operator)->post(route('docking-space-request.arrival', $request->unique_id), ['arrived_at' => $this->at('-6 hours')])
+            ->assertRedirect(route('docking-space-request.show', $request->unique_id));
+        $this->assertSame('arrived', $request->fresh()->visit_stage);
+
+        $this->actingAs($operator)->post(route('docking-space-request.start-docking', $request->unique_id), [
+            'docking_space_id' => $request->fresh()->recommended_docking_space_id, 'docked_at' => $this->at('-5 hours'),
+        ])->assertSessionHas('success');
+        $this->assertSame('docked', $request->fresh()->visit_stage);
+        $this->assertSame(1, DockingOccupancy::where('project_docking_request_id', $request->id)->where('occupancy_status', 'occupied')->count());
+
+        $this->actingAs($marketing)->post(route('docking-space-request.cancel', $request->unique_id), ['cancellation_reason' => 'Tidak boleh lagi.'])
+            ->assertSessionHas('error');
+
+        $this->actingAs($operator)->post(route('docking-space-request.undock', $request->unique_id), [
+            'undocked_at' => $this->at('-3 hours'), 'next_step' => 'floating',
+        ])->assertSessionHasErrors('floating_started_at');
+
+        $this->actingAs($operator)->post(route('docking-space-request.undock', $request->unique_id), [
+            'undocked_at' => $this->at('-3 hours'), 'next_step' => 'floating', 'floating_started_at' => $this->at('-3 hours'),
+        ])->assertSessionHas('success');
+        $this->assertSame('floating', $request->fresh()->visit_stage);
+        $this->assertSame(1, FloatingRepairHistory::where('floating_status', 'active')->count());
+
+        $this->actingAs($operator)->get(route('docking-space-request.index', ['tab' => 'galangan']))
+            ->assertOk()->assertSee('Selesaikan atas air');
+
+        $this->actingAs($operator)->post(route('docking-space-request.complete-floating', $request->unique_id), ['floating_completed_at' => $this->at('-2 hours')])
+            ->assertSessionHas('success');
+        $this->assertSame('ready_to_depart', $request->fresh()->visit_stage);
+
+        $this->actingAs($operator)->post(route('docking-space-request.depart', $request->unique_id), ['departed_at' => $this->at('-1 hour')])
+            ->assertSessionHas('error');
+
+        $project = Project::create(['project_code' => 'RP-UJI-01', 'ship_id' => $request->ship_id, 'project_type' => 'Docking Repair', 'status' => 'In Progress', 'progress' => 90]);
+        $request->update(['project_id' => $project->id]);
+
+        $this->actingAs($marketing)->post(route('docking-space-request.administration', $request->unique_id), ['administration_notes' => 'BAST dan invoice lunas.'])
+            ->assertSessionHasErrors('administration_confirmed');
+        $this->actingAs($marketing)->post(route('docking-space-request.administration', $request->unique_id), [
+            'administration_notes' => 'BAST dan invoice lunas.', 'administration_confirmed' => '1',
+        ])->assertSessionHas('success');
+
+        $this->actingAs($operator)->get(route('docking-space-request.show', $request->unique_id))
+            ->assertOk()->assertSee('belum berstatus selesai');
+        $this->actingAs($operator)->post(route('docking-space-request.depart', $request->unique_id), ['departed_at' => $this->at('-1 hour')])
+            ->assertSessionHas('error');
+
+        $project->update(['status' => 'Completed']);
+        $this->actingAs($operator)->post(route('docking-space-request.depart', $request->unique_id), ['departed_at' => $this->at('-1 hour')])
+            ->assertSessionHas('success');
+
+        $fresh = $request->fresh();
+        $this->assertSame('completed', $fresh->request_status);
+        $this->assertSame('departed', $fresh->visit_stage);
+        $this->assertSame($operator->id, $fresh->departed_recorded_by);
+
+        $this->actingAs($operator)->get(route('docking-space-request.index', ['tab' => 'selesai']))
+            ->assertOk()->assertSee('KM Test');
+    }
+
+    public function test_undock_without_floating_goes_straight_to_ready_to_depart(): void
+    {
+        [$request] = $this->approved_request();
+        $operator = $this->make_user('444444444', 'docking.manage');
+
+        $this->actingAs($operator)->post(route('docking-space-request.arrival', $request->unique_id), ['arrived_at' => $this->at('-6 hours')]);
+        $this->actingAs($operator)->post(route('docking-space-request.start-docking', $request->unique_id), ['docked_at' => $this->at('-5 hours')]);
+        $this->actingAs($operator)->post(route('docking-space-request.undock', $request->unique_id), [
+            'undocked_at' => $this->at('-1 hour'), 'next_step' => 'ready_to_depart',
+        ])->assertSessionHas('success');
+
+        $this->assertSame('ready_to_depart', $request->fresh()->visit_stage);
+        $this->assertSame(0, FloatingRepairHistory::count());
+    }
+
+    public function test_visit_actions_require_operator_and_valid_dates(): void
+    {
+        [$request, $marketing] = $this->approved_request();
+        $operator = $this->make_user('444444444', 'docking.manage');
+
+        $this->actingAs($marketing)->post(route('docking-space-request.arrival', $request->unique_id), ['arrived_at' => $this->at('-1 hour')])
+            ->assertSessionHas('error');
+        $this->assertSame('awaiting_arrival', $request->fresh()->visit_stage);
+
+        $this->actingAs($operator)->post(route('docking-space-request.arrival', $request->unique_id), ['arrived_at' => $this->at('+2 days')])
+            ->assertSessionHasErrors('arrived_at');
+
+        $this->actingAs($operator)->post(route('docking-space-request.undock', $request->unique_id), [
+            'undocked_at' => $this->at('-1 hour'), 'next_step' => 'ready_to_depart',
+        ])->assertSessionHas('error');
+    }
+
+    public function test_detail_page_shows_lifecycle_actions_and_auto_opens_requested_modal(): void
+    {
+        [$request, $marketing] = $this->approved_request();
+        $operator = $this->make_user('444444444', 'docking.manage');
+
+        $this->actingAs($operator)->get(route('docking-space-request.show', ['docking_request' => $request->unique_id, 'action' => 'arrival']))
+            ->assertOk()->assertSee('visit-arrival-modal')->assertSee('Catat kedatangan kapal')->assertSee('"arrival"', false);
+
+        $this->actingAs($marketing)->get(route('docking-space-request.show', $request->unique_id))
+            ->assertOk()->assertDontSee('visit-arrival-modal')->assertSee('Batalkan permohonan')->assertSee('Tunda jadwal docking');
+
+        $this->get(route('docking-space-request.show', '00000000-0000-0000-0000-000000000000'))->assertNotFound();
+    }
+
+    public function test_index_lanes_filter_and_search(): void
+    {
+        [$request, $marketing] = $this->approved_request();
+
+        $this->actingAs($marketing)->get(route('docking-space-request.index'))
+            ->assertOk()->assertDontSee(route('docking-space-request.show', $request->unique_id));
+        $this->actingAs($marketing)->get(route('docking-space-request.index', ['tab' => 'kedatangan']))
+            ->assertOk()->assertSee(route('docking-space-request.show', $request->unique_id));
+        $this->actingAs($marketing)->get(route('docking-space-request.index', ['tab' => 'kedatangan', 'q' => 'Tidak Ada']))
+            ->assertOk()->assertSee('Tidak ada data yang cocok');
+        $this->actingAs($marketing)->get(route('docking-space-request.index', ['tab' => 'kedatangan', 'q' => 'KM Te']))
+            ->assertOk()->assertSee(route('docking-space-request.show', $request->unique_id));
     }
 }

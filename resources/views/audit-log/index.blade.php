@@ -97,7 +97,7 @@
                 </table>
             </div>
             <div class="card-footer">
-                {{ $audit_logs->links() }}
+                {{ $audit_logs->onEachSide(1)->links('accounts.partials.pagination') }}
             </div>
         </div>
     </div>

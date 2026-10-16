@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\DockingVisitException;
+use App\Http\Requests\Docking\CancelDockingRequest;
 use App\Http\Requests\Docking\CompleteFloatingRepairRequest;
 use App\Http\Requests\Docking\EvaluateDockingRequest;
 use App\Http\Requests\Docking\MarketingRecommendationResponseRequest;
 use App\Http\Requests\Docking\PostponeDockingRequest;
 use App\Http\Requests\Docking\ReviewDockingStageRequest;
 use App\Http\Requests\Docking\SaveDockingSpaceRequest;
-use App\Http\Requests\Docking\StartDockingOccupancyRequest;
 use App\Http\Requests\Docking\StoreProjectDockingRequest;
 use App\Http\Requests\Docking\UndockToFloatingRepairRequest;
 use App\Models\DockingCapacityEvaluation;
@@ -24,6 +25,7 @@ use App\Models\Ship;
 use App\Services\DockingCapacityService;
 use App\Services\DockingRequestCheckService;
 use App\Services\DockingRequestDocumentStorage;
+use App\Services\DockingVisitService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -83,7 +85,7 @@ class DockingManagementController extends Controller
         return redirect()->route('docking-space.index')->with('success', 'Docking space berhasil dihapus.');
     }
 
-    public function create_request(): \Illuminate\Contracts\View\View
+    public function create_request(DockingCapacityService $capacity_service): \Illuminate\Contracts\View\View
     {
         $projects = Project::with('ship')
             ->orderByDesc('created_at')
@@ -98,33 +100,79 @@ class DockingManagementController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('docking-space-request.create', compact('projects', 'ships', 'docking_spaces'));
+        $dock_options_by_ship = $ships->mapWithKeys(function (Ship $ship) use ($docking_spaces, $capacity_service): array {
+            return [$ship->id => $docking_spaces->mapWithKeys(function (DockingSpace $space) use ($ship, $capacity_service): array {
+                $evaluation = $capacity_service->evaluate_ship_for_space($ship, $space, 0);
+
+                return [$space->id => [
+                    'is_compatible' => $evaluation['is_compatible'],
+                    'reason' => implode(' ', $evaluation['violations']),
+                ]];
+            })];
+        });
+
+        return view('docking-space-request.create', compact('projects', 'ships', 'docking_spaces', 'dock_options_by_ship'));
     }
 
-    public function index_request(Request $request): \Illuminate\Contracts\View\View
+    public function index_request(Request $request, DockingVisitService $visit_service): \Illuminate\Contracts\View\View
     {
-        $status = trim((string) $request->query('status', ''));
+        $lanes = ['pengajuan', 'kedatangan', 'galangan', 'selesai', 'semua'];
+        $lane = in_array($request->query('tab'), $lanes, true) ? (string) $request->query('tab') : 'pengajuan';
+        $search = mb_substr(trim((string) $request->query('q', '')), 0, 100);
+
+        $apply_lane = function ($query, string $lane_key): void {
+            match ($lane_key) {
+                'pengajuan' => $query->whereIn('request_status', ProjectDockingRequest::PENDING_STATUSES),
+                'kedatangan' => $query->where('request_status', 'approved')
+                    ->where(fn ($builder) => $builder->whereNull('visit_stage')->orWhere('visit_stage', 'awaiting_arrival')),
+                'galangan' => $query->where('request_status', 'approved')->whereIn('visit_stage', ProjectDockingRequest::IN_YARD_STAGES),
+                'selesai' => $query->whereIn('request_status', ['completed', 'cancelled']),
+                default => $query->where('request_status', '!=', 'rejected'),
+            };
+        };
+
+        $lane_counts = collect($lanes)->mapWithKeys(function (string $lane_key) use ($apply_lane): array {
+            $query = ProjectDockingRequest::query();
+            $apply_lane($query, $lane_key);
+
+            return [$lane_key => $query->count()];
+        });
 
         $docking_requests = ProjectDockingRequest::with([
             'project',
-            'ship',
+            'ship.company',
             'requested_docking_space',
-            'documents',
-            'engineering_approver',
-            'production_approver',
+            'recommended_docking_space',
+            'canceller',
         ])
-            ->when($status !== '', function ($query) use ($status) {
-                $query->where('request_status', $status);
+            ->withCount('documents')
+            ->withExists(['docking_occupancies as has_started_docking' => function ($query): void {
+                $query->whereIn('occupancy_status', ['occupied', 'undocked']);
+            }])
+            ->withExists(['docking_occupancies as has_scheduled_slot' => function ($query): void {
+                $query->where('occupancy_status', 'scheduled');
+            }])
+            ->tap(fn ($query) => $apply_lane($query, $lane))
+            ->when($search !== '', function ($query) use ($search): void {
+                $like = '%' . addcslashes($search, '%_\\') . '%';
+                $query->where(function ($builder) use ($like): void {
+                    $builder->whereHas('ship', fn ($ship) => $ship->where('name', 'like', $like))
+                        ->orWhereHas('project', fn ($project) => $project->where('project_code', 'like', $like));
+                });
             })
-            ->orderByDesc('requested_start_at')
-            ->orderByDesc('created_at')
-            ->get();
+            ->when(
+                $lane === 'selesai',
+                fn ($query) => $query->orderByDesc('updated_at'),
+                fn ($query) => $query->orderBy('requested_start_at')->orderBy('created_at')
+            )
+            ->paginate(20)
+            ->withQueryString();
 
-        $docking_spaces = DockingSpace::query()
-            ->orderBy('name')
-            ->get();
+        $departure_blockers = $docking_requests->getCollection()
+            ->filter(fn (ProjectDockingRequest $item): bool => $item->is_in_yard())
+            ->mapWithKeys(fn (ProjectDockingRequest $item): array => [$item->id => $visit_service->departure_blockers($item)]);
 
-        return view('docking-space-request.index', compact('docking_requests', 'status', 'docking_spaces'));
+        return view('docking-space-request.index', compact('docking_requests', 'lane', 'lane_counts', 'search', 'departure_blockers'));
     }
 
     public function rejected_requests(Request $request): \Illuminate\Contracts\View\View
@@ -350,6 +398,7 @@ class DockingManagementController extends Controller
         DB::transaction(function () use ($docking_request, $data, $user_id, $docking_space): void {
             $docking_request->update([
                 'request_status' => 'approved',
+                'visit_stage' => 'awaiting_arrival',
                 'production_approved_by' => $user_id,
                 'production_approved_at' => now(),
                 'production_notes' => $data['notes'] ?? null,
@@ -562,7 +611,7 @@ class DockingManagementController extends Controller
 
         $has_scheduled = $docking_request->docking_occupancies()->where('occupancy_status', 'scheduled')->exists();
 
-        if ($docking_request->request_status !== 'approved' || ! $has_scheduled) {
+        if (! $docking_request->is_before_docking() || ! $has_scheduled) {
             return redirect()->route('docking-space-request.index')->with('error', 'Hanya permohonan disetujui yang kapalnya belum masuk dock yang dapat ditunda.');
         }
 
@@ -578,24 +627,49 @@ class DockingManagementController extends Controller
         return max(60, (int) $docking_request->requested_start_at->diffInMinutes($docking_request->requested_end_at));
     }
 
-    public function cancel_request(Request $request, string $docking_request): RedirectResponse
+    public function cancel_request(CancelDockingRequest $request, string $docking_request, DockingRequestDocumentStorage $document_storage): RedirectResponse
     {
-        $docking_request = $this->find_docking_request($docking_request);
+        $docking_request = $this->find_docking_request($docking_request, ['documents']);
         $user = $request->user();
 
-        $is_owner = $user !== null && (int) $docking_request->requested_by === (int) $user->id;
-
-        if (! $is_owner && ! $user?->hasRole('admin')) {
-            return back()->with('error', 'Hanya pemohon yang dapat membatalkan permohonan ini.');
+        if (! $docking_request->is_managed_by($user)) {
+            return back()->with('error', 'Hanya pemohon atau admin yang dapat membatalkan permohonan ini.');
         }
 
-        if (! in_array($docking_request->request_status, ProjectDockingRequest::PENDING_STATUSES, true)) {
-            return back()->with('error', 'Permohonan yang sudah diputuskan tidak dapat dibatalkan.');
+        $has_started = $docking_request->docking_occupancies()
+            ->whereIn('occupancy_status', ['occupied', 'undocked'])
+            ->exists();
+
+        if ($has_started || in_array($docking_request->visit_stage, ['docked', 'floating', 'ready_to_depart', 'departed'], true)) {
+            return back()->with('error', 'Kapal sudah masuk dock sehingga permohonan tidak dapat dibatalkan.');
         }
 
-        $docking_request->update(['request_status' => 'cancelled']);
+        if (! $docking_request->is_cancellable()) {
+            return back()->with('error', 'Permohonan dengan status ini tidak dapat dibatalkan.');
+        }
 
-        return back()->with('success', 'Permohonan docking dibatalkan.');
+        $reason = $request->validated('cancellation_reason');
+
+        DB::transaction(function () use ($docking_request, $user, $reason, $document_storage): void {
+            $docking_request->update([
+                'request_status' => 'cancelled',
+                'cancelled_by' => $user->id,
+                'cancelled_at' => now(),
+                'cancellation_reason' => $reason,
+            ]);
+
+            $docking_request->docking_occupancies()
+                ->where('occupancy_status', 'scheduled')
+                ->update([
+                    'occupancy_status' => 'cancelled',
+                    'remarks' => 'Jadwal dilepas karena permohonan docking dibatalkan.',
+                    'updated_at' => now(),
+                ]);
+
+            $document_storage->move_to_cancelled($docking_request);
+        });
+
+        return back()->with('success', 'Permohonan docking untuk kapal ' . ($docking_request->ship?->name ?? '-') . ' berhasil dibatalkan.');
     }
 
     public function download_request_document(Request $request, string $docking_request, string $document): StreamedResponse|RedirectResponse
@@ -653,112 +727,25 @@ class DockingManagementController extends Controller
         return back()->with('success', 'Evaluasi kapasitas docking space berhasil diperbarui.');
     }
 
-    public function start_docking(StartDockingOccupancyRequest $request, string $docking_request, DockingCapacityService $docking_capacity_service): RedirectResponse
+    public function undock_to_floating(UndockToFloatingRepairRequest $request, string $occupancy, DockingVisitService $visit_service): RedirectResponse
     {
         if ($response = $this->ensure_docking_operator($request)) {
             return $response;
         }
 
-        $docking_request = $this->find_docking_request($docking_request, ['ship']);
-
-        if ($docking_request->request_status !== 'approved') {
-            return back()->with('error', 'Permohonan harus berstatus disetujui sebelum kapal dapat masuk dock.');
-        }
-
+        $occupancy = $this->find_docking_occupancy($occupancy, ['docking_request']);
         $data = $request->validated();
-        $docking_space_id = isset($data['docking_space_id'])
-            ? (int) $data['docking_space_id']
-            : (int) ($docking_request->effective_docking_space_id() ?? 0);
 
-        if ($docking_space_id <= 0) {
-            return back()->with('error', 'Docking space untuk pelaksanaan docking belum ditentukan.');
+        try {
+            $visit_service->undock_occupancy($occupancy, $data['undocked_at'], true, $data['floating_started_at'] ?? null, $data['notes'] ?? null, (int) $request->user()->id);
+        } catch (DockingVisitException $exception) {
+            return back()->with('error', $exception->getMessage());
         }
-
-        $has_conflict = app(DockingRequestCheckService::class)->has_schedule_conflict(
-            $docking_space_id,
-            (string) $data['docked_at'],
-            $data['estimated_undock_at'] ?? null,
-            $docking_request->id
-        );
-
-        if ($has_conflict) {
-            return back()->with('error', 'Pelaksanaan docking bentrok dengan jadwal docking lain pada docking space yang dipilih.');
-        }
-
-        $docking_space = DockingSpace::findOrFail($docking_space_id);
-        $evaluation = $docking_capacity_service->evaluate_ship_for_space($docking_request->ship, $docking_space);
-
-        if (! ($evaluation['is_compatible'] ?? false)) {
-            return back()->with('error', 'Docking space tidak kompatibel untuk kapal ini. Periksa hasil evaluasi kapasitas.');
-        }
-
-        $user_id = $request->user()?->id;
-
-        DB::transaction(function () use ($docking_request, $docking_space_id, $data, $user_id): void {
-            DockingOccupancy::query()
-                ->where('project_docking_request_id', $docking_request->id)
-                ->where('occupancy_status', 'scheduled')
-                ->update([
-                    'occupancy_status' => 'cancelled',
-                    'remarks' => 'Jadwal lama dibatalkan karena realisasi docking terbaru.',
-                    'updated_at' => now(),
-                ]);
-
-            DockingOccupancy::create([
-                'project_id' => $docking_request->project_id,
-                'ship_id' => $docking_request->ship_id,
-                'docking_space_id' => $docking_space_id,
-                'project_docking_request_id' => $docking_request->id,
-                'docked_at' => $data['docked_at'],
-                'estimated_undock_at' => $data['estimated_undock_at'] ?? null,
-                'undocked_at' => null,
-                'occupancy_status' => 'occupied',
-                'remarks' => $data['remarks'] ?? null,
-                'created_by' => $user_id,
-            ]);
-        });
-
-        return back()->with('success', 'Status okupansi kapal berhasil diubah menjadi sedang docking.');
-    }
-
-    public function undock_to_floating(UndockToFloatingRepairRequest $request, string $occupancy): RedirectResponse
-    {
-        if ($response = $this->ensure_docking_operator($request)) {
-            return $response;
-        }
-
-        $occupancy = $this->find_docking_occupancy($occupancy, ['project', 'ship']);
-
-        if ($occupancy->occupancy_status !== 'occupied' || $occupancy->undocked_at !== null) {
-            return back()->with('error', 'Data okupansi sudah tidak aktif untuk proses undock.');
-        }
-
-        $data = $request->validated();
-        $floating_started_at = $data['floating_started_at'] ?? $data['undocked_at'];
-        $user_id = $request->user()?->id;
-
-        DB::transaction(function () use ($occupancy, $data, $floating_started_at, $user_id): void {
-            $occupancy->update([
-                'undocked_at' => $data['undocked_at'],
-                'occupancy_status' => 'undocked',
-                'remarks' => $data['notes'] ?? $occupancy->remarks,
-            ]);
-
-            FloatingRepairHistory::create([
-                'project_id' => $occupancy->project_id,
-                'ship_id' => $occupancy->ship_id,
-                'docking_occupancy_id' => $occupancy->id,
-                'floating_started_at' => $floating_started_at,
-                'floating_status' => 'active',
-                'notes' => $data['notes'] ?? null,
-                'created_by' => $user_id,
-            ]);
-        });
 
         return back()->with('success', 'Kapal berhasil diundock dan riwayat floating repair aktif telah dibuat.');
     }
 
-    public function complete_floating(CompleteFloatingRepairRequest $request, string $occupancy): RedirectResponse
+    public function complete_floating(CompleteFloatingRepairRequest $request, string $occupancy, DockingVisitService $visit_service): RedirectResponse
     {
         if ($response = $this->ensure_docking_operator($request)) {
             return $response;
@@ -767,6 +754,7 @@ class DockingManagementController extends Controller
         $occupancy = $this->find_docking_occupancy($occupancy);
 
         $floating_history = FloatingRepairHistory::query()
+            ->with('docking_occupancy.docking_request')
             ->where('docking_occupancy_id', $occupancy->id)
             ->where('floating_status', 'active')
             ->latest('floating_started_at')
@@ -778,11 +766,11 @@ class DockingManagementController extends Controller
 
         $data = $request->validated();
 
-        $floating_history->update([
-            'floating_completed_at' => $data['floating_completed_at'],
-            'floating_status' => 'completed',
-            'notes' => $data['notes'] ?? $floating_history->notes,
-        ]);
+        try {
+            $visit_service->complete_floating_history($floating_history, $data['floating_completed_at'], $data['notes'] ?? null);
+        } catch (DockingVisitException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
 
         return back()->with('success', 'Riwayat floating repair berhasil diselesaikan.');
     }
@@ -929,7 +917,7 @@ class DockingManagementController extends Controller
     public function current_docking(): \Illuminate\Contracts\View\View
     {
         $current_occupancies = DockingOccupancy::with(['project', 'ship', 'docking_space'])
-            ->current()
+            ->where('occupancy_status', 'occupied')->whereNull('undocked_at')
             ->orderByDesc('docked_at')
             ->get();
 

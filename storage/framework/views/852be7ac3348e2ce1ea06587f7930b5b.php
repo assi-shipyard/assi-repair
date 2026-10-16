@@ -1,8 +1,11 @@
 <?php $__env->startSection('title', 'Daftar Permohonan Docking Space'); ?>
-<?php $__env->startSection('body_title', 'Daftar Permohonan Docking Space'); ?>
+<?php $__env->startSection('body_title', 'Permohonan & Kunjungan Docking'); ?>
 
 <?php $__env->startSection('buttons_beside_title'); ?>
-    <a href="<?php echo e(route('docking-space-request.create')); ?>" class="btn btn-primary">Permohonan Baru</a>
+    <div class="btn-list">
+        <a href="<?php echo e(route('docking-space-request.rejected')); ?>" class="btn btn-outline-secondary"><i class="ti ti-ban me-1"></i>Request ditolak</a>
+        <a href="<?php echo e(route('docking-space-request.create')); ?>" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Permohonan baru</a>
+    </div>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('content'); ?>
@@ -10,348 +13,224 @@
 
     <?php
         $current_user = auth()->user();
-        $can_manage_docking = $current_user?->hasRole('admin')
-            || $current_user?->can('docking.manage')
-            || $current_user?->can('project.manage')
-            || $current_user?->can('project.update');
-        $can_approve_engineering = $current_user?->hasRole('admin') || $current_user?->can('approve-docking-engineering');
-        $can_approve_production = $current_user?->hasRole('admin') || $current_user?->can('approve-docking-production');
+        $can_operate = $current_user->hasRole('admin')
+            || $current_user->can('docking.manage')
+            || $current_user->can('project.manage')
+            || $current_user->can('project.update');
+        $can_approve_engineering = $current_user->hasRole('admin') || $current_user->can('approve-docking-engineering');
+        $can_approve_production = $current_user->hasRole('admin') || $current_user->can('approve-docking-production');
 
-        $status_labels = [
-            'submitted' => 'Menunggu Engineering',
-            'engineering_approved' => 'Menunggu Produksi',
-            'awaiting_marketing' => 'Menunggu Konfirmasi Marketing',
-            'approved' => 'Disetujui / menunggu kedatangan',
-            'rejected' => 'Ditolak',
-            'cancelled' => 'Dibatalkan',
+        $lane_tabs = [
+            'pengajuan' => ['label' => 'Pengajuan', 'icon' => 'ti-file-description', 'hint' => 'Menunggu pemeriksaan Engineering, Produksi, atau konfirmasi Marketing.'],
+            'kedatangan' => ['label' => 'Menunggu kedatangan', 'icon' => 'ti-calendar-event', 'hint' => 'Disetujui dan slot dock sudah dipesan. Catat kedatangan saat kapal tiba.'],
+            'galangan' => ['label' => 'Di galangan', 'icon' => 'ti-anchor', 'hint' => 'Kapal sudah tiba: menunggu dock, di dalam dock, pekerjaan atas air, atau menunggu keluar galangan.'],
+            'selesai' => ['label' => 'Selesai & batal', 'icon' => 'ti-flag-check', 'hint' => 'Kapal sudah keluar galangan atau permohonan dibatalkan.'],
+            'semua' => ['label' => 'Semua', 'icon' => 'ti-list', 'hint' => 'Seluruh permohonan kecuali yang ditolak.'],
         ];
 
-        $status_badges = [
-            'submitted' => 'bg-blue-lt text-blue',
-            'engineering_approved' => 'bg-amber-lt text-amber',
-            'awaiting_marketing' => 'bg-orange-lt text-orange',
-            'approved' => 'bg-success-lt text-success',
-            'rejected' => 'bg-red-lt text-red',
-            'cancelled' => 'bg-secondary-lt text-secondary',
+        $stage_badges = [
+            'submitted' => 'bg-blue-lt',
+            'engineering_approved' => 'bg-azure-lt',
+            'awaiting_marketing' => 'bg-orange-lt',
+            'awaiting_arrival' => 'bg-cyan-lt',
+            'arrived' => 'bg-indigo-lt',
+            'docked' => 'bg-purple-lt',
+            'floating' => 'bg-teal-lt',
+            'ready_to_depart' => 'bg-lime-lt',
+            'completed' => 'bg-success-lt',
+            'cancelled' => 'bg-secondary-lt',
         ];
-
-        $status_counts = [
-            'submitted' => 0,
-            'engineering_approved' => 0,
-            'approved' => 0,
-            'rejected' => 0,
-            'cancelled' => 0,
-        ];
-
-        foreach ($docking_requests as $docking_request) {
-            if (isset($status_counts[$docking_request->request_status])) {
-                $status_counts[$docking_request->request_status]++;
-            }
-        }
     ?>
 
-    <div class="row g-3 mb-3">
-        <div class="col-md-3">
-            <div class="card h-100 border-0 bg-primary-lt shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <div class="text-muted small">Menunggu Engineering</div>
-                            <div class="fw-bold fs-2 mb-0"><?php echo e($status_counts['submitted']); ?></div>
-                        </div>
-                        <span class="avatar bg-primary text-white"><i class="ti ti-send"></i></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100 border-0 bg-amber-lt shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <div class="text-muted small">Menunggu Produksi</div>
-                            <div class="fw-bold fs-2 mb-0"><?php echo e($status_counts['engineering_approved']); ?></div>
-                        </div>
-                        <span class="avatar bg-amber text-white"><i class="ti ti-search"></i></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100 border-0 bg-success-lt shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <div class="text-muted small">Disetujui</div>
-                            <div class="fw-bold fs-2 mb-0"><?php echo e($status_counts['approved']); ?></div>
-                        </div>
-                        <span class="avatar bg-success text-white"><i class="ti ti-check"></i></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100 border-0 bg-secondary-lt shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <div class="text-muted small">Selesai / ditolak</div>
-                            <div class="fw-bold fs-2 mb-0"><?php echo e($status_counts['rejected'] + $status_counts['cancelled']); ?></div>
-                        </div>
-                        <span class="avatar bg-secondary text-white"><i class="ti ti-flag"></i></span>
-                    </div>
-                </div>
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap align-items-center gap-2 small text-secondary">
+                <span class="fw-medium text-body me-1"><i class="ti ti-route me-1"></i>Alur kapal:</span>
+                <span>1. Pengajuan</span><i class="ti ti-chevron-right"></i>
+                <span>2. Persetujuan Engineering &amp; Produksi</span><i class="ti ti-chevron-right"></i>
+                <span>3. Tiba di galangan</span><i class="ti ti-chevron-right"></i>
+                <span>4. Masuk dock</span><i class="ti ti-chevron-right"></i>
+                <span>5. Undocking / pekerjaan atas air</span><i class="ti ti-chevron-right"></i>
+                <span>6. Keluar galangan <span class="text-muted">(proyek selesai + administrasi tuntas)</span></span>
             </div>
         </div>
     </div>
 
-    <form class="card mb-3 shadow-sm" method="GET" action="<?php echo e(route('docking-space-request.index')); ?>">
-        <div class="card-body">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label">Filter Status SOP</label>
-                    <select name="status" class="form-select">
-                        <option value="">Semua Tahap</option>
-                        <?php $__currentLoopData = array_keys($status_labels); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item_status): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                            <option value="<?php echo e($item_status); ?>" <?php if($status === $item_status): echo 'selected'; endif; ?>><?php echo e($status_labels[$item_status] ?? strtoupper($item_status)); ?></option>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <button class="btn btn-outline-primary w-100" type="submit">Terapkan</button>
-                </div>
-            </div>
-        </div>
-    </form>
+    <div class="card">
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs flex-nowrap overflow-auto" role="tablist">
+                <?php $__currentLoopData = $lane_tabs; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $lane_key => $lane_tab): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <li class="nav-item">
+                        <a href="<?php echo e(route('docking-space-request.index', array_filter(['tab' => $lane_key, 'q' => $search]))); ?>"
+                            class="nav-link text-nowrap <?php echo e($lane === $lane_key ? 'active' : ''); ?>" <?php if($lane === $lane_key): ?> aria-current="page" <?php endif; ?>>
+                            <i class="ti <?php echo e($lane_tab['icon']); ?> me-1"></i><?php echo e($lane_tab['label']); ?>
 
-    <div class="card shadow-sm">
-        <div class="card-header border-0">
-            <div>
-                <h3 class="card-title mb-1">Timeline permohonan docking</h3>
-                <div class="text-secondary">1) Pemeriksaan sistem, 2) persetujuan Engineering, 3) persetujuan Produksi, 4) menunggu kedatangan kapal &amp; masuk dock</div>
+                            <span class="badge <?php echo e($lane === $lane_key ? 'bg-primary text-primary-fg' : 'bg-secondary-lt'); ?> ms-2"><?php echo e($lane_counts[$lane_key]); ?></span>
+                        </a>
+                    </li>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </ul>
+        </div>
+        <div class="card-body border-bottom py-3">
+            <div class="row g-2 align-items-center">
+                <div class="col-lg">
+                    <div class="text-secondary small"><i class="ti ti-info-circle me-1"></i><?php echo e($lane_tabs[$lane]['hint']); ?></div>
+                </div>
+                <div class="col-lg-auto">
+                    <form method="GET" action="<?php echo e(route('docking-space-request.index')); ?>" class="d-flex gap-2" role="search">
+                        <input type="hidden" name="tab" value="<?php echo e($lane); ?>">
+                        <div class="input-icon">
+                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                            <input type="search" name="q" value="<?php echo e($search); ?>" maxlength="100" class="form-control" placeholder="Cari kapal / kode proyek" aria-label="Cari kapal atau kode proyek">
+                        </div>
+                        <button class="btn btn-outline-primary" type="submit">Cari</button>
+                        <?php if($search !== ''): ?>
+                            <a href="<?php echo e(route('docking-space-request.index', ['tab' => $lane])); ?>" class="btn btn-link link-secondary px-2">Reset</a>
+                        <?php endif; ?>
+                    </form>
+                </div>
             </div>
         </div>
+
         <div class="table-responsive">
             <table class="table table-vcenter card-table">
                 <thead>
                     <tr>
-                        <th>Proyek / Ship</th>
-                        <th>Jadwal</th>
-                        <th>Docking Space</th>
-                        <th>Status &amp; Persetujuan</th>
-                        <th>Dokumen</th>
-                        <th>Aksi</th>
+                        <th>Kapal &amp; proyek</th>
+                        <th>Jadwal docking</th>
+                        <th>Docking space</th>
+                        <th class="w-25">Tahap</th>
+                        <th class="w-1 text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php $__empty_1 = true; $__currentLoopData = $docking_requests; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $docking_request): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                         <?php
-                            $status_key = $docking_request->request_status;
-                            $status_label = $status_labels[$status_key] ?? strtoupper($status_key);
-                            $status_badge = $status_badges[$status_key] ?? 'bg-secondary-lt text-secondary';
+                            $stage_key = $docking_request->request_status === 'approved' ? ($docking_request->visit_stage ?? 'awaiting_arrival') : $docking_request->request_status;
+                            $step = $docking_request->progress_step();
+                            $is_owner = $docking_request->is_managed_by($current_user);
+                            $blockers = $departure_blockers[$docking_request->id] ?? [];
+                            $detail_url = route('docking-space-request.show', $docking_request->unique_id);
+                            $effective_dock = $docking_request->recommended_docking_space ?? $docking_request->requested_docking_space;
+
+                            $next_action = match (true) {
+                                $stage_key === 'submitted' && $can_approve_engineering => ['label' => 'Tinjau Engineering', 'icon' => 'ti-ruler-measure', 'url' => route('docking-approval.show', ['engineering', $docking_request->unique_id])],
+                                $stage_key === 'engineering_approved' && $can_approve_production => ['label' => 'Tinjau Produksi', 'icon' => 'ti-tool', 'url' => route('docking-approval.show', ['production', $docking_request->unique_id])],
+                                $stage_key === 'awaiting_marketing' && $is_owner => ['label' => 'Tanggapi rekomendasi', 'icon' => 'ti-message-reply', 'url' => $detail_url . '?action=marketing'],
+                                $stage_key === 'awaiting_arrival' && $can_operate => ['label' => 'Catat kedatangan', 'icon' => 'ti-ship', 'url' => $detail_url . '?action=arrival'],
+                                $stage_key === 'arrived' && $can_operate => ['label' => 'Masuk dock', 'icon' => 'ti-anchor', 'url' => $detail_url . '?action=dock'],
+                                $stage_key === 'docked' && $can_operate => ['label' => 'Undocking', 'icon' => 'ti-arrow-bar-up', 'url' => $detail_url . '?action=undock'],
+                                $stage_key === 'floating' && $can_operate => ['label' => 'Selesaikan atas air', 'icon' => 'ti-check', 'url' => $detail_url . '?action=floating'],
+                                $stage_key === 'ready_to_depart' && $blockers === [] && $can_operate => ['label' => 'Keluar galangan', 'icon' => 'ti-door-exit', 'url' => $detail_url . '?action=depart'],
+                                $docking_request->is_in_yard() && $docking_request->administration_completed_at === null && ($can_operate || $is_owner) && $stage_key === 'ready_to_depart' => ['label' => 'Konfirmasi administrasi', 'icon' => 'ti-file-check', 'url' => $detail_url . '?action=administration'],
+                                default => null,
+                            };
                         ?>
                         <tr>
                             <td>
-                                <div class="fw-medium"><?php echo e($docking_request->project?->project_code ?? '-'); ?></div>
-                                <div class="text-secondary small mt-1"><?php echo e($docking_request->ship?->name ?? '-'); ?></div>
+                                <a href="<?php echo e($detail_url); ?>" class="fw-medium text-reset"><?php echo e($docking_request->ship?->name ?? '-'); ?></a>
+                                <div class="text-secondary small"><?php echo e($docking_request->ship?->company?->name ?? '-'); ?></div>
+                                <div class="mt-1">
+                                    <?php if($docking_request->project): ?>
+                                        <span class="badge bg-blue-lt"><?php echo e($docking_request->project->project_code); ?></span>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary-lt">Belum ada proyek</span>
+                                    <?php endif; ?>
+                                    <?php if($docking_request->documents_count > 0): ?>
+                                        <span class="badge bg-secondary-lt" title="Dokumen terlampir"><i class="ti ti-paperclip"></i> <?php echo e($docking_request->documents_count); ?></span>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                             <td>
-                                <div><?php echo e(optional($docking_request->requested_start_at)->tanggal_waktu_indonesia() ?? '-'); ?></div>
-                                <div class="text-secondary small">s/d <?php echo e(optional($docking_request->requested_end_at)->tanggal_waktu_indonesia() ?? '-'); ?></div>
-                            </td>
-                            <td>
-                                <div class="fw-medium"><?php echo e($docking_request->requested_docking_space?->name ?? '-'); ?></div>
-                                <div class="text-secondary small">Ditetapkan sistem</div>
-                            </td>
-                            <td>
-                                <span class="badge <?php echo e($status_badge); ?>"><?php echo e($status_label); ?></span>
-                                <?php if($docking_request->engineering_approved_at): ?>
-                                    <div class="text-secondary small mt-1">Engineering: <?php echo e($docking_request->engineering_approver?->employee_id ?? '-'); ?>, <?php echo e($docking_request->engineering_approved_at->tanggal_waktu_indonesia()); ?></div>
+                                <div><?php echo e($docking_request->requested_start_at?->tanggal_waktu_indonesia() ?? '-'); ?></div>
+                                <div class="text-secondary small">s/d <?php echo e($docking_request->requested_end_at?->tanggal_waktu_indonesia() ?? '-'); ?></div>
+                                <?php if($docking_request->arrived_at): ?>
+                                    <div class="small text-indigo mt-1"><i class="ti ti-ship me-1"></i>Tiba <?php echo e($docking_request->arrived_at->tanggal_waktu_indonesia()); ?></div>
                                 <?php endif; ?>
-                                <?php if($docking_request->production_approved_at): ?>
-                                    <div class="text-secondary small">Produksi: <?php echo e($docking_request->production_approver?->employee_id ?? '-'); ?>, <?php echo e($docking_request->production_approved_at->tanggal_waktu_indonesia()); ?></div>
+                                <?php if($docking_request->departed_at): ?>
+                                    <div class="small text-success"><i class="ti ti-door-exit me-1"></i>Keluar <?php echo e($docking_request->departed_at->tanggal_waktu_indonesia()); ?></div>
                                 <?php endif; ?>
-                                <?php if($docking_request->request_status === 'awaiting_marketing'): ?>
-                                    <div class="small mt-1 text-orange">
-                                        Produksi menyarankan <?php echo e($docking_request->production_recommendation === 'postpone' ? 'penundaan' : 'pembatalan'); ?>
-
-                                        <?php if($docking_request->production_recommendation === 'postpone'): ?>
-                                            ke <?php echo e($docking_request->recommended_start_at?->tanggal_waktu_indonesia()); ?> s/d <?php echo e($docking_request->recommended_end_at?->tanggal_waktu_indonesia()); ?>
-
-                                        <?php endif; ?>
+                            </td>
+                            <td>
+                                <div class="fw-medium"><?php echo e($effective_dock?->name ?? 'Belum ditentukan'); ?></div>
+                                <?php if($docking_request->recommended_docking_space_id && $docking_request->recommended_docking_space_id !== $docking_request->requested_docking_space_id): ?>
+                                    <div class="text-secondary small">Rekomendasi Engineering</div>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <span class="badge <?php echo e($stage_badges[$stage_key] ?? 'bg-secondary-lt'); ?>"><?php echo e($docking_request->status_label()); ?></span>
+                                <?php if($step > 0): ?>
+                                    <div class="d-flex align-items-center gap-2 mt-2">
+                                        <div class="progress progress-sm flex-fill" role="progressbar" aria-label="Progres kunjungan" aria-valuenow="<?php echo e($step); ?>" aria-valuemin="0" aria-valuemax="7">
+                                            <div class="progress-bar <?php echo e($step === 7 ? 'bg-success' : ''); ?>" style="width: <?php echo e(round($step / 7 * 100)); ?>%"></div>
+                                        </div>
+                                        <span class="text-secondary small text-nowrap"><?php echo e($step); ?>/7</span>
                                     </div>
-                                    <div class="text-secondary small">Alasan: <?php echo e($docking_request->production_notes); ?></div>
                                 <?php endif; ?>
-                                <?php if($docking_request->marketing_response === 'decline' && $docking_request->request_status === 'engineering_approved'): ?>
-                                    <div class="text-secondary small mt-1">Keberatan customer: <?php echo e($docking_request->marketing_notes); ?></div>
-                                <?php endif; ?>
-                                <?php if($docking_request->request_status === 'rejected'): ?>
-                                    <div class="text-danger small mt-1">Ditolak <?php echo e($docking_request->rejection_stage === 'production' ? 'Produksi' : 'Engineering'); ?>: <?php echo e($docking_request->rejection_reason); ?></div>
+                                <?php if($stage_key === 'awaiting_marketing'): ?>
+                                    <div class="small text-orange mt-1">Produksi menyarankan <?php echo e($docking_request->production_recommendation === 'postpone' ? 'penundaan' : 'pembatalan'); ?></div>
+                                <?php elseif($stage_key === 'ready_to_depart' && $blockers !== []): ?>
+                                    <div class="small text-secondary mt-1"><i class="ti ti-lock me-1"></i><?php echo e($blockers[0]); ?><?php if(count($blockers) > 1): ?> (+<?php echo e(count($blockers) - 1); ?>)<?php endif; ?></div>
+                                <?php elseif($docking_request->is_in_yard() && $docking_request->administration_completed_at): ?>
+                                    <div class="small text-success mt-1"><i class="ti ti-file-check me-1"></i>Administrasi selesai</div>
+                                <?php elseif($stage_key === 'cancelled' && $docking_request->cancellation_reason): ?>
+                                    <div class="small text-secondary mt-1 text-truncate" style="max-width: 16rem" title="<?php echo e($docking_request->cancellation_reason); ?>">Alasan: <?php echo e($docking_request->cancellation_reason); ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td>
-                                <?php $__empty_2 = true; $__currentLoopData = $docking_request->documents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $document): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_2 = false; ?>
-                                    <div class="small">
-                                        <a href="<?php echo e(route('docking-space-request.documents.download', [$docking_request->unique_id, $document->unique_id])); ?>"><?php echo e($document->document_name); ?></a>
+                            <td class="text-end">
+                                <div class="btn-list flex-nowrap justify-content-end">
+                                    <?php if($next_action): ?>
+                                        <a href="<?php echo e($next_action['url']); ?>" class="btn btn-sm btn-primary text-nowrap"><i class="ti <?php echo e($next_action['icon']); ?> me-1"></i><?php echo e($next_action['label']); ?></a>
+                                    <?php else: ?>
+                                        <a href="<?php echo e($detail_url); ?>" class="btn btn-sm btn-outline-secondary text-nowrap">Detail</a>
+                                    <?php endif; ?>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-icon btn-ghost-secondary" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="Aksi lainnya">
+                                            <i class="ti ti-dots-vertical"></i>
+                                        </button>
+                                        <div class="dropdown-menu dropdown-menu-end">
+                                            <a class="dropdown-item" href="<?php echo e($detail_url); ?>"><i class="ti ti-eye me-2"></i>Lihat detail</a>
+                                            <?php if($docking_request->is_before_docking() && $docking_request->has_scheduled_slot && $is_owner): ?>
+                                                <a class="dropdown-item" href="<?php echo e(route('docking-space-request.postpone', $docking_request->unique_id)); ?>"><i class="ti ti-calendar-time me-2"></i>Tunda jadwal docking</a>
+                                            <?php endif; ?>
+                                            <?php if($docking_request->is_cancellable() && ! $docking_request->has_started_docking && $is_owner): ?>
+                                                <div class="dropdown-divider"></div>
+                                                <?php echo $__env->make('docking-space-request.partials.cancel-trigger', ['trigger_class' => 'dropdown-item text-danger', 'trigger_label' => 'Batalkan permohonan'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
-                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_2): ?>
-                                    <span class="text-secondary">-</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <div class="d-flex flex-column gap-2">
-                                    <?php if(($docking_request->request_status === 'submitted' && $can_approve_engineering) || ($docking_request->request_status === 'engineering_approved' && $can_approve_production)): ?>
-                                        <a class="btn btn-sm btn-outline-primary w-100" href="<?php echo e(route('docking-approval.show', [$docking_request->request_status === 'submitted' ? 'engineering' : 'production', $docking_request->unique_id])); ?>">Tinjau detail</a>
-                                    <?php endif; ?>
-
-                                    <?php if($docking_request->request_status === 'engineering_approved' && $can_approve_production): ?>
-                                        <?php echo $__env->make('docking-space-request.partials.review-form', ['docking_request' => $docking_request, 'route_name' => 'docking-space-request.production-review', 'approve_label' => 'Setujui (Produksi)'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
-                                    <?php endif; ?>
-
-                                    <?php if($docking_request->request_status === 'approved' && ((int) $docking_request->requested_by === (int) $current_user?->id || $current_user?->hasRole('admin'))): ?>
-                                        <a class="btn btn-sm btn-outline-warning w-100" href="<?php echo e(route('docking-space-request.postpone', $docking_request->unique_id)); ?>">Tunda docking</a>
-                                    <?php endif; ?>
-
-                                    <?php if($docking_request->request_status === 'awaiting_marketing' && ((int) $docking_request->requested_by === (int) $current_user?->id || $current_user?->hasRole('admin'))): ?>
-                                        <form method="POST" action="<?php echo e(route('docking-space-request.marketing-response', $docking_request->unique_id)); ?>" class="d-flex flex-column gap-2 js-marketing-form">
-                                            <?php echo csrf_field(); ?>
-                                            <textarea class="form-control form-control-sm" name="notes" rows="2" maxlength="2000" placeholder="Alasan keberatan customer (wajib bila keberatan)"></textarea>
-                                            <button class="btn btn-sm btn-success w-100" type="submit" name="response" value="accept">Customer setuju</button>
-                                            <button class="btn btn-sm btn-outline-danger w-100" type="submit" name="response" value="decline">Customer keberatan</button>
-                                        </form>
-                                    <?php endif; ?>
-
-                                    <?php if(in_array($docking_request->request_status, ['submitted', 'engineering_approved', 'awaiting_marketing'], true) && ((int) $docking_request->requested_by === (int) $current_user?->id || $current_user?->hasRole('admin'))): ?>
-                                        <form method="POST" action="<?php echo e(route('docking-space-request.cancel', $docking_request->unique_id)); ?>">
-                                            <?php echo csrf_field(); ?>
-                                            <button class="btn btn-sm btn-outline-secondary w-100" type="submit">Batalkan</button>
-                                        </form>
-                                    <?php endif; ?>
-
-                                    <?php if($can_manage_docking): ?>
-                                        <form method="POST" action="<?php echo e(route('docking-space-request.evaluate', $docking_request->unique_id ?? $docking_request->id)); ?>">
-                                            <?php echo csrf_field(); ?>
-                                            <button class="btn btn-sm btn-outline-primary w-100" type="submit">Evaluasi ulang</button>
-                                        </form>
-
-                                        <?php if($docking_request->request_status === 'approved'): ?>
-                                            <form method="POST" action="<?php echo e(route('docking-space-request.start-docking', $docking_request->unique_id ?? $docking_request->id)); ?>" class="d-flex flex-column gap-2 js-start-docking-form">
-                                                <?php echo csrf_field(); ?>
-                                                <input type="hidden" name="docking_space_id" value="<?php echo e($docking_request->requested_docking_space_id); ?>">
-                                                <input type="datetime-local" class="form-control form-control-sm" name="docked_at" value="<?php echo e(optional($docking_request->requested_start_at)->format('Y-m-d\TH:i')); ?>" required>
-                                                <input type="datetime-local" class="form-control form-control-sm" name="estimated_undock_at" value="<?php echo e(optional($docking_request->requested_end_at)->format('Y-m-d\TH:i')); ?>">
-                                                <button class="btn btn-sm btn-primary w-100" type="submit">Masuk dock</button>
-                                            </form>
-                                        <?php endif; ?>
-                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <tr>
-                            <td colspan="6" class="text-center text-secondary py-4">Belum ada data permohonan docking space.</td>
+                            <td colspan="5">
+                                <div class="empty py-4">
+                                    <div class="empty-icon"><i class="ti <?php echo e($lane_tabs[$lane]['icon']); ?> fs-1"></i></div>
+                                    <p class="empty-title"><?php echo e($search !== '' ? 'Tidak ada data yang cocok' : 'Belum ada data'); ?></p>
+                                    <p class="empty-subtitle text-secondary"><?php echo e($search !== '' ? 'Coba kata kunci lain atau reset pencarian.' : 'Belum ada permohonan pada tahap ini.'); ?></p>
+                                </div>
+                            </td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
+        <?php if($docking_requests->hasPages()): ?>
+            <div class="card-footer d-flex align-items-center">
+                <p class="m-0 text-secondary small">Menampilkan <?php echo e($docking_requests->firstItem()); ?>–<?php echo e($docking_requests->lastItem()); ?> dari <?php echo e($docking_requests->total()); ?> data</p>
+                <div class="ms-auto"><?php echo e($docking_requests->links()); ?></div>
+            </div>
+        <?php endif; ?>
     </div>
 <?php $__env->stopSection(); ?>
 
+<?php $__env->startSection('modal'); ?>
+    <?php echo $__env->make('docking-space-request.partials.cancel-modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+<?php $__env->stopSection(); ?>
+
 <?php $__env->startPush('scripts'); ?>
-    <script>
-        $(function () {
-            $.validator.addMethod('greaterThanOrEqual', function (value, element, param) {
-                if (!value) {
-                    return true;
-                }
-
-                const comparedValue = $(element).closest('form').find(param).val();
-                if (!comparedValue) {
-                    return true;
-                }
-
-                return new Date(value) >= new Date(comparedValue);
-            });
-
-            $('.js-review-form').each(function () {
-                $(this).validate({
-                    errorClass: 'is-invalid',
-                    errorElement: 'div',
-                    errorPlacement: function (error, element) {
-                        error.addClass('invalid-feedback');
-                        element.closest('div').append(error);
-                    },
-                    rules: { notes: { maxlength: 2000 } },
-                    messages: { notes: { maxlength: 'Catatan maksimal 2000 karakter.' } },
-                });
-            });
-
-            $('.js-review-form button[value="reject"]').on('click', function (event) {
-                const form = $(this).closest('form');
-                const notes = form.find('[name="notes"]');
-                notes.rules('add', { required: true, messages: { required: 'Alasan penolakan wajib diisi.' } });
-
-                if (!form.valid()) {
-                    event.preventDefault();
-                }
-            });
-
-            $('.js-review-form button[value="approve"]').on('click', function () {
-                $(this).closest('form').find('[name="notes"]').rules('remove', 'required');
-            });
-
-            $('.js-marketing-form').each(function () {
-                $(this).validate({
-                    errorClass: 'is-invalid',
-                    errorElement: 'div',
-                    errorPlacement: function (error, element) {
-                        error.addClass('invalid-feedback');
-                        element.closest('form').find('textarea').after(error);
-                    },
-                    rules: { notes: { maxlength: 2000 } },
-                    messages: { notes: { maxlength: 'Catatan maksimal 2000 karakter.' } },
-                });
-            });
-
-            $('.js-marketing-form button[value="decline"]').on('click', function (event) {
-                const form = $(this).closest('form');
-                form.find('[name="notes"]').rules('add', { required: true, messages: { required: 'Alasan keberatan customer wajib diisi.' } });
-
-                if (!form.valid()) {
-                    event.preventDefault();
-                }
-            });
-
-            $('.js-marketing-form button[value="accept"]').on('click', function () {
-                $(this).closest('form').find('[name="notes"]').rules('remove', 'required');
-            });
-
-            $('.js-start-docking-form').each(function () {
-                $(this).validate({
-                    errorClass: 'is-invalid',
-                    validClass: 'is-valid',
-                    errorElement: 'div',
-                    errorPlacement: function (error, element) {
-                        error.addClass('invalid-feedback');
-                        element.closest('div').append(error);
-                    },
-                    rules: {
-                        docked_at: { required: true },
-                        estimated_undock_at: {
-                            greaterThanOrEqual: '[name="docked_at"]',
-                        },
-                    },
-                    messages: {
-                        docked_at: { required: 'Waktu masuk dock wajib diisi.' },
-                        estimated_undock_at: {
-                            greaterThanOrEqual: 'Estimasi keluar dock tidak boleh lebih awal dari waktu masuk dock.',
-                        },
-                    },
-                });
-            });
-        });
-    </script>
+    <?php echo $__env->make('docking-space-request.partials.cancel-modal-script', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 <?php $__env->stopPush(); ?>
 
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /home/snowy/projects/assi-repair/resources/views/docking-space-request/index.blade.php ENDPATH**/ ?>
