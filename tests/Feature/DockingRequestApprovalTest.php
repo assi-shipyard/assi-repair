@@ -139,17 +139,22 @@ class DockingRequestApprovalTest extends TestCase
         $this->assertSame(0, ProjectDockingRequest::count());
     }
 
-    public function test_ship_particular_document_is_required(): void
+    public function test_request_can_be_submitted_without_documents(): void
     {
         Storage::fake('ship');
-        $this->make_space();
+        $space = $this->make_space();
         $ship = $this->make_ship();
+        $payload = $this->payload($ship);
+        unset($payload['documents']);
 
         $this->actingAs($this->make_user('111111111'))
-            ->post(route('docking-space-request.store'), $this->payload($ship, [
-                'documents' => [['type' => 'other', 'file' => UploadedFile::fake()->create('x.pdf', 10, 'application/pdf')]],
-            ]))
-            ->assertSessionHasErrors('documents');
+            ->post(route('docking-space-request.store'), $payload)
+            ->assertRedirect(route('docking-space-request.index'))
+            ->assertSessionHas('success');
+
+        $request = ProjectDockingRequest::firstOrFail();
+        $this->assertSame($space->id, $request->requested_docking_space_id);
+        $this->assertCount(0, $request->documents);
     }
 
     public function test_two_tier_approval_creates_scheduled_occupancy(): void

@@ -240,7 +240,7 @@ class DockingManagementController extends Controller
                 'request_status' => 'submitted',
             ]);
 
-            foreach ($data['documents'] as $index => $document) {
+            foreach ($data['documents'] ?? [] as $index => $document) {
                 $file = $request->file("documents.{$index}.file");
 
                 $docking_request->documents()->create([

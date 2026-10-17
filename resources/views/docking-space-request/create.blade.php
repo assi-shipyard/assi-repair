@@ -162,13 +162,14 @@
 
                             <div class="col-md-6">
                                 <label class="form-label" for="requested_start_at">Jadwal mulai docking</label>
-                                <input type="datetime-local" class="form-control" id="requested_start_at" name="requested_start_at" value="{{ old('requested_start_at') }}" data-date-display="long" placeholder="Pilih tanggal dan waktu" required>
+                                <input type="datetime-local" class="form-control" id="requested_start_at" name="requested_start_at" value="{{ str_replace(' ', 'T', old('requested_start_at', '')) }}" data-date-display="long" placeholder="Pilih tanggal dan waktu" required>
+                                <div class="form-hint">Format tanggal Indonesia, contoh: 31 Januari 2026, 08:00 WIB.</div>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label" for="requested_end_at">Jadwal selesai docking (estimasi)</label>
-                                <input type="datetime-local" class="form-control" id="requested_end_at" name="requested_end_at" value="{{ old('requested_end_at') }}" data-date-display="long" placeholder="Pilih tanggal dan waktu">
-                                <div class="form-hint">Waktu Indonesia Barat (WIB).</div>
+                                <input type="datetime-local" class="form-control" id="requested_end_at" name="requested_end_at" value="{{ str_replace(' ', 'T', old('requested_end_at', '')) }}" data-date-display="long" placeholder="Pilih tanggal dan waktu">
+                                <div class="form-hint">Format tanggal Indonesia, contoh: 31 Januari 2026, 08:00 WIB.</div>
                             </div>
 
                             <div class="col-12">
@@ -186,10 +187,10 @@
                             </div>
 
                             <div class="col-12">
-                                <label class="form-label required">Dokumen kapal</label>
+                                <label class="form-label">Dokumen kapal</label>
                                 <div id="document-rows" class="d-flex flex-column gap-2"></div>
                                 <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-document-row">Tambah dokumen</button>
-                                <div class="form-hint mt-1">Wajib melampirkan Ship Particular. Format: pdf, doc, docx, xls, xlsx, dwg, jpg, png (maks. 20MB per file, 10 dokumen). Dokumen akan ditinjau Engineering.</div>
+                                <div class="form-hint mt-1">Opsional. Format: pdf, doc, docx, xls, xlsx, dwg, jpg, png (maks. 20MB per file, 10 dokumen). Dokumen yang dilampirkan akan ditinjau Engineering.</div>
                                 @error('documents')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                 @foreach ($errors->get('documents.*') as $messages)
                                     @foreach ($messages as $message)<div class="text-danger small mt-1">{{ $message }}</div>@endforeach
@@ -434,11 +435,8 @@
 
             $('#add-document-row').on('click', function () { addDocumentRow('other'); });
             $('#document-rows').on('click', '.js-remove-document', function () {
-                if ($('.js-document-row').length > 1) {
-                    $(this).closest('.js-document-row').remove();
-                }
+                $(this).closest('.js-document-row').remove();
             });
-            addDocumentRow('ship_particular');
         });
     </script>
 @endpush
