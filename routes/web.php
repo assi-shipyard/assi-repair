@@ -21,6 +21,7 @@ use App\Http\Controllers\ProgressReportController;
 use App\Http\Controllers\ProjectBoqController;
 use App\Http\Controllers\ProjectJobGroupController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectContractController;
 use App\Http\Controllers\ProjectJobDocumentPageController;
 use App\Http\Controllers\RepairTypeController;
 use App\Http\Controllers\RoleController;
@@ -208,6 +209,12 @@ Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): v
         Route::put('/{id}', 'update')->name('update');
         Route::delete('/{id}', 'destroy')->name('destroy');
     });
+
+    Route::controller(ProjectContractController::class)->prefix('project/{project_id}/contract')->name('project.contract.')
+        ->whereUuid(['project_id', 'document_id'])->group(function (): void {
+            Route::put('/', 'update')->middleware('role:legal')->name('update');
+            Route::get('/documents/{document_id}', 'download')->name('download');
+        });
 
     Route::controller(ProjectBoqController::class)->prefix('project/{projectId}/job-document')->name('project.job-document.workflow.')
         ->whereUuid(['projectId', 'document', 'job', 'material'])->group(function (): void {

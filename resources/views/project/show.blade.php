@@ -29,6 +29,8 @@
 @section('content')
     @include('partials.flash')
 
+    @include('project.partials.contract')
+
     <div class="card mb-3">
         <div class="card-body">
             <div class="subheader">Buku Kamus Harga Proyek</div>
@@ -344,6 +346,7 @@
             'created' => ['plus', 'green'], 'docking_linked' => ['anchor', 'azure'], 'status_changed' => ['flag', 'purple'],
             'progress_changed' => ['progress', 'blue'], 'divisions_changed' => ['users-group', 'orange'],
             'surveyors_changed' => ['user-search', 'yellow'], 'document' => ['file-description', 'teal'], 'updated' => ['pencil', 'secondary'],
+            'contract_updated' => ['file-certificate', 'blue'],
         ];
     @endphp
     <div class="card mt-3">
@@ -364,7 +367,7 @@
                                 <div class="card-body py-2">
                                     <div class="d-flex flex-wrap justify-content-between gap-1">
                                         <div class="fw-semibold">{{ $entry['description'] }}</div>
-                                        <div class="text-secondary small" title="{{ $entry['at']?->format('d/m/Y H:i:s') }}">{{ $entry['at']?->format('d/m/Y H:i') }}</div>
+                                        <div class="text-secondary small">{{ $entry['at']?->copy()->timezone('Asia/Jakarta')->locale('id')->translatedFormat('j F Y H:i') }} WIB</div>
                                     </div>
                                     @if (! empty($entry['changes']))
                                         <ul class="list-unstyled small mb-1 mt-1">

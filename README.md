@@ -7,6 +7,33 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Project contracts
+
+Project details include **Kontrak Proyek** with a contract number, five signing
+stages (drafting, awaiting the shipyard director's signature, signed by the
+shipyard, sent to the customer, and signed by the customer), and optional
+PDF/DOC/DOCX uploads up to 20 MB. A draft can be recorded before a document
+is available. Only users explicitly assigned the `legal` role can update
+contracts or upload files; the admin role alone does not grant write access.
+Other internal users can view and download contracts through authenticated,
+project-scoped UUID routes. Customer portal access is not provided.
+
+Uploads are versioned, retaining previous files and the signing stage at upload.
+They use the private `ship` disk under `projects/{project UUID}/contracts`,
+not public storage. Contract changes and uploads are recorded transactionally
+in the database audit log and project timeline with the acting user.
+Legal users can correct a stage directly; this is manual tracking, not an
+electronic signature or an automatic document-delivery service.
+
+An optional target signing date enables a remaining-days/today/overdue alert
+on project details, calculated using the Asia/Jakarta (WIB) calendar. Clearing
+the date disables the reminder; customer signature completion suppresses it.
+No scheduler, email, or background notifications are involved.
+Run `php artisan migrate` before using the contract section.
+For 20 MB uploads, configure PHP-FPM's `upload_max_filesize` to at least `20M`
+and set `post_max_size` and NGINX's `client_max_body_size` above `20M` to allow
+for multipart form overhead.
+
 ## Kamus Harga
 
 The **Kamus Harga** menu manages independent price books. One book can be the

@@ -277,7 +277,7 @@ class ProjectController extends Controller
 
     public function show(string $id)
     {
-        $project = Project::with(['price_book', 'ship.company', 'ship.type', 'ship.classification', 'leader', 'ppc', 'divisions', 'owner_surveyors', 'created_by', 'job_documents'])
+        $project = Project::with(['contract.documents', 'price_book', 'ship.company', 'ship.type', 'ship.classification', 'leader', 'ppc', 'divisions', 'owner_surveyors', 'created_by', 'job_documents'])
             ->firstWhere('unique_id', $id);
 
         if (! $project) {
