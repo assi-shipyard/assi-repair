@@ -23,7 +23,7 @@ class StoreProjectDockingRequest extends FormRequest
             'request_notes' => 'nullable|string|max:2000',
             'documents' => 'sometimes|array|max:10',
             'documents.*.type' => ['required', 'in:' . implode(',', array_keys(DockingRequestDocument::TYPE_LABELS))],
-            'documents.*.file' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,dwg,jpg,jpeg,png|max:20480',
+            'documents.*.file' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,dwg,jpg,jpeg,png|max:51200',
         ];
     }
 
@@ -45,7 +45,7 @@ class StoreProjectDockingRequest extends FormRequest
             'documents.*.file.required' => 'File dokumen wajib diunggah.',
             'documents.*.file.file' => 'File dokumen harus berupa file yang valid.',
             'documents.*.file.mimes' => 'Format file harus pdf, doc, docx, xls, xlsx, dwg, jpg, jpeg, atau png.',
-            'documents.*.file.max' => 'Ukuran file maksimal 20MB.',
+            'documents.*.file.max' => 'Ukuran file maksimal 50MB.',
             'request_notes.string' => 'Catatan permohonan harus berupa teks.',
             'request_notes.max' => 'Catatan permohonan maksimal 2000 karakter.',
         ];

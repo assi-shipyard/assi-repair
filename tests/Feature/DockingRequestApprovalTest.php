@@ -77,18 +77,41 @@ class DockingRequestApprovalTest extends TestCase
     {
         $space = $this->make_space();
         $small_ship = $this->make_ship();
-        $large_ship = $this->make_ship(['name' => 'KM Besar', 'length_overall' => 150]);
+        $large_ship = $this->make_ship(['name' => 'KM Besar', 'breadth' => 25]);
+        DockingOccupancy::create([
+            'ship_id' => $small_ship->id,
+            'docking_space_id' => $space->id,
+            'occupancy_status' => 'occupied',
+            'docked_at' => '2026-10-01 08:00',
+        ]);
 
         $this->actingAs($this->make_user('111111111'))
             ->get(route('docking-space-request.create'))
             ->assertOk()
             ->assertSeeInOrder(['Kapal (Vessel)', 'Proyek yang sudah ada'])
             ->assertSee('id="request_scope_ship" value="ship" checked', false)
+            ->assertSee('accept: false', false)
+            ->assertSee('maks. 50MB per file', false)
+            ->assertSee('Panduan awal kesesuaian kapal', false)
+            ->assertSee('>Lebar</th>', false)
+            ->assertSee('>Draft</th>', false)
+            ->assertSee('>GT</th>', false)
+            ->assertSee('>Kapasitas</th>', false)
+            ->assertSee('Pilih docking space (opsional)', false)
+            ->assertSee('<option value="'.$space->id.'"', false)
+            ->assertSee($space->name, false)
+            ->assertDontSee('undefined')
+            ->assertDontSee('Sistem akan mengevaluasi otomatis')
             ->assertSee('Repair List dari Owner', false)
             ->assertSee('data-date-display="long"', false)
             ->assertViewHas('dock_options_by_ship', function ($options) use ($small_ship, $large_ship, $space): bool {
-                return $options[$small_ship->id][$space->id]['is_compatible']
-                    && ! $options[$large_ship->id][$space->id]['is_compatible'];
+                return $options[$small_ship->id][$space->id]['checks']['breadth']
+                    && $options[$small_ship->id][$space->id]['checks']['draft']
+                    && $options[$small_ship->id][$space->id]['checks']['tonnage']
+                    && ! $options[$small_ship->id][$space->id]['checks']['capacity']
+                    && ! $options[$large_ship->id][$space->id]['checks']['breadth']
+                    && $options[$large_ship->id][$space->id]['checks']['draft']
+                    && $options[$large_ship->id][$space->id]['checks']['tonnage'];
             });
     }
 
@@ -112,6 +135,26 @@ class DockingRequestApprovalTest extends TestCase
         ]);
     }
 
+    public function test_docking_request_document_limit_is_50_mb_per_file(): void
+    {
+        Storage::fake('ship');
+        $this->make_space();
+        $user = $this->make_user('111111111');
+        $ship = $this->make_ship();
+
+        $this->actingAs($user)
+            ->post(route('docking-space-request.store'), $this->payload($ship, [
+                'documents' => [['type' => 'ship_particular', 'file' => UploadedFile::fake()->create('particular.pdf', 51200, 'application/pdf')]],
+            ]))
+            ->assertSessionHas('success');
+
+        $this->actingAs($user)
+            ->post(route('docking-space-request.store'), $this->payload($ship, [
+                'documents' => [['type' => 'ship_particular', 'file' => UploadedFile::fake()->create('particular-large.pdf', 51201, 'application/pdf')]],
+            ]))
+            ->assertSessionHasErrors('documents.0.file');
+    }
+
     public function test_schedule_conflict_is_rejected(): void
     {
         Storage::fake('ship');
@@ -127,16 +170,21 @@ class DockingRequestApprovalTest extends TestCase
         $this->assertSame(1, ProjectDockingRequest::count());
     }
 
-    public function test_ship_too_large_for_every_space_is_rejected(): void
+    public function test_request_can_be_submitted_when_ship_does_not_fit_selected_dock(): void
     {
         Storage::fake('ship');
-        $this->make_space();
+        $space = $this->make_space();
 
         $this->actingAs($this->make_user('111111111'))
-            ->post(route('docking-space-request.store'), $this->payload($this->make_ship(['length_overall' => 150])))
-            ->assertSessionHas('error');
+            ->post(route('docking-space-request.store'), $this->payload(
+                $this->make_ship(['length_overall' => 150]),
+                ['requested_docking_space_id' => $space->id]
+            ))
+            ->assertRedirect(route('docking-space-request.index'))
+            ->assertSessionHas('success');
 
-        $this->assertSame(0, ProjectDockingRequest::count());
+        $request = ProjectDockingRequest::firstOrFail();
+        $this->assertSame($space->id, $request->requested_docking_space_id);
     }
 
     public function test_request_can_be_submitted_without_documents(): void
@@ -344,7 +392,10 @@ class DockingRequestApprovalTest extends TestCase
         $engineer = $this->make_user('222222222', 'approve-docking-engineering');
         $producer = $this->make_user('333333333', 'approve-docking-production');
 
-        $this->actingAs($engineer)->post(route('docking-space-request.store'), $this->payload($this->make_ship()));
+        $this->actingAs($engineer)->post(route('docking-space-request.store'), $this->payload(
+            $this->make_ship(),
+            ['requested_docking_space_id' => $requested->id]
+        ));
         $request = ProjectDockingRequest::firstOrFail();
         $this->assertSame($requested->id, $request->requested_docking_space_id);
 

@@ -97,16 +97,21 @@ class DockingManagementController extends Controller
             ->get();
 
         $docking_spaces = DockingSpace::query()
+            ->where('status', 'active')
+            ->withCount('current_docking_occupancies')
             ->orderBy('name')
             ->get();
 
         $dock_options_by_ship = $ships->mapWithKeys(function (Ship $ship) use ($docking_spaces, $capacity_service): array {
             return [$ship->id => $docking_spaces->mapWithKeys(function (DockingSpace $space) use ($ship, $capacity_service): array {
-                $evaluation = $capacity_service->evaluate_ship_for_space($ship, $space, 0);
+                $evaluation = $capacity_service->evaluate_ship_for_space(
+                    $ship,
+                    $space,
+                    $space->current_docking_occupancies_count
+                );
 
                 return [$space->id => [
-                    'is_compatible' => $evaluation['is_compatible'],
-                    'reason' => implode(' ', $evaluation['violations']),
+                    'checks' => $evaluation['checks'],
                 ]];
             })];
         });
@@ -213,10 +218,7 @@ class DockingManagementController extends Controller
             $ship_id = (int) $data['ship_id'];
         }
 
-        $ship = Ship::findOrFail($ship_id);
-
         $check = $check_service->check(
-            $ship,
             (string) $data['requested_start_at'],
             $data['requested_end_at'] ?? null,
             ! empty($data['requested_docking_space_id']) ? (int) $data['requested_docking_space_id'] : null

@@ -69,7 +69,7 @@
                     <ul class="list-unstyled mb-0">
                         <li class="d-flex gap-2 mb-3">
                             <span class="text-primary"><i class="ti ti-info-circle"></i></span>
-                            <span>Preferensi docking space bersifat opsional. Jika kosong, sistem akan mengevaluasi otomatis dari semua ruang docking yang tersedia.</span>
+                            <span>Marketing dapat memilih docking space preferensi. Pilihan ini tidak membatasi pemeriksaan Engineering.</span>
                         </li>
                         <li class="d-flex gap-2 mb-3">
                             <span class="text-primary"><i class="ti ti-calendar-time"></i></span>
@@ -77,7 +77,7 @@
                         </li>
                         <li class="d-flex gap-2 mb-0">
                             <span class="text-primary"><i class="ti ti-alert-circle"></i></span>
-                            <span>Sistem memeriksa bentrok jadwal dan kesesuaian dimensi kapal. Jika lolos, permohonan diteruskan ke persetujuan Engineering, lalu Produksi.</span>
+                            <span>Sistem memeriksa bentrok jadwal. Engineering menilai kesesuaian kapal dan menentukan docking space sebelum persetujuan Produksi.</span>
                         </li>
                     </ul>
                 </div>
@@ -149,27 +149,47 @@
                             <div class="col-md-6">
                                 <label class="form-label">Docking space preferensi</label>
                                 <select class="form-select" name="requested_docking_space_id">
-                                    <option value="">Sistem akan mengevaluasi otomatis</option>
+                                    <option value="">Pilih docking space (opsional)</option>
                                     <?php $__currentLoopData = $docking_spaces; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $docking_space): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                        <option value="<?php echo e($docking_space->id); ?>" data-label="<?php echo e($docking_space->name); ?>" <?php if(old('requested_docking_space_id') == $docking_space->id): echo 'selected'; endif; ?>>
+                                        <option value="<?php echo e($docking_space->id); ?>" <?php if(old('requested_docking_space_id') == $docking_space->id): echo 'selected'; endif; ?>>
                                             <?php echo e($docking_space->name); ?>
 
                                         </option>
                                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 </select>
-                                <div class="form-hint mt-1">Kosongkan bila Anda ingin sistem memilih ruang docking terbaik berdasarkan ketersediaan.</div>
-                                <div id="dock-compatibility-hint" class="form-hint mt-1" role="status"></div>
+                                <div class="form-hint mt-1">Marketing dapat memilih preferensi. Engineering akan menentukan docking space yang sesuai setelah perhitungan teknis.</div>
+                                <div class="mt-3">
+                                    <div class="form-label">Panduan awal kesesuaian kapal</div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-vcenter table-bordered mb-1">
+                                            <thead>
+                                                <tr>
+                                                    <th class="text-center">Docking space</th>
+                                                    <th class="text-center">Lebar</th>
+                                                    <th class="text-center">Draft</th>
+                                                    <th class="text-center">GT</th>
+                                                    <th class="text-center">Kapasitas</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="dock-guide-body">
+                                                <tr><td colspan="5" class="text-secondary">Pilih kapal untuk melihat panduan spesifikasi.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div id="dock-compatibility-hint" class="form-hint" role="status">Setiap sel menunjukkan hasil pemeriksaan kriteria tersebut: centang berarti sesuai dan silang berarti tidak sesuai. Kapasitas mencerminkan okupansi saat ini. Panduan ini tidak menghalangi pengajuan; Engineering tetap melakukan perhitungan teknis.</div>
+                                </div>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label" for="requested_start_at">Jadwal mulai docking</label>
-                                <input type="datetime-local" class="form-control" id="requested_start_at" name="requested_start_at" value="<?php echo e(old('requested_start_at')); ?>" data-date-display="long" placeholder="Pilih tanggal dan waktu" required>
+                                <input type="datetime-local" class="form-control" id="requested_start_at" name="requested_start_at" value="<?php echo e(str_replace(' ', 'T', old('requested_start_at', ''))); ?>" data-date-display="long" placeholder="Pilih tanggal dan waktu" required>
+                                <div class="form-hint">Format tanggal Indonesia, contoh: 31 Januari 2026, 08:00 WIB.</div>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label" for="requested_end_at">Jadwal selesai docking (estimasi)</label>
-                                <input type="datetime-local" class="form-control" id="requested_end_at" name="requested_end_at" value="<?php echo e(old('requested_end_at')); ?>" data-date-display="long" placeholder="Pilih tanggal dan waktu">
-                                <div class="form-hint">Waktu Indonesia Barat (WIB).</div>
+                                <input type="datetime-local" class="form-control" id="requested_end_at" name="requested_end_at" value="<?php echo e(str_replace(' ', 'T', old('requested_end_at', ''))); ?>" data-date-display="long" placeholder="Pilih tanggal dan waktu">
+                                <div class="form-hint">Format tanggal Indonesia, contoh: 31 Januari 2026, 08:00 WIB.</div>
                             </div>
 
                             <div class="col-12">
@@ -180,17 +200,17 @@
                                                 <div class="fw-semibold">Preview jadwal</div>
                                                 <div id="schedule-preview" class="text-secondary small mt-1">Masukkan jadwal mulai dan selesai untuk melihat estimasi durasi.</div>
                                             </div>
-                                            <span id="space-preference-summary" class="badge bg-azure-lt text-azure">Evaluasi otomatis</span>
+                                            <span id="space-preference-summary" class="badge bg-azure-lt text-azure">Engineering menentukan</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="col-12">
-                                <label class="form-label required">Dokumen kapal</label>
+                                <label class="form-label">Dokumen kapal</label>
                                 <div id="document-rows" class="d-flex flex-column gap-2"></div>
                                 <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-document-row">Tambah dokumen</button>
-                                <div class="form-hint mt-1">Wajib melampirkan Ship Particular. Format: pdf, doc, docx, xls, xlsx, dwg, jpg, png (maks. 20MB per file, 10 dokumen). Dokumen akan ditinjau Engineering.</div>
+                                <div class="form-hint mt-1">Opsional. Format: pdf, doc, docx, xls, xlsx, dwg, jpg, jpeg, png (maks. 50MB per file, 10 dokumen). Dokumen yang dilampirkan akan ditinjau Engineering.</div>
                                 <?php $__errorArgs = ['documents'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -227,37 +247,55 @@ unset($__errorArgs, $__bag); ?>
         $(function () {
             const dock_options_by_ship = <?php echo json_encode($dock_options_by_ship, 15, 512) ?>;
 
+            function update_dock_guide(ship_id) {
+                const guide_body = $('#dock-guide-body').empty();
+                const options = dock_options_by_ship[ship_id] || {};
+                const check_columns = [
+                    ['breadth', 'Lebar'],
+                    ['draft', 'Draft'],
+                    ['tonnage', 'GT'],
+                    ['capacity', 'Kapasitas'],
+                ];
+
+                if (!ship_id) {
+                    guide_body.append($('<tr>').append(
+                        $('<td>').attr('colspan', check_columns.length + 1).addClass('text-secondary').text('Pilih kapal untuk melihat panduan spesifikasi.')
+                    ));
+                    return;
+                }
+
+                Object.entries(options).forEach(function ([space_id, result]) {
+                    const space_name = $('select[name="requested_docking_space_id"] option[value="' + space_id + '"]').text().trim();
+                    const row = $('<tr>').append($('<td>').text(space_name));
+
+                    check_columns.forEach(function ([check_key, label]) {
+                        const matches = result.checks && result.checks[check_key] === true;
+                        const status = matches ? 'Sesuai' : 'Perlu ditinjau';
+                        const indicator = $('<span>')
+                            .addClass(matches ? 'text-success' : 'text-danger')
+                            .attr('title', label + ': ' + status)
+                            .append($('<i>').addClass(matches ? 'ti ti-check' : 'ti ti-x').attr('aria-hidden', 'true'))
+                            .append($('<span>').addClass('visually-hidden').text(status));
+
+                        row.append($('<td>').addClass('text-center').append(indicator));
+                    });
+
+                    guide_body.append(row);
+                });
+
+                if (guide_body.children().length === 0) {
+                    guide_body.append($('<tr>').append(
+                        $('<td>').attr('colspan', check_columns.length + 1).addClass('text-secondary').text('Belum ada docking space aktif.')
+                    ));
+                }
+            }
+
             function update_dock_options() {
                 const is_project = $('input[name="request_scope"]:checked').val() === 'project';
                 const ship_id = is_project
                     ? $('select[name="project_id"] option:selected').data('ship-id')
                     : $('select[name="ship_id"]').val();
-                const options = dock_options_by_ship[ship_id] || {};
-                const select = $('select[name="requested_docking_space_id"]');
-                let compatible_count = 0;
-                let cleared = false;
-
-                select.find('option[value!=""]').each(function () {
-                    const result = options[this.value];
-                    const compatible = !!result && result.is_compatible;
-                    this.disabled = !compatible;
-                    this.textContent = $(this).data('label') + (result && !compatible ? ' - ' + result.reason : '');
-                    if (compatible) {
-                        compatible_count++;
-                    }
-                    if (this.selected && !compatible) {
-                        cleared = true;
-                    }
-                });
-
-                if (cleared) {
-                    select.val('');
-                }
-
-                $('#dock-compatibility-hint').text(!ship_id
-                    ? 'Pilih kapal terlebih dahulu untuk melihat dok yang sesuai.'
-                    : (cleared ? 'Preferensi sebelumnya tidak sesuai untuk kapal ini dan telah dikosongkan. ' : '')
-                        + compatible_count + ' dok sesuai spesifikasi. Ketersediaan jadwal diperiksa kembali saat permohonan dikirim.');
+                update_dock_guide(ship_id);
             }
 
             function formatDuration(startDate, endDate) {
@@ -311,7 +349,7 @@ unset($__errorArgs, $__bag); ?>
 
                 const dockingValue = $('select[name="requested_docking_space_id"]').val();
                 const dockingLabel = $('select[name="requested_docking_space_id"] option:selected').text().trim();
-                const selectedDocking = dockingValue ? dockingLabel : 'Evaluasi otomatis';
+                const selectedDocking = dockingValue ? dockingLabel : 'Engineering menentukan';
                 $('#space-preference-summary').text(selectedDocking);
 
                 const startValue = $('input[name="requested_start_at"]').val();
@@ -437,16 +475,17 @@ unset($__errorArgs, $__bag); ?>
                     '</div>'
                 );
                 $('#document-rows').append(row);
-                row.find('input[type="file"]').rules('add', { required: true, messages: { required: 'File dokumen wajib diunggah.' } });
+                row.find('input[type="file"]').rules('add', {
+                    required: true,
+                    accept: false,
+                    messages: { required: 'File dokumen wajib diunggah.' },
+                });
             }
 
             $('#add-document-row').on('click', function () { addDocumentRow('other'); });
             $('#document-rows').on('click', '.js-remove-document', function () {
-                if ($('.js-document-row').length > 1) {
-                    $(this).closest('.js-document-row').remove();
-                }
+                $(this).closest('.js-document-row').remove();
             });
-            addDocumentRow('ship_particular');
         });
     </script>
 <?php $__env->stopPush(); ?>
