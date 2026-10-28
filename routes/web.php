@@ -212,7 +212,7 @@ Route::middleware(['auth', 'account_access', 'audit_log'])->group(function (): v
 
     Route::controller(ProjectContractController::class)->prefix('project/{project_id}/contract')->name('project.contract.')
         ->whereUuid(['project_id', 'document_id'])->group(function (): void {
-            Route::put('/', 'update')->middleware('role:legal')->name('update');
+            Route::put('/', 'update')->middleware('role:legal|admin')->name('update');
             Route::get('/documents/{document_id}', 'download')->name('download');
         });
 

@@ -25,6 +25,7 @@ class ProjectContractController extends Controller
         );
 
         return redirect()->route('project.show', $project->unique_id)
+            ->with('contract_updated', true)
             ->with('success', 'Kontrak proyek berhasil diperbarui.');
     }
 

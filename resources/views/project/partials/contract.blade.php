@@ -61,7 +61,7 @@
             <p class="text-secondary">Kontrak belum dicatat. Tim legal dapat mencatat nomor, memperbarui proses penandatanganan, dan mengunggah dokumen kontrak.</p>
         @endif
 
-        @role('legal')
+        @hasanyrole('legal|admin')
             <form id="project-contract-form" action="{{ route('project.contract.update', $project->unique_id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
@@ -99,8 +99,8 @@
                 </div>
             </form>
         @else
-            <div class="text-secondary small">Hanya pengguna dengan peran legal yang dapat mengubah kontrak dan mengunggah dokumen.</div>
-        @endrole
+            <div class="text-secondary small">Hanya pengguna dengan peran legal atau admin yang dapat mengubah kontrak dan mengunggah dokumen.</div>
+        @endhasanyrole
     </div>
     @if ($contract && $contract->documents->isNotEmpty())
         <div class="table-responsive">
@@ -126,7 +126,7 @@
     @endif
 </div>
 
-@role('legal')
+@hasanyrole('legal|admin')
     @push('scripts')
         <script>
             $(function () {
@@ -156,4 +156,4 @@
             });
         </script>
     @endpush
-@endrole
+@endhasanyrole

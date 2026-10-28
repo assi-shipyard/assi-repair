@@ -9,12 +9,13 @@
 
 ## Project contracts
 
-Project details include **Kontrak Proyek** with a contract number, five signing
+The **Kontrak** tab immediately after **Dokumen** on project details includes
+**Kontrak Proyek** with a contract number, five signing
 stages (drafting, awaiting the shipyard director's signature, signed by the
 shipyard, sent to the customer, and signed by the customer), and optional
 PDF/DOC/DOCX uploads up to 20 MB. A draft can be recorded before a document
-is available. Only users explicitly assigned the `legal` role can update
-contracts or upload files; the admin role alone does not grant write access.
+is available. Users assigned the `legal` or `admin` role can update contracts
+or upload files. Administrator write access is currently enabled temporarily.
 Other internal users can view and download contracts through authenticated,
 project-scoped UUID routes. Customer portal access is not provided.
 

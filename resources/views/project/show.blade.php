@@ -29,8 +29,6 @@
 @section('content')
     @include('partials.flash')
 
-    @include('project.partials.contract')
-
     <div class="card mb-3">
         <div class="card-body">
             <div class="subheader">Buku Kamus Harga Proyek</div>
@@ -62,6 +60,7 @@
         $request_labels = ['draft' => 'Draf', 'submitted' => 'Diajukan', 'engineering_approved' => 'Disetujui Engineering', 'approved' => 'Disetujui', 'rejected' => 'Ditolak', 'cancelled' => 'Dibatalkan'];
         $docs_final = $project->job_documents->whereIn('status', ['approved', 'locked', 'final'])->count();
         $spec = fn ($v, $unit = '') => filled($v) ? $v.($unit ? ' '.$unit : '') : '-';
+        $contract_tab_active = session('contract_updated', false) || $errors->hasAny(['contract_number', 'status', 'signing_due_date', 'document']);
     @endphp
 
     <div class="card mb-3">
@@ -155,17 +154,18 @@
         </div>
         <div class="card-header border-top">
             <ul class="nav nav-tabs card-header-tabs" role="tablist">
-                <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab_ringkasan" role="tab">Ringkasan</a></li>
+                <li class="nav-item"><a class="nav-link {{ $contract_tab_active ? '' : 'active' }}" data-bs-toggle="tab" href="#tab_ringkasan" role="tab">Ringkasan</a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_docking" role="tab">Docking <span class="badge bg-secondary-lt ms-1">{{ $occupancies->count() }}</span></a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_kapal" role="tab">Data Kapal</a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_surveyor" role="tab">Surveyor <span class="badge bg-secondary-lt ms-1">{{ $project->owner_surveyors->count() }}</span></a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_dokumen" role="tab">Dokumen <span class="badge bg-secondary-lt ms-1">{{ $project->job_documents->count() }}</span></a></li>
+                <li class="nav-item"><a class="nav-link {{ $contract_tab_active ? 'active' : '' }}" data-bs-toggle="tab" href="#tab_kontrak" role="tab">Kontrak</a></li>
             </ul>
         </div>
     </div>
 
     <div class="tab-content">
-        <div class="tab-pane active show" id="tab_ringkasan" role="tabpanel">
+        <div class="tab-pane {{ $contract_tab_active ? '' : 'active show' }}" id="tab_ringkasan" role="tabpanel">
             <div class="row row-cards">
                 <div class="col-lg-8">
                     <div class="card mb-3">
@@ -338,6 +338,9 @@
                     </table>
                 </div>
             </div>
+        </div>
+        <div class="tab-pane {{ $contract_tab_active ? 'active show' : '' }}" id="tab_kontrak" role="tabpanel">
+            @include('project.partials.contract')
         </div>
     </div>
 

@@ -125,18 +125,44 @@ class ProjectContractTest extends TestCase
         $this->assertDatabaseCount('project_contracts', 1);
     }
 
-    public function test_only_legal_can_write_even_when_the_user_is_an_admin(): void
+    public function test_other_internal_users_cannot_write_but_admins_can_manage_contracts(): void
     {
         $this->actingAs($this->viewer);
         $this->get(route('project.show', $this->project->unique_id))
             ->assertOk()->assertDontSee('id="project-contract-form"', false);
         $this->put(route('project.contract.update', $this->project->unique_id), $this->payload(['document' => $this->pdf()]))
             ->assertForbidden();
-        $this->viewer->assignRole(Role::findOrCreate('admin'));
-        $this->put(route('project.contract.update', $this->project->unique_id), $this->payload())
-            ->assertForbidden();
         $this->assertDatabaseCount('project_contracts', 0);
         $this->assertSame([], Storage::disk('ship')->allFiles());
+        $this->viewer->assignRole(Role::findOrCreate('admin'));
+        $this->get(route('project.show', $this->project->unique_id))
+            ->assertOk()->assertSee('id="project-contract-form"', false);
+        $this->put(route('project.contract.update', $this->project->unique_id), $this->payload(['document' => $this->pdf()]))
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertDatabaseHas('project_contracts', ['project_id' => $this->project->id, 'status' => 'drafting']);
+        $document = project_contract_document::firstOrFail();
+        $this->assertSame($this->viewer->id, $document->uploaded_by);
+        Storage::disk('ship')->assertExists($document->document_path);
+    }
+
+    public function test_contract_management_is_in_a_tab_after_documents(): void
+    {
+        $this->actingAs($this->legal)->get(route('project.show', $this->project->unique_id))
+            ->assertOk()
+            ->assertSeeInOrder(['href="#tab_dokumen"', 'href="#tab_kontrak"'], false)
+            ->assertSeeInOrder(['id="tab_kontrak"', 'id="project-contract"', 'id="project-contract-form"'], false);
+    }
+
+    public function test_contract_tab_remains_open_after_saving_or_validation_errors(): void
+    {
+        $this->actingAs($this->legal);
+        $this->followingRedirects()
+            ->put(route('project.contract.update', $this->project->unique_id), $this->payload())
+            ->assertOk()->assertSee('class="tab-pane active show" id="tab_kontrak"', false);
+        $this->followingRedirects()->from(route('project.show', $this->project->unique_id))
+            ->put(route('project.contract.update', $this->project->unique_id), $this->payload(['contract_number' => '']))
+            ->assertOk()->assertSee('class="tab-pane active show" id="tab_kontrak"', false)
+            ->assertSee('Nomor kontrak wajib diisi.');
     }
 
     public function test_guests_and_customer_accounts_cannot_access_contract_endpoints(): void

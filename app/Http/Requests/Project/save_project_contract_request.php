@@ -13,7 +13,7 @@ class save_project_contract_request extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasRole('legal') ?? false;
+        return $this->user()?->hasAnyRole(['legal', 'admin']) ?? false;
     }
 
     public function rules(): array

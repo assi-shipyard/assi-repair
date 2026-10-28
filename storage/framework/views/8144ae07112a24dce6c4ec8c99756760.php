@@ -58,6 +58,7 @@
         $request_labels = ['draft' => 'Draf', 'submitted' => 'Diajukan', 'engineering_approved' => 'Disetujui Engineering', 'approved' => 'Disetujui', 'rejected' => 'Ditolak', 'cancelled' => 'Dibatalkan'];
         $docs_final = $project->job_documents->whereIn('status', ['approved', 'locked', 'final'])->count();
         $spec = fn ($v, $unit = '') => filled($v) ? $v.($unit ? ' '.$unit : '') : '-';
+        $contract_tab_active = session('contract_updated', false) || $errors->hasAny(['contract_number', 'status', 'signing_due_date', 'document']);
     ?>
 
     <div class="card mb-3">
@@ -154,17 +155,18 @@
         </div>
         <div class="card-header border-top">
             <ul class="nav nav-tabs card-header-tabs" role="tablist">
-                <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab_ringkasan" role="tab">Ringkasan</a></li>
+                <li class="nav-item"><a class="nav-link <?php echo e($contract_tab_active ? '' : 'active'); ?>" data-bs-toggle="tab" href="#tab_ringkasan" role="tab">Ringkasan</a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_docking" role="tab">Docking <span class="badge bg-secondary-lt ms-1"><?php echo e($occupancies->count()); ?></span></a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_kapal" role="tab">Data Kapal</a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_surveyor" role="tab">Surveyor <span class="badge bg-secondary-lt ms-1"><?php echo e($project->owner_surveyors->count()); ?></span></a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab_dokumen" role="tab">Dokumen <span class="badge bg-secondary-lt ms-1"><?php echo e($project->job_documents->count()); ?></span></a></li>
+                <li class="nav-item"><a class="nav-link <?php echo e($contract_tab_active ? 'active' : ''); ?>" data-bs-toggle="tab" href="#tab_kontrak" role="tab">Kontrak</a></li>
             </ul>
         </div>
     </div>
 
     <div class="tab-content">
-        <div class="tab-pane active show" id="tab_ringkasan" role="tabpanel">
+        <div class="tab-pane <?php echo e($contract_tab_active ? '' : 'active show'); ?>" id="tab_ringkasan" role="tabpanel">
             <div class="row row-cards">
                 <div class="col-lg-8">
                     <div class="card mb-3">
@@ -338,6 +340,9 @@
                 </div>
             </div>
         </div>
+        <div class="tab-pane <?php echo e($contract_tab_active ? 'active show' : ''); ?>" id="tab_kontrak" role="tabpanel">
+            <?php echo $__env->make('project.partials.contract', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        </div>
     </div>
 
     <?php
@@ -345,6 +350,7 @@
             'created' => ['plus', 'green'], 'docking_linked' => ['anchor', 'azure'], 'status_changed' => ['flag', 'purple'],
             'progress_changed' => ['progress', 'blue'], 'divisions_changed' => ['users-group', 'orange'],
             'surveyors_changed' => ['user-search', 'yellow'], 'document' => ['file-description', 'teal'], 'updated' => ['pencil', 'secondary'],
+            'contract_updated' => ['file-certificate', 'blue'],
         ];
     ?>
     <div class="card mt-3">
@@ -365,7 +371,7 @@
                                 <div class="card-body py-2">
                                     <div class="d-flex flex-wrap justify-content-between gap-1">
                                         <div class="fw-semibold"><?php echo e($entry['description']); ?></div>
-                                        <div class="text-secondary small" title="<?php echo e($entry['at']?->format('d/m/Y H:i:s')); ?>"><?php echo e($entry['at']?->format('d/m/Y H:i')); ?></div>
+                                        <div class="text-secondary small"><?php echo e($entry['at']?->copy()->timezone('Asia/Jakarta')->locale('id')->translatedFormat('j F Y H:i')); ?> WIB</div>
                                     </div>
                                     <?php if(! empty($entry['changes'])): ?>
                                         <ul class="list-unstyled small mb-1 mt-1">
